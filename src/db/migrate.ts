@@ -1,20 +1,25 @@
 import Database from 'better-sqlite3'
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
-import { drizzle } from 'drizzle-orm/better-sqlite3'
+import fs from 'fs'
+import path from 'path'
 import { getDatabase } from '@/config/db'
-import * as schema from '@/db/schema'
 
-export async function runMigrations(db?: Database): Promise<void> {
+export function runMigrations(db?: Database): void {
   const instance = db ?? getDatabase()
   const dbInstance = instance as Database
-  const drizzleDb = drizzle(dbInstance, { schema })
 
-  try {
-    await migrate(drizzleDb, {
-      migrationsPath: 'src/db/migrations',
-    })
-  } catch (error) {
-    console.error('Migration failed:', error)
-    throw error
+  const migrationsDir = path.join(process.cwd(), 'src', 'db', 'migrations')
+  const sqlFiles = fs
+    .readdirSync(migrationsDir)
+    .filter((f) => f.endsWith('.sql'))
+    .sort()
+
+  for (const file of sqlFiles) {
+    const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8')
+    try {
+      dbInstance.exec(sql)
+    } catch (error) {
+      console.error(`Migration failed on ${file}:`, error)
+      throw error
+    }
   }
 }
