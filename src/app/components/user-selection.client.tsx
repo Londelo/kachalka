@@ -76,7 +76,7 @@ function UserCard({ user, isActive, onSelect }: UserCardProps) {
       )}
 
       <div className="flex items-center gap-6">
-        <div className="flex h-24 w-24 items-center justify-center border-4 border-primary bg-surface text-3xl font-black uppercase text-on-surface">
+        <div className={`flex h-24 w-24 items-center justify-center border-4 ${isActive ? 'border-primary' : 'border-on-surface'} bg-surface text-3xl font-black uppercase text-on-surface`}>
           {initials}
         </div>
         <div>
