@@ -353,6 +353,41 @@ This ensures the UI looks like the mock but behaves according to the plan.
 
 ---
 
+## Visual Verification Strategy (Playwright MCP)
+
+After implementing each phase's design, visually verify the running app against the corresponding mock HTML file using Playwright MCP. This catches styling gaps that manual code review misses.
+
+**Process:**
+
+1. **Ensure dev server is running** — `npm run dev` on `localhost:3000`
+2. **Navigate to the page** — Use `browser_navigate` to load the relevant route
+3. **Capture screenshot** — Use `browser_take_screenshot` to get a visual snapshot
+4. **Capture accessibility snapshot** — Use `browser_snapshot` for DOM structure verification
+5. **Read the mock HTML** — Open `docs/mocks/<page>.html` and compare structure, styling, and layout
+6. **Document differences** — Report issues by severity:
+   - **SEVERITY 1** — Missing elements (entire components not rendered)
+   - **SEVERITY 2** — Color/system broken (wrong colors, missing shadows, wrong fonts)
+   - **SEVERITY 3** — Typography/layout issues (wrong fonts, spacing mismatches, missing icons)
+   - **SEVERITY 4** — Neo-brutalist styling missing (shadows, borders, press effects)
+   - **SEVERITY 5** — Minor polish (hover states, edge case styling)
+7. **Fix identified issues** — Address each severity level in order
+8. **Re-verify** — Repeat steps 2-4 until all issues are resolved
+9. **Confirm match** — When zero issues remain, the phase UI is complete
+
+**Key checks per phase:**
+- Color utilities render correctly (computed styles match design tokens)
+- Fonts load and apply (Epilogue, Inter, Space Grotesk)
+- Material Symbols icons display (not showing text fallbacks)
+- Neo-brutalist shadows visible (hard offset, no blur)
+- Borders correct (thick 4px, solid vs dashed)
+- Active press effects work (`:active` translate + shadow collapse)
+- Layout matches grid/padding/spacing from mock
+- No duplicate elements or misplaced components
+
+**This process should be applied after every phase that has a corresponding mock HTML file.**
+
+---
+
 ## Implementation Order Summary
 
 ```
