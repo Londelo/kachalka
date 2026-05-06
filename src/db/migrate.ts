@@ -3,13 +3,19 @@ import fs from 'fs'
 import path from 'path'
 import { getDatabase } from '@/config/db'
 
-let migrated = false
+const REQUIRED_TABLES = ['users', 'exercises', 'user_routines', 'workout_logs']
 
 export function runMigrations(db?: Database): void {
-  if (migrated) return
-
   const instance = db ?? getDatabase()
   const dbInstance = instance as Database
+
+  const tables = dbInstance
+    .prepare("SELECT name FROM sqlite_master WHERE type='table'")
+    .all() as { name: string }[]
+  const tableNames = tables.map((t) => t.name)
+
+  const needsMigration = REQUIRED_TABLES.some((t) => !tableNames.includes(t))
+  if (!needsMigration) return
 
   const migrationsDir = path.join(process.cwd(), 'src', 'db', 'migrations')
   const sqlFiles = fs
@@ -26,6 +32,4 @@ export function runMigrations(db?: Database): void {
       throw error
     }
   }
-
-  migrated = true
 }
