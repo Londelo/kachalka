@@ -3,7 +3,11 @@ import fs from 'fs'
 import path from 'path'
 import { getDatabase } from '@/config/db'
 
+let migrated = false
+
 export function runMigrations(db?: Database): void {
+  if (migrated) return
+
   const instance = db ?? getDatabase()
   const dbInstance = instance as Database
 
@@ -22,4 +26,6 @@ export function runMigrations(db?: Database): void {
       throw error
     }
   }
+
+  migrated = true
 }
