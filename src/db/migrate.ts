@@ -5,9 +5,9 @@ import { getDatabase } from '@/config/db'
 
 const REQUIRED_TABLES = ['users', 'exercises', 'user_routines', 'workout_logs']
 
-export function runMigrations(db?: Database): void {
+export function runMigrations(db?: ReturnType<typeof Database>): void {
   const instance = db ?? getDatabase()
-  const dbInstance = instance as Database
+  const dbInstance = instance as ReturnType<typeof Database>
 
   const tables = dbInstance
     .prepare("SELECT name FROM sqlite_master WHERE type='table'")

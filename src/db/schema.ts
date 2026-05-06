@@ -39,7 +39,7 @@ export const workoutLogs = sqliteTable('workout_logs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   userId: integer('user_id').references(() => users.id).notNull(),
   exerciseId: integer('exercise_id').references(() => exercises.id).notNull(),
-  date: text('date', { mode: 'date' }).notNull(),
+  date: text('date').notNull(),
   sets: text('sets', { mode: 'json' }).notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(new Date()),

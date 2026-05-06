@@ -14,7 +14,7 @@ function mapRowToUser(row: Record<string, unknown>): User {
   }
 }
 
-export function createSqliteUserRepository(db: Database): UserRepository {
+export function createSqliteUserRepository(db: ReturnType<typeof Database>): UserRepository {
   const queryDb = drizzle(db, { schema })
 
   return {

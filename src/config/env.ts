@@ -9,7 +9,7 @@ interface EnvConfig {
 }
 
 export function validateEnv(): EnvConfig {
-  const nodeEnv = process.env.NODE_ENV
+  const nodeEnv = process.env.NODE_ENV as string
   const databasePath = process.env.DATABASE_PATH
 
   if (!nodeEnv || nodeEnv === '') {
@@ -25,7 +25,7 @@ export function validateEnv(): EnvConfig {
   }
 
   return {
-    nodeEnv,
+    nodeEnv: nodeEnv as ValidNodeEnv,
     databasePath,
   }
 }

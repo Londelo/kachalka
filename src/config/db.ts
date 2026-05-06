@@ -6,9 +6,9 @@ import * as schema from '@/db/schema'
 
 const dbPath = path.join(process.cwd(), 'data', 'kachalka.db')
 
-let dbInstance: Database | null = null
+let dbInstance: ReturnType<typeof Database> | null = null
 
-export function getDatabase(): Database {
+export function getDatabase(): ReturnType<typeof Database> {
   if (!dbInstance) {
     fs.mkdirSync(path.dirname(dbPath), { recursive: true })
     const db = new Database(dbPath)
