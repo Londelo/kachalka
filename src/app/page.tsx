@@ -1,10 +1,8 @@
-import '@/app/globals.css'
+import UserSelectionClient from '@/app/components/user-selection.client'
+import { getUsersAction } from '@/features/user/user-server-actions'
 
-export default function Home() {
-  return (
-    <div>
-      <h1 className="text-2xl font-bold">Welcome to Kachalka</h1>
-      <p className="mt-2 text-gray-600">Select a user or create a new one.</p>
-    </div>
-  )
+export default async function Home() {
+  const users = await getUsersAction()
+
+  return <UserSelectionClient initialUsers={users} />
 }

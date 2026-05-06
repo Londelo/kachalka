@@ -8,7 +8,7 @@ import {
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull().unique(),
-  email: text('email').notNull(),
+  email: text('email').notNull().default(''),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(new Date()),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
 })
