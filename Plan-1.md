@@ -1,190 +1,171 @@
-# Lifting App — Implementation Plan
+# Plan-1 — Phase 1: Users
 
-## Overview
+## WHAT
 
-A Next.js web app for tracking weightlifting workouts, backed by SQLite via `better-sqlite3`. Built using Clean Architecture principles organized as deep feature modules.
-
-**Reference documents:**
-- [Business Logic & UX Plan](lifting-app.md) — the "what"
-- [Architecture Plan](lifting-app-architecture.md) — the "how"
-- [Data Flow & Relationships](lifting-app-data-flow.md) — how data connects
-
----
-
-## Roadmap
-
-### Phase 0 — Scaffolding
-
-Set up the project foundation.
+Build the user management feature: entity definition, repository interface and SQLite implementation, use cases for creating and listing users, Next.js server action wrappers, and the user selection/create page. This is the app's entry point — users must exist before they can track exercises, routines, or workouts.
 
 **Files to create:**
-- `package.json` with Next.js, Drizzle, better-sqlite3 dependencies
-- `tsconfig.json` with path aliases and strict mode
-- `next.config.ts`
-- `src/app/layout.tsx` — root layout with nav bar shell
-- `src/app/globals.css` — base styles
-- `src/config/db.ts` — SQLite singleton with Drizzle initialization
-- `src/config/env.ts` — environment variable validation
-- `src/db/schema.ts` — Drizzle table definitions (users, exercises, user_routines, workout_logs)
-- `src/db/migrate.ts` — migration runner for app startup
-- `src/shared/errors/app-error.ts` — base error class
-- `src/shared/utils/volume.ts` — volume calculation helper
-- `src/shared/utils/date.ts` — date formatting helpers
-- `src/shared/types/day-of-week.ts` — DayOfWeek type
-- `.gitignore` (include `data/` directory)
-- `data/` directory for the SQLite file
-
-**Acceptance criteria:**
-- `npm run dev` starts the app and shows a blank page
-- SQLite database file is created on first request
-- All 4 tables exist with correct schema
-
----
-
-### Phase 1 — Users
-
-User selection and creation. The foundation — every other feature is per-user.
-
-**Files to create:**
-- `src/features/user/user-entity.ts` — User type, UserId value object, name validation
-- `src/features/user/user-repository.ts` — UserRepository interface
+- `src/features/user/user-entity.ts` — User domain type, UserId value object, name validation factory
+- `src/features/user/user-repository.ts` — UserRepository interface definition
 - `src/features/user/create-user.ts` — CreateUser use case
 - `src/features/user/get-users.ts` — GetUsers use case
 - `src/features/user/user-server-actions.ts` — Next.js server action wrappers
-- `src/features/user/user-repo-impl.ts` — Drizzle + SQLite implementation
-- `src/app/page.tsx` — User selection page (list of users + add new)
+- `src/features/user/user-repo-impl.ts` — Drizzle + SQLite repository implementation
+- `src/app/page.tsx` — User selection page (list + create form)
+- `tests/features/user/user-entity.test.ts` — Unit tests for entity validation
+- `tests/features/user/create-user.test.ts` — Unit tests for CreateUser use case
+- `tests/features/user/get-users.test.ts` — Unit tests for GetUsers use case
+- `tests/features/user/user-repo-impl.test.ts` — Integration tests against in-memory SQLite
 
 **Acceptance criteria:**
 - Can create a new user from the selection page
-- Can select an existing user and get redirected
-- User names are validated (not empty, max 100 chars)
+- Can select an existing user and get redirected (via session/cookie to `src/app/today/page.tsx`)
+- User names are validated (not empty, max 100 chars, trimmed)
 - Users are stored in SQLite and listed on reload
+- Duplicate names are rejected (users table has UNIQUE constraint on name)
+- All repository interfaces are tested with in-memory SQLite
 
----
+#### [src/features/user/user-entity.ts](src/features/user/user-entity.ts)
 
-### Phase 2 — Exercises
+**UserId value object**
+- Wraps a number in an object with a `value` property
+- Private constructor — only create via `UserId.make(n)`
+- `UserId.make(n)` validates n is a non-negative integer, returns `{ value: n }` or throws
 
-Shared global exercise pool with ownership semantics.
+**User domain type**
+- `{ id: UserId, name: string }`
 
-**Files to create:**
-- `src/features/exercise/exercise-entity.ts` — Exercise type
-- `src/features/exercise/exercise-repository.ts` — ExerciseRepository interface
-- `src/features/exercise/create-exercise.ts` — CreateExercise use case (with ownership)
-- `src/features/exercise/rename-exercise.ts` — RenameExercise use case (owner-only)
-- `src/features/exercise/delete-exercise.ts` — DeleteExercise use case (only if not in routines)
-- `src/features/exercise/list-exercises.ts` — ListExercises use case
-- `src/features/exercise/exercise-server-actions.ts` — Server action wrappers
-- `src/features/exercise/exercise-repo-impl.ts` — SQLite implementation
+**createUser(name)**
+- Trim whitespace from name
+- If empty after trim: throw Error('Name cannot be empty')
+- If length > 100: throw Error('Name too long')
+- Return `{ id: { value: 0 }, name: trimmedName }` (id placeholder, assigned by DB)
 
-**Acceptance criteria:**
-- Users can create exercises (creator becomes owner)
-- Only the owner can rename or delete their exercise
-- Renaming cascades automatically (queries use exercise ID, not name)
-- Can't delete an exercise that's in someone's routine
+#### [src/features/user/user-repository.ts](src/features/user/user-repository.ts)
 
----
+**UserRepository interface**
+- `findById(id: number): User | undefined` — find by primary key
+- `findByName(name: string): User | undefined` — find by unique name
+- `findAll(): User[]` — list all users ordered by name
+- `create(user: User): User` — insert and return persisted user (with assigned id)
+- `delete(id: number): void` — soft delete not required yet
 
-### Phase 3 — Routines
+#### [src/features/user/create-user.ts](src/features/user/create-user.ts)
 
-Per-user exercise-to-day assignments.
+**CreateUser class**
+- Constructor takes `UserRepository`
+- `execute(name: string): User`
+  - Validate name via `createUser(name)` from entity
+  - Check if user with same name already exists via `repo.findByName(name)`
+  - If exists: throw Error('User already exists')
+  - Persist via `repo.create(user)`
+  - Return persisted user
 
-**Files to create:**
-- `src/features/routine/routine-entity.ts` — RoutineAssignment type
-- `src/features/routine/routine-repository.ts` — RoutineRepository interface
-- `src/features/routine/assign-exercise.ts` — AssignExercise use case (no duplicates)
-- `src/features/routine/remove-exercise.ts` — RemoveExercise use case
-- `src/features/routine/get-user-routine.ts` — GetUserRoutine use case
-- `src/features/routine/routine-server-actions.ts` — Server action wrappers
-- `src/features/routine/routine-repo-impl.ts` — SQLite implementation
-- `src/app/profile/page.tsx` — Routine setup page (days + exercise assignments)
+#### [src/features/user/get-users.ts](src/features/user/get-users.ts)
 
-**Acceptance criteria:**
-- Users can assign exercises to days of the week
-- Can't assign the same exercise twice on the same day
-- Can remove exercises from days
-- Routine is organized by day when fetched (matches UI shape)
+**GetUsers class**
+- Constructor takes `UserRepository`
+- `execute(): User[]`
+  - Call `repo.findAll()`
+  - Return the user list
 
----
+#### [src/features/user/user-server-actions.ts](src/features/user/user-server-actions.ts)
 
-### Phase 4 — Workout Logging
+**createUserAction(name: string): Promise<{ success: boolean; user?: User; error?: string }>**
+- Validate name is a non-empty string on the server side
+- Wire: `getDb()` → `SqliteUserRepository(db)` → `CreateUser(repo)` → `execute(name)`
+- On success: return `{ success: true, user: createdUser }`
+- On error: return `{ success: false, error: errorMessage }`
 
-The core feature — log sets, reps, and weight for today's exercises.
+**getUsersAction(): Promise<User[]>**
+- Wire: `getDb()` → `SqliteUserRepository(db)` → `GetUsers(repo)` → `execute()`
+- Return the user array
 
-**Files to create:**
-- `src/features/workout/workout-entity.ts` — WorkoutLog, Set types, calculateVolume
-- `src/features/workout/workout-repository.ts` — WorkoutRepository interface
-- `src/features/workout/log-workout.ts` — LogWorkout use case
-- `src/features/workout/update-workout.ts` — UpdateWorkout use case
-- `src/features/workout/delete-workout.ts` — DeleteWorkout use case
-- `src/features/workout/get-today-exercises.ts` — GetTodayExercises use case
-- `src/features/workout/workout-server-actions.ts` — Server action wrappers
-- `src/features/workout/workout-repo-impl.ts` — SQLite implementation
-- `src/app/today/page.tsx` — Today's workout page (exercise cards + set logging modal)
+#### [src/features/user/user-repo-impl.ts](src/features/user/user-repo-impl.ts)
 
-**Acceptance criteria:**
-- Today's page shows exercises scheduled for the current day
-- Users can log sets (reps + weight) for each exercise
-- Last session's numbers appear as placeholders
-- Users can add/remove sets within a session
-- Multiple sessions per day are supported
-- Volume is calculated correctly: Σ(reps × weight)
+**SqliteUserRepository implements UserRepository**
+- Constructor takes `Database` from better-sqlite3
+- `findById(id)` — prepare `SELECT * FROM users WHERE id = ?`, return mapped User or undefined
+- `findByName(name)` — prepare `SELECT * FROM users WHERE name = ?`, return mapped User or undefined
+- `findAll()` — prepare `SELECT * FROM users ORDER BY name`, return mapped User[]
+- `create(user)` — prepare `INSERT INTO users (name) VALUES (?) RETURNING *`, map row to User with `UserId.make(row.id)`
+- `delete(id)` — prepare `DELETE FROM users WHERE id = ?`, run
 
----
+#### [src/app/page.tsx](src/app/page.tsx)
 
-### Phase 5 — History
+**UserSelectionPage (Server Component)**
+- Fetch user list via `getUsersAction()`
+- Render:
+  - Heading: "Select your user"
+  - List of existing users as clickable cards/buttons
+  - Text input for new user name
+  - "Add" button to trigger `createUserAction(name)`
+- On user selection: set session/cookie with userId, redirect to `src/app/today/page.tsx`
+- On new user creation: refresh list, auto-select the new user, redirect to `src/app/today/page.tsx`
+- Handle error state: display error message if creation fails (e.g., duplicate name)
 
-View, edit, and delete past workout logs.
+#### [tests/features/user/user-entity.test.ts](tests/features/user/user-entity.test.ts)
 
-**Files to create:**
-- `src/features/workout/get-workout-history.ts` — GetWorkoutHistory use case (update existing file)
-- `src/features/workout/get-user-volume.ts` — GetUserVolume use case (update existing file)
-- `src/app/history/page.tsx` — History page (scrollable, grouped by date)
+Use cases to test:
+- Happy path: valid name returns User with trimmed name and placeholder id
+- Trim: leading/trailing whitespace is trimmed before validation
+- Empty string: throws Error('Name cannot be empty')
+- Whitespace-only string: throws Error('Name cannot be empty')
+- Too long: 101-char name throws Error('Name too long')
+- Exactly 100 chars: accepted
+- UserId.make: positive integer creates value object
+- UserId.make: zero is accepted (edge case)
+- UserId.make: negative number throws
+- UserId.make: non-integer throws
+- UserId.make: null/undefined throws
 
-**Acceptance criteria:**
-- History shows past workouts grouped by date, newest first
-- Each entry shows exercise name, number of sets, total volume
-- Can click into an entry to see/set-level details
-- Can edit or delete past entries
+#### [tests/features/user/create-user.test.ts](tests/features/user/create-user.test.ts)
 
----
+Use cases to test:
+- Happy path: valid name creates user and returns persisted user with id
+- Duplicate name: throws Error('User already exists')
+- Empty name: throws from entity validation
+- Repo failure: throws when repo.create throws
 
-### Phase 6 — Progress Chart
+#### [tests/features/user/get-users.test.ts](tests/features/user/get-users.test.ts)
 
-Bar chart of volume over time per exercise.
+Use cases to test:
+- Empty database: returns empty array
+- Single user: returns array with one user
+- Multiple users: returns array sorted by name
+- Repo returns undefined fields: filters them out
 
-**Files to create:**
-- `src/features/chart/chart-entity.ts` — ChartDataPoint type
-- `src/features/chart/chart-repository.ts` — ChartRepository interface
-- `src/features/chart/chart-service.ts` — ChartService use case
-- `src/features/chart/chart-server-actions.ts` — Server action wrappers
-- `src/features/chart/chart-repo-impl.ts` — SQLite aggregation queries
-- `src/app/progress/page.tsx` — Progress chart page (dropdown + bar chart)
-- `src/app/config/page.tsx` — Config page (routine editor + delete account)
+#### [tests/features/user/user-repo-impl.test.ts](tests/features/user/user-repo-impl.test.ts)
 
-**Acceptance criteria:**
-- User selects an exercise from a dropdown
-- Bar chart shows volume over time (one bar per logged session)
-- Hovering over a bar shows date, individual sets, total volume
-- Shows "No data yet" when appropriate
+Use cases to test:
+- Integration: create → findByName → findById returns the same user
+- Integration: findAll returns all created users
+- Integration: delete removes user from findAll results
+- Integration: findByName for non-existent user returns undefined
+- Integration: findById for non-existent user returns undefined
+- Setup/teardown: uses in-memory SQLite (`:memory:`) with Drizzle schema migration per test
 
----
+## WHY
 
-## Implementation Order Summary
+Users are the identity boundary for all data in this app. Every exercise, routine, and workout log is scoped to a user. Without users, no other feature can function. This phase also establishes the deep module pattern (entity → repository interface → use case → server action → implementation) that all subsequent phases will follow. Getting this right ensures consistency across the entire codebase.
 
-```
-Phase 0 — Scaffolding          (project setup, DB, folder structure)
-    ↓
-Phase 1 — Users                (user selection, creation, auth shell)
-    ↓
-Phase 2 — Exercises            (exercise pool, ownership, CRUD)
-    ↓
-Phase 3 — Routines             (assign exercises to days)
-    ↓
-Phase 4 — Workout Logging      (log sets, today's page) ← core feature
-    ↓
-Phase 5 — History              (view/edit/delete past logs)
-    ↓
-Phase 6 — Progress Chart       (volume chart, config page)
-```
+## QUESTIONS
 
-Each phase builds on the previous one. No phase depends on anything after it.
+**For you to answer:**
+  • Should we persist the selected userId in a cookie, localStorage, or a server-side session? Cookie is framework-agnostic but localStorage survives server restarts.
+  • Do we need soft-delete for users (to preserve exercise ownership when a user leaves), or is hard-delete acceptable for v1?
+  • Should the redirect after user selection go directly to `src/app/today/page.tsx`, or should we check if the user has a routine set up first and redirect to profile setup if empty?
+
+**You can ask me:**
+  • "What should happen if a user is deleted but owns exercises someone else uses in their routine?"
+  • "Should we support user avatars or initials for the selection page UI?"
+  • "How should the today page behave for a user with no routine — blank page or a guided setup?"
+
+## CRITIQUES
+
+  • The UserId value object adds indirection that may be overkill for a simple autoincrement integer — could just use `number` directly and save boilerplate. Worth it only if we plan to add value-object semantics (equality, serialization) later.
+  • Server actions duplicate input validation that the entity layer already does — this is intentional for security (defense in depth), but means every action needs two validation points.
+  • No auth mechanism means any browser can access any user's data if the userId is guessed — acceptable for v1 since this is a personal workout tracker, but should be flagged that this is not a multi-tenant secure design.
+  • The `src/app/page.tsx` handles both listing and creation, which means it grows as we add features (avatar, initials, etc.). Consider if a separate component should handle the "add user" form to keep the page file thin.
+  • Redirecting to `src/app/today/page.tsx` immediately assumes the user has a routine — if they don't, the today page will show "No workout scheduled." This is actually the desired UX per the business logic doc, but it means the today page MUST handle the empty-routine case gracefully.
+

@@ -12,6 +12,15 @@ A Next.js web app for tracking weightlifting workouts, backed by SQLite via `bet
 - [Data Flow & Relationships](lifting-app-data-flow.md) — how data connects
 - [Design Mocks](designmocks.html) — visual identity, layout, and component patterns
 
+## Orchestrator Instructions
+
+When executing work against this roadmap, team leads and orchestrators MUST:
+
+- **Save plans** — any implementation plan derived from this roadmap goes in `docs/plans/` (e.g. `docs/plans/Phase-1-Users.md`)
+- **Save reports** — upon completing a phase, leave a session report in `docs/reports/` (e.g. `docs/reports/report-phase-1-users.md`)
+
+These directories are the single source of truth for planning artifacts and phase completion reports. Do not scatter them elsewhere.
+
 ---
 
 ## Design System
