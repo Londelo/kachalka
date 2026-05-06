@@ -340,6 +340,19 @@ Bar chart of volume over time per exercise.
 
 ---
 
+## Mock Usage Guidelines
+
+When implementing phases from mock HTML files in `docs/mocks/`:
+
+1. **Use what works** — visual styling, layout patterns, and component shapes from mocks are the UI reference
+2. **Discard misaligned data** — any mock data (placeholder stats, hardcoded images, fake metrics) that does not align with the plan's data model should be left out; replace with real data or appropriate placeholders
+3. **Discard misaligned elements** — any mock UI element (badges, sections, images) that has no corresponding feature or data in the plan should be omitted
+4. **Preserve the design system** — colors, typography, neo-brutalist styling, and layout patterns are always preserved regardless of data availability
+
+This ensures the UI looks like the mock but behaves according to the plan.
+
+---
+
 ## Implementation Order Summary
 
 ```

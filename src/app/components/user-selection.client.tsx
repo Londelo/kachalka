@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createUserAction, getUsersAction } from '@/features/user/user-server-actions'
+import { createUserAction } from '@/features/user/user-server-actions'
 
 interface UserSelectionClientProps {
   initialUsers: { id: { value: number }; name: string }[]
@@ -12,11 +12,17 @@ export default function UserSelectionClient({
   initialUsers,
 }: UserSelectionClientProps) {
   const router = useRouter()
+  const [users, setUsers] = useState(initialUsers)
+  const [showModal, setShowModal] = useState(false)
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [users, setUsers] = useState(initialUsers)
+  const [creating, setCreating] = useState(false)
 
   async function handleCreate() {
+    if (!name.trim()) return
+    setCreating(true)
+    setError(null)
+
     const result = await createUserAction(name)
 
     if (result.success && result.user) {
@@ -25,6 +31,8 @@ export default function UserSelectionClient({
     } else {
       setError(result.error ?? 'Failed to create user')
     }
+
+    setCreating(false)
   }
 
   function handleSelect(userId: number): void {
@@ -33,57 +41,160 @@ export default function UserSelectionClient({
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold">Select your user</h1>
+    <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[120px] pb-[140px]">
+      <div className="mb-12 w-full text-center">
+        <h2 className="font-headline-xl text-headline-xl uppercase text-on-surface">
+          SELECT COMMANDER
+        </h2>
+        <div className="mt-2 h-1 w-full bg-on-surface" />
+      </div>
 
-      {error && (
-        <p className="mt-3 rounded bg-red-50 p-3 text-sm text-red-700">
-          {error}
-        </p>
+      <div className="grid w-full grid-cols-1 gap-8 md:grid-cols-2">
+        {users.map((user, index) => (
+          <UserCard
+            key={user.id.value}
+            user={user}
+            isActive={index === 0}
+            onSelect={() => handleSelect(user.id.value)}
+          />
+        ))}
+
+        <QuickAddCard />
+      </div>
+
+      <div className="mt-8 w-full px-6">
+        <button
+          type="button"
+          onClick={() => setShowModal(true)}
+          className="flex w-full items-center justify-center gap-4 border-4 border-on-surface bg-primary py-4 font-headline-md text-headline-md uppercase text-on-primary neo-shadow-sm transition-all active-press"
+        >
+          <span
+            className="material-symbols-outlined"
+            style={{ fontVariationSettings: "'FILL' 1" }}
+          >
+            person_add
+          </span>
+          NEW RECRUIT
+        </button>
+      </div>
+
+      {showModal && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowModal(false)
+          }}
+        >
+          <div className="w-full max-w-sm border-4 border-on-surface bg-surface-container-high p-6 neo-shadow">
+            <h3 className="mb-4 font-headline-md text-headline-md uppercase text-on-surface">
+              NEW RECRUIT
+            </h3>
+
+            {error && (
+              <p className="mb-3 rounded bg-error-container p-3 text-sm text-error">
+                {error}
+              </p>
+            )}
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                handleCreate()
+              }}
+              className="flex gap-3"
+            >
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Recruit name"
+                className="flex-1 border-4 border-on-surface bg-surface px-4 py-2 font-label-bold text-on-surface placeholder:text-on-surface-variant focus:outline-none"
+                autoFocus
+              />
+              <button
+                type="submit"
+                disabled={creating || !name.trim()}
+                className="border-4 border-on-surface bg-primary px-6 py-2 font-label-bold uppercase text-on-primary neo-shadow-sm disabled:opacity-50 active-press"
+              >
+                {creating ? '...' : 'ADD'}
+              </button>
+            </form>
+          </div>
+        </div>
       )}
+    </main>
+  )
+}
 
-      {users.length > 0 && (
-        <div className="mt-4 space-y-2">
-          <h2 className="text-sm font-semibold text-gray-500">Existing users</h2>
-          <ul className="space-y-2">
-            {users.map((user) => (
-              <li key={user.id.value}>
-                <button
-                  type="button"
-                  onClick={() => handleSelect(user.id.value)}
-                  className="w-full rounded border px-4 py-2 text-left hover:bg-gray-50"
-                >
-                  {user.name}
-                </button>
-              </li>
-            ))}
-          </ul>
+interface UserCardProps {
+  user: { id: { value: number }; name: string }
+  isActive: boolean
+  onSelect: () => void
+}
+
+function UserCard({ user, isActive, onSelect }: UserCardProps) {
+  const initials = user.name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className="group relative cursor-pointer border-4 border-on-surface bg-surface-container-high p-6 neo-shadow transition-all active-press"
+    >
+      {isActive && (
+        <div className="absolute right-0 top-0 border-l-4 border-b-4 border-on-surface bg-primary px-4 py-1 font-label-bold text-label-bold uppercase text-on-primary">
+          ACTIVE
         </div>
       )}
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          setError(null)
-          handleCreate()
-        }}
-        className="mt-6 flex gap-2"
-      >
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="New user name"
-          className="flex-1 rounded border px-3 py-2 text-sm"
-        />
-        <button
-          type="submit"
-          className="rounded bg-black px-4 py-2 text-sm text-white"
-        >
-          Add
-        </button>
-      </form>
-    </div>
+      <div className="flex items-center gap-6">
+        <div className="flex h-24 w-24 items-center justify-center border-4 border-primary bg-surface text-3xl font-black uppercase text-on-surface">
+          {initials}
+        </div>
+        <div>
+          <h3 className="font-headline-lg text-headline-lg uppercase text-on-surface">
+            {user.name}
+          </h3>
+          <p className="font-label-mono text-label-mono font-bold text-primary">
+            LVL 1 BEGINNER
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-4">
+        <div className="bg-on-surface p-2">
+          <p className="font-label-mono text-[10px] uppercase text-background">
+            TOTAL LOAD
+          </p>
+          <p className="font-label-bold text-headline-md text-background">0 KG</p>
+        </div>
+        <div className="bg-primary p-2">
+          <p className="font-label-mono text-[10px] uppercase text-on-primary">
+            MAX SQUAT
+          </p>
+          <p className="font-label-bold text-headline-md text-on-primary">0 KG</p>
+        </div>
+      </div>
+    </button>
+  )
+}
+
+function QuickAddCard() {
+  return (
+    <button
+      type="button"
+      className="flex cursor-pointer items-center justify-center border-4 border-dashed border-on-surface bg-surface-variant p-6 neo-shadow transition-colors hover:bg-on-surface hover:text-background active-press"
+    >
+      <div className="text-center">
+        <span className="material-symbols-outlined mb-2 block text-[48px]">add_circle</span>
+        <p className="font-headline-md text-headline-md uppercase">QUICK ADD</p>
+      </div>
+    </button>
   )
 }
 

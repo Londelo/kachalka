@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react'
 import './globals.css'
 import { runMigrations } from '@/db/migrate'
+import Header from '@/app/components/header'
+import BottomNav from '@/app/components/bottom-nav'
 
 export const metadata = {
-  title: 'Kachalka — Lifting Tracker',
+  title: 'IRON COMMAND',
   description: 'Track your weightlifting workouts',
 }
 
@@ -11,19 +13,20 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   runMigrations()
   return (
     <html lang="en">
-      <body className="min-h-screen bg-gray-50 text-gray-900">
-        <nav className="border-b bg-white px-4 py-3">
-          <div className="mx-auto flex max-w-4xl items-center justify-between">
-            <a href="/" className="text-lg font-bold">Kachalka</a>
-            <div className="flex gap-4">
-              <a href="/today" className="text-sm text-gray-600 hover:text-gray-900">Today</a>
-              <a href="/history" className="text-sm text-gray-600 hover:text-gray-900">History</a>
-              <a href="/progress" className="text-sm text-gray-600 hover:text-gray-900">Progress</a>
-              <a href="/config" className="text-sm text-gray-600 hover:text-gray-900">Config</a>
-            </div>
-          </div>
-        </nav>
-        <main className="mx-auto max-w-4xl px-4 py-6">{children}</main>
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Epilogue:wght@800;900&family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500&display=swap"
+          rel="stylesheet"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="bg-background text-on-surface font-body-md">
+        <Header />
+        <main>{children}</main>
+        <BottomNav activeTab="CONFIG" />
       </body>
     </html>
   )
