@@ -1,0 +1,119 @@
+import { describe, it, expect, afterEach } from 'vitest'
+import Database from 'better-sqlite3'
+import { drizzle } from 'drizzle-orm/better-sqlite3'
+import * as schema from '@/db/schema'
+import { createSqliteUserRepository } from '@/features/user/user-repo-impl'
+import type { UserRepository } from '@/features/user/user-repository'
+
+function setupDb(): Database {
+  const db = new Database(':memory:')
+  db.pragma('journal_mode = WAL')
+  db.pragma('foreign_keys = ON')
+  return db
+}
+
+function runMigration(db: Database): void {
+  db.exec(`
+    CREATE TABLE users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      name TEXT NOT NULL UNIQUE,
+      email TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+      is_active INTEGER NOT NULL DEFAULT 1
+    )
+  `)
+}
+
+describe('createSqliteUserRepository', () => {
+  afterEach(() => {
+    // close any open db connections
+  })
+
+  it('creates a user and retrieves by name', () => {
+    const db = setupDb()
+    runMigration(db)
+    const repo = createSqliteUserRepository(db)
+
+    const user = repo.create({ id: { value: 0 }, name: 'Alice' })
+
+    expect(user.name).toBe('Alice')
+    expect(user.id.value).toBe(1)
+
+    const found = repo.findByName('Alice')
+    expect(found).toBeDefined()
+    expect(found?.name).toBe('Alice')
+    expect(found?.id.value).toBe(1)
+  })
+
+  it('finds a user by id', () => {
+    const db = setupDb()
+    runMigration(db)
+    const repo = createSqliteUserRepository(db)
+
+    const user = repo.create({ id: { value: 0 }, name: 'Bob' })
+
+    const found = repo.findById(user.id.value)
+    expect(found).toBeDefined()
+    expect(found?.name).toBe('Bob')
+  })
+
+  it('returns undefined for non-existent user by id', () => {
+    const db = setupDb()
+    runMigration(db)
+    const repo = createSqliteUserRepository(db)
+
+    const found = repo.findById(999)
+    expect(found).toBeUndefined()
+  })
+
+  it('returns undefined for non-existent user by name', () => {
+    const db = setupDb()
+    runMigration(db)
+    const repo = createSqliteUserRepository(db)
+
+    const found = repo.findByName('Nobody')
+    expect(found).toBeUndefined()
+  })
+
+  it('returns all created users', () => {
+    const db = setupDb()
+    runMigration(db)
+    const repo = createSqliteUserRepository(db)
+
+    repo.create({ id: { value: 0 }, name: 'Charlie' })
+    repo.create({ id: { value: 0 }, name: 'Alice' })
+    repo.create({ id: { value: 0 }, name: 'Bob' })
+
+    const all = repo.findAll()
+
+    expect(all).toHaveLength(3)
+    expect(all[0].name).toBe('Alice')
+    expect(all[1].name).toBe('Bob')
+    expect(all[2].name).toBe('Charlie')
+  })
+
+  it('deletes a user', () => {
+    const db = setupDb()
+    runMigration(db)
+    const repo = createSqliteUserRepository(db)
+
+    const user = repo.create({ id: { value: 0 }, name: 'Dave' })
+    repo.delete(user.id.value)
+
+    const all = repo.findAll()
+    expect(all).toHaveLength(0)
+
+    const found = repo.findById(user.id.value)
+    expect(found).toBeUndefined()
+  })
+
+  it('rejects duplicate names', () => {
+    const db = setupDb()
+    runMigration(db)
+    const repo = createSqliteUserRepository(db)
+
+    repo.create({ id: { value: 0 }, name: 'Eve' })
+
+    expect(() => repo.create({ id: { value: 0 }, name: 'Eve' })).toThrow()
+  })
+})
