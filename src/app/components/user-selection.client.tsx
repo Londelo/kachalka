@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import NewRecruitButton from '@/app/components/new-recruit-button'
 import { createUserAction } from '@/features/user/user-server-actions'
 
 interface UserSelectionClientProps {
@@ -13,27 +14,6 @@ export default function UserSelectionClient({
 }: UserSelectionClientProps) {
   const router = useRouter()
   const [users, setUsers] = useState(initialUsers)
-  const [showModal, setShowModal] = useState(false)
-  const [name, setName] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [creating, setCreating] = useState(false)
-
-  async function handleCreate() {
-    if (!name.trim()) return
-    setCreating(true)
-    setError(null)
-
-    const result = await createUserAction(name)
-
-    if (result.success && result.user) {
-      setCookie('kachalka.userId', String(result.user.id.value))
-      router.push('/today')
-    } else {
-      setError(result.error ?? 'Failed to create user')
-    }
-
-    setCreating(false)
-  }
 
   function handleSelect(userId: number): void {
     setCookie('kachalka.userId', String(userId))
@@ -63,65 +43,8 @@ export default function UserSelectionClient({
       </div>
 
       <div className="mt-8 w-full px-6">
-        <button
-          type="button"
-          onClick={() => setShowModal(true)}
-          className="flex w-full items-center justify-center gap-4 border-4 border-on-surface bg-primary py-4 font-headline-md text-headline-md uppercase text-on-primary neo-shadow-sm transition-all active-press"
-        >
-          <span
-            className="material-symbols-outlined"
-            style={{ fontVariationSettings: "'FILL' 1" }}
-          >
-            person_add
-          </span>
-          NEW RECRUIT
-        </button>
+        <NewRecruitButton />
       </div>
-
-      {showModal && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowModal(false)
-          }}
-        >
-          <div className="w-full max-w-sm border-4 border-on-surface bg-surface-container-high p-6 neo-shadow">
-            <h3 className="mb-4 font-headline-md text-headline-md uppercase text-on-surface">
-              NEW RECRUIT
-            </h3>
-
-            {error && (
-              <p className="mb-3 rounded bg-error-container p-3 text-sm text-error">
-                {error}
-              </p>
-            )}
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                handleCreate()
-              }}
-              className="flex gap-3"
-            >
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Recruit name"
-                className="flex-1 border-4 border-on-surface bg-surface px-4 py-2 font-label-bold text-on-surface placeholder:text-on-surface-variant focus:outline-none"
-                autoFocus
-              />
-              <button
-                type="submit"
-                disabled={creating || !name.trim()}
-                className="border-4 border-on-surface bg-primary px-6 py-2 font-label-bold uppercase text-on-primary neo-shadow-sm disabled:opacity-50 active-press"
-              >
-                {creating ? '...' : 'ADD'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
     </main>
   )
 }

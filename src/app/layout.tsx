@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import './globals.css'
 import { runMigrations } from '@/db/migrate'
+import { seedDatabase } from '@/db/seed'
 import Header from '@/app/components/header'
 import BottomNav from '@/app/components/bottom-nav'
 
@@ -11,11 +12,12 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   runMigrations()
+  seedDatabase()
   return (
     <html lang="en">
       <head>
         <link
-          href="https://fonts.googleapis.com/css2?family=Epilogue:wght@800;900&family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;700;800;900&family=Space+Grotesk:wght@400;500;700&family=Inter:wght@400;500;700&display=swap"
           rel="stylesheet"
         />
         <link
