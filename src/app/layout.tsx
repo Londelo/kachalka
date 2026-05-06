@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import './globals.css'
+import { runMigrations } from '@/db/migrate'
 
 export const metadata = {
   title: 'Kachalka — Lifting Tracker',
@@ -7,6 +8,7 @@ export const metadata = {
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  runMigrations()
   return (
     <html lang="en">
       <body className="min-h-screen bg-gray-50 text-gray-900">
