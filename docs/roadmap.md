@@ -4,13 +4,13 @@
 
 A Next.js web app for tracking weightlifting workouts, backed by SQLite via `better-sqlite3`. Built using Clean Architecture principles organized as deep feature modules.
 
-**Design reference:** `docs/designmocks.html` — neo-brutalist "IRON COMMAND" visual identity with Tailwind CSS. Use these HTML files as the UI reference when building Next.js components.
+**Design reference:** `docs/mocks/` — neo-brutalist "IRON COMMAND" visual identity with Tailwind CSS. Each page has its own HTML file. Use these as the UI reference when building Next.js components.
 
 **Reference documents:**
 - [Business Logic & UX Plan](lifting-app.md) — the "what"
 - [Architecture Plan](lifting-app-architecture.md) — the "how"
 - [Data Flow & Relationships](lifting-app-data-flow.md) — how data connects
-- [Design Mocks](designmocks.html) — visual identity, layout, and component patterns
+- [Design Mocks](mocks/userpage.html) — visual identity, layout, and component patterns (per-page HTML files in `docs/mocks/`)
 
 ## Orchestrator Instructions
 
@@ -115,7 +115,7 @@ These directories are the single source of truth for planning artifacts and phas
 
 ## Design System & UI Patterns
 
-**All screens are in `docs/designmocks.html` — use as the single source of truth for styling when building Next.js components.**
+**All screens are in `docs/mocks/` — use as the single source of truth for styling when building Next.js components.**
 
 ### Brand
 - **Name:** IRON COMMAND — displayed in header, uppercase, bold, red (`#a20000`)
@@ -214,8 +214,7 @@ User selection and creation. The foundation — every other feature is per-user.
 - User names are validated (not empty, max 100 chars)
 - Users are stored in SQLite and listed on reload
 
-**UI (from `designmocks.html`):** "SELECT COMMANDER" hero header with centered title and full-width divider. 2-column grid of user cards showing: avatar image (grayscale, high-contrast), name in uppercase headline, rank/role in mono (e.g., "LVL 48 HEAVYWEIGHT"), two stat tiles (TOTAL LOAD, MAX SQUAT). Active user card has red "ACTIVE" badge in top-right corner. "QUICK ADD" card with dashed border, add-circle icon, and hover-to-dark transition. Bottom sheet: "NEW RECRUIT" CTA button above bottom nav.
-**UI (from `designmocks.html`):** Card grid layout with profile image placeholder, name + rank line ("LVL 48 HEAVYWEIGHT"), 2-column stats (TOTAL LOAD, MAX SQUAT). "QUICK ADD" dashed-border card for new users. "ACTIVE" badge on current user. Neo-brutalist styling (thick borders, hard shadows, active press effects).
+**Design:** `docs/mocks/userpage.html` — "User Selection" page (SELECT COMMANDER). Convert to Next.js components preserving: centered hero header with full-width divider, 2-column grid of user cards with avatar/image, uppercase name, rank line ("LVL 48 HEAVYWEIGHT"), 2 stat tiles (TOTAL LOAD, MAX SQUAT), "ACTIVE" badge top-right on current user, "QUICK ADD" dashed-border card with add-circle icon, "NEW RECRUIT" full-width CTA button. Neo-brutalist: thick 4px borders, hard offset shadows, no border-radius, active press effects.
 
 ---
 
@@ -239,6 +238,8 @@ Shared global exercise pool with ownership semantics.
 - Renaming cascades automatically (queries use exercise ID, not name)
 - Can't delete an exercise that's in someone's routine
 
+**Design:** `docs/mocks/todaysworkout.html` — exercise cards section. Convert to Next.js components preserving: neo-brutalist exercise cards with thick borders, hard shadows, uppercase names, category subtitle ("PRIMARY PUSH // COMPOUND"), 4-column input grid (WEIGHT, REPS, RPE, REST), "LOG SET" CTA button, "LOCKED" state with dashed separator and unlock message. Exercise cards reuse the same design system.
+
 ---
 
 ### Phase 3 — Routines
@@ -260,6 +261,8 @@ Per-user exercise-to-day assignments.
 - Can't assign the same exercise twice on the same day
 - Can remove exercises from days
 - Routine is organized by day when fetched (matches UI shape)
+
+**Design:** No dedicated mock for the routine editor page. Follow the established design system: neo-brutalist cards, thick borders, hard shadows. Days of the week as pill badges, exercise assignment as dropdown selectors with neo-brutalist styling. Reuse header/nav components from Phase 1.1.
 
 ---
 
@@ -289,7 +292,8 @@ The core feature — log sets, reps, and weight for today's exercises.
 - **Exercise card states:** Active (editable inputs), Locked (requires completing prior exercise), with category subtitle ("PRIMARY PUSH // COMPOUND")
 - **Session notes:** Previous session's free-text notes displayed on Today's page
 - **Intensity card:** Estimated 1RM shown in bento card (derived from workout data)
-**UI (from `designmocks.html`):** Neo-brutalist exercise cards with thick borders, hard shadows, uppercase names, 4-column input grid (WEIGHT, REPS, RPE, REST). Full-width "LOG SET" CTA button. Session toggle pills at bottom. Hero header with "TODAY'S BATTLE" title and AM/PM session badge. Training image section with grayscale aesthetic.
+
+**Design:** `docs/mocks/todaysworkout.html` — "Today's Workout" page (TODAY'S BATTLE). Convert to Next.js components preserving: hero header with "TODAY'S BATTLE" title and AM/PM session badge, training image section (grayscale, contrast-125, neo-shadow), exercise cards with 4-column input grid (WEIGHT, REPS, RPE, REST), "LOG SET" CTA button, "LOCKED" state, bento grid for last session notes + intensity peak card, session toggle pills ("06:00 MORNING PUSH", "18:00 EVENING RECON").
 
 ---
 
@@ -308,7 +312,7 @@ View, edit, and delete past workout logs.
 - Can click into an entry to see/set-level details
 - Can edit or delete past entries
 
-**UI (from `designmocks.html`):** "WAR LOGS" hero header with subtitle "CAMPAIGN HISTORY & PERFORMANCE DATA". Date groups with left-bordered headers (e.g., "OCT 24" with 4px left border, red accent). Log entries are full-width cards with session number badge ("SESSION 082"), exercise name, 3-column metrics grid (VOLUME, SETS, INTENSITY). Industrial image break between date groups with "NEVER SURRENDER" overlay. Bottom nav with HISTORY pill highlighted.
+**Design:** `docs/mocks/history.html` — "History Log" page (WAR LOGS). Convert to Next.js components preserving: hero header "WAR LOGS" with subtitle "CAMPAIGN HISTORY & PERFORMANCE DATA", date groups with left-bordered headers (4px left border, red accent), log entry cards with session number badge ("SESSION 082"), exercise name, 3-column metrics grid (VOLUME, SETS, INTENSITY), industrial image break with "NEVER SURRENDER" overlay, bottom nav with HISTORY pill highlighted.
 
 ---
 
@@ -332,7 +336,7 @@ Bar chart of volume over time per exercise.
 - Shows "No data yet" when appropriate
 - Time range filter: 1M / 3M / 6M / ALL toggle pills
 
-**UI (from `designmocks.html`):** "FORCE PROGRESSION" italic uppercase header. Exercise dropdown with neo-brutalist styling (thick border, uppercase, arrow icon). Bar chart in bordered container with hover tooltips showing date + volume. Peak volume metric in top-right ("ALL TIME PEAK: 12,450"). Bento grid below: INTENSITY SPLIT bar (percentage of 85%+ 1RM sessions), COMMANDER'S INTEL card with fatigue analysis and warning icon. SECONDARY PROGRESSION section with "NO DATA FOR ESTIMATED 1RM" placeholder and "LOG SESSION" CTA.
+**Design:** `docs/mocks/stats.html` — "Force Progression" page. Convert to Next.js components preserving: italic uppercase "FORCE PROGRESSION" header, exercise dropdown with neo-brutalist styling, bar chart in bordered container with hover tooltips, peak volume metric ("ALL TIME PEAK: 12,450"), bento grid with INTENSITY SPLIT percentage bar, COMMANDER'S INTEL card with warning icon, SECONDARY PROGRESSION placeholder ("NO DATA FOR ESTIMATED 1RM"), bottom nav with PROGRESS pill highlighted.
 
 ---
 

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@800;900&amp;family=Space+Grotesk:wght@500;700&amp;family=Inter:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-fixed-dim": "#c6c6c6",
+                    "background": "#fbfbe2",
+                    "primary-container": "#d00000",
+                    "on-primary-fixed": "#410000",
+                    "on-surface": "#1b1d0e",
+                    "on-primary-container": "#ffded9",
+                    "secondary": "#5f5e5e",
+                    "inverse-surface": "#303221",
+                    "on-tertiary-container": "#e6e6e6",
+                    "primary-fixed-dim": "#ffb4a8",
+                    "surface-variant": "#e4e4cc",
+                    "on-surface-variant": "#5e3f3a",
+                    "secondary-fixed-dim": "#c8c6c6",
+                    "outline": "#936e69",
+                    "on-secondary-container": "#656464",
+                    "surface-container-high": "#eaead1",
+                    "on-primary": "#ffffff",
+                    "surface-container-highest": "#e4e4cc",
+                    "primary": "#a20000",
+                    "on-tertiary-fixed-variant": "#464747",
+                    "on-tertiary-fixed": "#1a1c1c",
+                    "tertiary-container": "#666767",
+                    "surface-container-lowest": "#ffffff",
+                    "on-secondary-fixed-variant": "#474747",
+                    "on-background": "#1b1d0e",
+                    "secondary-container": "#e4e2e1",
+                    "surface": "#fbfbe2",
+                    "on-primary-fixed-variant": "#930000",
+                    "error": "#ba1a1a",
+                    "tertiary": "#4e4f4f",
+                    "tertiary-fixed": "#e3e2e2",
+                    "outline-variant": "#e8bdb6",
+                    "surface-container": "#efefd7",
+                    "on-secondary-fixed": "#1b1c1c",
+                    "inverse-primary": "#ffb4a8",
+                    "surface-bright": "#fbfbe2",
+                    "inverse-on-surface": "#f2f2d9",
+                    "on-secondary": "#ffffff",
+                    "error-container": "#ffdad6",
+                    "on-tertiary": "#ffffff",
+                    "primary-fixed": "#ffdad4",
+                    "on-error": "#ffffff",
+                    "secondary-fixed": "#e4e2e1",
+                    "surface-container-low": "#f5f5dc",
+                    "surface-dim": "#dbdcc3",
+                    "surface-tint": "#c00000",
+                    "on-error-container": "#93000a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0px",
+                    "lg": "0px",
+                    "xl": "0px",
+                    "full": "0px"
+            },
+            "spacing": {
+                    "sm": "8px",
+                    "xs": "4px",
+                    "stack-heavy": "48px",
+                    "md": "16px",
+                    "lg": "24px",
+                    "unit": "4px",
+                    "xl": "32px"
+            },
+            "fontFamily": {
+                    "headline-xl": ["Epilogue"],
+                    "label-bold": ["Space Grotesk"],
+                    "headline-md": ["Epilogue"],
+                    "body-lg": ["Inter"],
+                    "headline-lg": ["Epilogue"],
+                    "label-mono": ["Space Grotesk"],
+                    "body-md": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-xl": ["48px", {"lineHeight": "1.0", "letterSpacing": "-0.04em", "fontWeight": "900"}],
+                    "label-bold": ["14px", {"lineHeight": "1.0", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "headline-md": ["24px", {"lineHeight": "1.2", "fontWeight": "800"}],
+                    "body-lg": ["18px", {"lineHeight": "1.5", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "label-mono": ["12px", {"lineHeight": "1.0", "fontWeight": "500"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 700, 'GRAD' 0, 'opsz' 48;
+        }
+        .neo-shadow {
+            box-shadow: 8px 8px 0px 0px rgba(27, 29, 14, 1);
+        }
+        .neo-shadow-sm {
+            box-shadow: 4px 4px 0px 0px rgba(27, 29, 14, 1);
+        }
+        .active-press:active {
+            transform: translate(4px, 4px);
+            box-shadow: 0px 0px 0px 0px rgba(27, 29, 14, 1);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-md">
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-lg py-md bg-background border-b-4 border-on-surface shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-primary" data-icon="menu">menu</span>
+<h1 class="font-headline-lg text-headline-lg uppercase font-black text-primary tracking-tighter">IRON COMMAND</h1>
+</div>
+<span class="material-symbols-outlined text-primary" data-icon="account_circle">account_circle</span>
+</header>
+<main class="flex-grow flex flex-col items-center px-lg pt-[120px] pb-[140px] max-w-4xl mx-auto w-full">
+<div class="w-full text-center mb-stack-heavy">
+<h2 class="font-headline-xl text-headline-xl uppercase text-on-surface">SELECT COMMANDER</h2>
+<div class="h-1 w-full bg-on-surface mt-sm"></div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-xl w-full">
+<div class="group relative bg-surface-container-high border-4 border-on-surface neo-shadow p-lg flex flex-col gap-md cursor-pointer transition-all active-press">
+<div class="absolute top-0 right-0 bg-primary text-on-primary px-md py-xs font-label-bold border-l-4 border-b-4 border-on-surface uppercase">ACTIVE</div>
+<div class="flex items-center gap-lg">
+<div class="w-24 h-24 border-4 border-primary overflow-hidden">
+<img class="w-full h-full object-cover grayscale contrast-125" data-alt="A gritty, high-contrast portrait of a muscular weightlifter with intense focus. The lighting is dramatic and low-key, emphasizing raw physical power and discipline. The overall aesthetic is industrial and neo-brutalist, featuring a color palette of deep charcoal, metallic silver, and aggressive primary red accents." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAEIHkwvmkIhB9Mmxk_n0Fr3JT-4y9AyaRrjeglY9e80iPmuh9S9Cc28K3fXpcewZE6J207picvuPYFxIYRaV05IJ6Ff4L18bqhYdQRRzJZRF1nbOH74QbdGct7osU8risl3WKYrU22frA0Qi5F4BMBQzWNWgNGTiQYMV-6Qki1yAPI9WMsM9ojTVNHL2YnJaAKiu_HSi7iD-EJC0Fu7KiRFtJT9J35x04fvQGJ2ZYN7ie6oC2BJOgWIlGOolXitSU-hNYjdU3rDP4"/>
+</div>
+<div>
+<h3 class="font-headline-lg text-headline-lg uppercase text-on-surface">BRUNO</h3>
+<p class="font-label-mono text-label-mono text-primary font-bold">LVL 48 HEAVYWEIGHT</p>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-sm mt-md">
+<div class="bg-on-surface p-sm">
+<p class="text-background font-label-mono text-[10px] uppercase">TOTAL LOAD</p>
+<p class="text-background font-label-bold text-headline-md">142,500 KG</p>
+</div>
+<div class="bg-primary p-sm">
+<p class="text-on-primary font-label-mono text-[10px] uppercase">MAX SQUAT</p>
+<p class="text-on-primary font-label-bold text-headline-md">240 KG</p>
+</div>
+</div>
+</div>
+<div class="group relative bg-surface-container-high border-4 border-on-surface neo-shadow p-lg flex flex-col gap-md cursor-pointer transition-all active-press">
+<div class="flex items-center gap-lg">
+<div class="w-24 h-24 border-4 border-on-surface overflow-hidden">
+<img class="w-full h-full object-cover grayscale contrast-125" data-alt="A monochromatic, industrial-style photo of a powerlifter gripping a barbell with chalk-covered hands. The mood is gritty and uncompromising, set in a garage gym environment. The visual style follows a neo-brutalist approach with heavy shadows and sharp geometry, dominated by cream, black, and bold red highlights." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAP6Gs5hNYfhaOb5-Iot2Mj3OnvDhHkdXYP2EE4wSrYQkX9uBLzFBwLd-Oz_EN_-b8X7rRulqv57snsIXuss1G0kGc_xIKO9NLEwHvlcvD0W4mT0S5aIUp7d_dNcJAUZqXiSnrXrGvsh2DZ7a8988Y13YQSDicw56aAuP_iLnK35Aypm4uOaeXY6kfzH_kKdnOOnrNkKbk3a08VRu56yWwnF7Q-OiOJ11IJKyffkFvFeXkgprD-BXAmXUTlsYXUQzguSA54fPmGhBI"/>
+</div>
+<div>
+<h3 class="font-headline-lg text-headline-lg uppercase text-on-surface">VIKTOR</h3>
+<p class="font-label-mono text-label-mono text-secondary font-bold">LVL 32 POWERLIFTER</p>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-sm mt-md">
+<div class="bg-on-surface p-sm opacity-80">
+<p class="text-background font-label-mono text-[10px] uppercase">TOTAL LOAD</p>
+<p class="text-background font-label-bold text-headline-md">98,200 KG</p>
+</div>
+<div class="bg-secondary p-sm">
+<p class="text-on-primary font-label-mono text-[10px] uppercase">MAX SQUAT</p>
+<p class="text-on-primary font-label-bold text-headline-md">195 KG</p>
+</div>
+</div>
+</div>
+<div class="group relative bg-surface-container-high border-4 border-on-surface neo-shadow p-lg flex flex-col gap-md cursor-pointer transition-all active-press">
+<div class="flex items-center gap-lg">
+<div class="w-24 h-24 border-4 border-on-surface overflow-hidden">
+<img class="w-full h-full object-cover grayscale contrast-125" data-alt="A powerful action shot of an athlete during a heavy deadlift, showing raw exertion and discipline. The setting is a minimalist, raw concrete gym with harsh directional lighting. The color scheme is strictly neo-brutalist, emphasizing cream backgrounds, heavy charcoal borders, and intense primary red focal points." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAtsYQ5V1d3WqdCNZKBfbT73DM_7Eq9YxiFtV4VUcyp2ujMRziJjXlnEfdpz8ydQJ6uPODEgDh6Y7snYY163JX0KrwTM4E_kuavRamo5Utkhz5Iy9S8kichIgNS6VT6lyrzCEdSPiPmEB9HXCsZWoLzcZ7tzg9-g4yzZPJJwvhBwNDstmnwcHhZtWt9tvG8maD_v1EwBVlBQRuTWGoAkmyxwI8X5ouOh-NPfUSh4wbzzsmLha4Lc4J2JHACUMdwN7DNO6oGFIhx8EA"/>
+</div>
+<div>
+<h3 class="font-headline-lg text-headline-lg uppercase text-on-surface">KARA</h3>
+<p class="font-label-mono text-label-mono text-secondary font-bold">LVL 29 ENDURANCE</p>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-sm mt-md">
+<div class="bg-on-surface p-sm opacity-80">
+<p class="text-background font-label-mono text-[10px] uppercase">TOTAL LOAD</p>
+<p class="text-background font-label-bold text-headline-md">76,400 KG</p>
+</div>
+<div class="bg-secondary p-sm">
+<p class="text-on-primary font-label-mono text-[10px] uppercase">MAX SQUAT</p>
+<p class="text-on-primary font-label-bold text-headline-md">140 KG</p>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-center border-4 border-dashed border-on-surface bg-surface-variant p-lg neo-shadow cursor-pointer active-press hover:bg-on-surface hover:text-background transition-colors group">
+<div class="text-center">
+<span class="material-symbols-outlined text-[48px] mb-sm block" data-icon="add_circle">add_circle</span>
+<p class="font-headline-md text-headline-md uppercase">QUICK ADD</p>
+</div>
+</div>
+</div>
+</main>
+<footer class="fixed bottom-0 left-0 w-full z-50 flex flex-col items-center bg-background px-md pb-safe border-t-4 border-on-surface shadow-[0px_-4px_0px_0px_rgba(27,29,14,1)]">
+<div class="w-full max-w-4xl px-lg py-md">
+<button class="w-full bg-primary text-on-primary font-headline-md text-headline-md uppercase py-lg border-4 border-on-surface neo-shadow-sm active-press flex items-center justify-center gap-md">
+<span class="material-symbols-outlined" data-icon="person_add" data-weight="fill" style="font-variation-settings: 'FILL' 1;">person_add</span>
+                NEW RECRUIT
+            </button>
+</div>
+<nav class="w-full flex justify-around items-center border-t-4 border-on-surface">
+<div class="flex flex-col items-center justify-center text-on-surface py-sm px-md hover:bg-surface-container-highest transition-all active:scale-95">
+<span class="material-symbols-outlined" data-icon="fitness_center">fitness_center</span>
+<span class="font-label-bold text-label-bold uppercase">WORKOUT</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface py-sm px-md hover:bg-surface-container-highest transition-all active:scale-95">
+<span class="material-symbols-outlined" data-icon="calendar_today">calendar_today</span>
+<span class="font-label-bold text-label-bold uppercase">HISTORY</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface py-sm px-md hover:bg-surface-container-highest transition-all active:scale-95">
+<span class="material-symbols-outlined" data-icon="monitoring">monitoring</span>
+<span class="font-label-bold text-label-bold uppercase">PROGRESS</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-primary text-on-primary py-sm px-md border-x-4 border-on-surface shadow-[2px_2px_0px_0px_rgba(27,29,14,1)]">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-bold text-label-bold uppercase">CONFIG</span>
+</div>
+</nav>
+</footer>
+</body></html>
