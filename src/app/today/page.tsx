@@ -45,8 +45,7 @@ export default function TodayPage() {
   function handleLogSet(exercise: ExerciseItem): void {
     setSelectedExercise(exercise)
     const last = exercise.lastLog
-    const first = last && last.length > 0 ? last[0] : null
-    setSets(first ? [{ ...defaultSet(), weight: first.weight, reps: first.reps }] : [defaultSet()])
+    setSets(last && last.length > 0 ? last.map((s) => ({ ...defaultSet(), weight: s.weight, reps: s.reps })) : [defaultSet()])
     setError(null)
     setModalOpen(true)
   }
