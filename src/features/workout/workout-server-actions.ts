@@ -16,6 +16,7 @@ export async function logWorkoutAction(
   date: string,
   sets: WorkoutSet[],
 ): Promise<{ success: boolean; log?: WorkoutLog; error?: string }> {
+  console.log('[TRACING] logWorkoutAction (server) - incoming sets:', JSON.stringify(sets, null, 2))
   try {
     const db = getDatabase()
     const repo = createSqliteWorkoutRepository(db)

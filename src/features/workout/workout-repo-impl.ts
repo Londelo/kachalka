@@ -36,6 +36,7 @@ export function createSqliteWorkoutRepository(db: ReturnType<typeof Database>): 
     },
 
     create(log: Omit<WorkoutLog, 'id' | 'createdAt' | 'updatedAt'>): WorkoutLog {
+      console.log('[TRACING] repo.create - sets being inserted:', JSON.stringify(log.sets, null, 2))
       const inserted = queryDb
         .insert(schema.workoutLogs)
         .values({
@@ -98,6 +99,7 @@ export function createSqliteWorkoutRepository(db: ReturnType<typeof Database>): 
     },
 
     update(id: number, sets: WorkoutSet[]): WorkoutLog | undefined {
+      console.log('[TRACING] repo.update - sets being updated:', JSON.stringify(sets, null, 2))
       const updated = queryDb
         .update(schema.workoutLogs)
         .set({ sets: JSON.stringify(sets) })
@@ -170,6 +172,9 @@ export function createSqliteWorkoutRepository(db: ReturnType<typeof Database>): 
           .get()
 
         const lastLog = row ? mapRowToWorkoutLog(row) : undefined
+        if (lastLog) {
+          console.log('[TRACING] repo.findByDayOfWeek - lastLog for exercise', exId, 'has', lastLog.sets.length, 'sets:', JSON.stringify(lastLog.sets, null, 2))
+        }
 
         results.push({
           exerciseId: exId,

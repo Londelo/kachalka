@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { logWorkoutAction, getTodayExercisesAction } from '@/features/workout/workout-server-actions'
 import type { WorkoutSet } from '@/features/workout/types'
+import { jsDayToAppIndex } from '@/shared/utils/date'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,14 +24,16 @@ export default function TodayPage() {
   const [sets, setSets] = useState<WorkoutSet[]>([defaultSet()])
   const [volumePreview, setVolumePreview] = useState(0)
   const [submitting, setSubmitting] = useState(false)
+  const backdropRef = useRef<HTMLDivElement>(null)
 
   // Load exercises on mount
   useEffect(() => {
     const userId = getStoredUserId()
     if (userId) {
-      const dayOfWeek = new Date().getDay()
+      const dayOfWeek = jsDayToAppIndex(new Date().getDay())
       getTodayExercisesAction(userId, dayOfWeek).then((res) => {
         if (res.success && res.exercises) {
+          console.log('[TRACING] exercises loaded:', JSON.stringify(res.exercises, null, 2))
           setExercises(res.exercises)
         }
         setLoading(false)
@@ -49,7 +52,11 @@ export default function TodayPage() {
   }
 
   function handleAddSet(): void {
-    setSets((prev) => [...prev, defaultSet()])
+    setSets((prev) => {
+      const next = [...prev, defaultSet()]
+      console.log('[TRACING] handleAddSet - new sets array length:', next.length, 'sets:', JSON.stringify(next))
+      return next
+    })
   }
 
   function handleRemoveSet(index: number): void {
@@ -60,10 +67,10 @@ export default function TodayPage() {
     setSets((prev) => {
       const updated = [...prev]
       const current = updated[index]
-      updated[index] = { ...current, [field]: field === 'note' ? value : parseFloat(value) || 0 }
+      updated[index] = { ...current, [field]: parseFloat(value) || 0 }
       return updated
     })
-    setVolumePreview(calculateVolumePreview(sets.map((s, i) => i === index ? { ...s, [field]: field === 'note' ? value : parseFloat(value) || 0 } : s)))
+    setVolumePreview(calculateVolumePreview(sets.map((s, i) => i === index ? { ...s, [field]: parseFloat(value) || 0 } : s)))
   }
 
   function calculateVolumePreview(currentSets: WorkoutSet[]): number {
@@ -77,10 +84,11 @@ export default function TodayPage() {
     if (!userId) return
 
     const today = new Date().toISOString().split('T')[0]
+    console.log('[TRACING] handleSaveSession - sets before send:', JSON.stringify(sets, null, 2))
     await logWorkoutAction(userId, selectedExercise.exerciseId, today, sets)
 
     // Refresh exercises
-    const dayOfWeek = new Date().getDay()
+    const dayOfWeek = jsDayToAppIndex(new Date().getDay())
     const res = await getTodayExercisesAction(userId, dayOfWeek)
     if (res.success && res.exercises) {
       setExercises(res.exercises)
@@ -201,7 +209,10 @@ export default function TodayPage() {
           onRemoveSet={handleRemoveSet}
           onSetChange={handleSetChange}
           onSave={handleSaveSession}
-          onClose={() => setModalOpen(false)}
+          onClose={(e?: React.MouseEvent) => {
+            if (e && backdropRef.current && !backdropRef.current.contains(e.target as Node)) return
+            setModalOpen(false)
+          }}
           submitting={submitting}
         />
       )}
@@ -217,7 +228,7 @@ interface SetModalProps {
   onRemoveSet: (index: number) => void
   onSetChange: (index: number, field: keyof WorkoutSet, value: string) => void
   onSave: () => Promise<void>
-  onClose: () => void
+  onClose: (e?: React.MouseEvent) => void
   submitting: boolean
 }
 
@@ -232,14 +243,20 @@ function SetModal({
   onClose,
   submitting,
 }: SetModalProps) {
+  const contentRef = useRef<HTMLDivElement>(null)
+
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
-      onClick={onClose}
+      onClickCapture={(e) => {
+        if (contentRef.current && !contentRef.current.contains(e.target as Node)) {
+          onClose()
+        }
+      }}
     >
       <div
+        ref={contentRef}
         className="w-full max-w-lg border-4 border-on-surface bg-background p-6 neo-shadow-lg"
-        onClick={(e) => e.stopPropagation()}
       >
         <h3 className="mb-4 font-headline-md text-headline-md uppercase text-on-surface">
           {exerciseName}

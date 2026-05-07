@@ -37,6 +37,7 @@ export function dayOfWeekToNumber(day: DayOfWeek): number {
 
 export function numberToDayOfWeek(n: number): DayOfWeek {
   const day = NUMBER_TO_DAY[n]
+  console.log('[TRACING] numberToDayOfWeek - input:', n, '-> output:', day)
   if (day === undefined) {
     throw new Error(`Invalid day number: ${n}`)
   }
