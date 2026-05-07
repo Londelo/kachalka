@@ -296,7 +296,7 @@ function SetModal({
           {sets.map((set, index) => (
             <div key={set.id} className="flex w-full items-center gap-3">
               {/* Set number box */}
-              <div className="flex flex-1 flex-col border-b-4 border-primary p-2">
+              <div className="flex flex-1 flex-row items-center border-b-4 border-primary p-2 gap-1">
                 <span className="font-label-mono text-label-mono text-secondary">SET:</span>
                 <span className="font-body-md text-body-md text-on-surface">
                   {String(index + 1).padStart(2, '0')}
@@ -304,7 +304,7 @@ function SetModal({
               </div>
 
               {/* Weight box */}
-              <div className="flex flex-1 flex-col border-b-4 border-primary p-2">
+              <div className="flex flex-1 flex-row items-center border-b-4 border-primary p-2 gap-1">
                 <span className="font-label-mono text-label-mono text-secondary">LB:</span>
                 <input
                   type="number"
@@ -316,7 +316,7 @@ function SetModal({
               </div>
 
               {/* Reps box */}
-              <div className="flex flex-1 flex-col border-b-4 border-primary p-2">
+              <div className="flex flex-1 flex-row items-center border-b-4 border-primary p-2 gap-1">
                 <span className="font-label-mono text-label-mono text-secondary">REPS:</span>
                 <input
                   type="number"
