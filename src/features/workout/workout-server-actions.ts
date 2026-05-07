@@ -64,7 +64,7 @@ export async function deleteWorkoutAction(
 type ExerciseInfo = {
   exerciseId: number
   exerciseName: string
-  lastLog: { weight: number; reps: number } | null
+  lastLog: { weight: number; reps: number }[] | null
 }
 
 export async function getTodayExercisesAction(

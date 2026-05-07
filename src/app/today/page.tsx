@@ -13,7 +13,7 @@ interface ExerciseItem {
   lastLog?: {
     weight: number
     reps: number
-  } | null
+  }[] | null
 }
 
 export default function TodayPage() {
@@ -22,7 +22,6 @@ export default function TodayPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedExercise, setSelectedExercise] = useState<ExerciseItem | null>(null)
   const [sets, setSets] = useState<WorkoutSet[]>([defaultSet()])
-  const [volumePreview, setVolumePreview] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const backdropRef = useRef<HTMLDivElement>(null)
@@ -46,8 +45,8 @@ export default function TodayPage() {
   function handleLogSet(exercise: ExerciseItem): void {
     setSelectedExercise(exercise)
     const last = exercise.lastLog
-    setSets(last ? [{ ...defaultSet(), weight: last.weight, reps: last.reps }] : [defaultSet()])
-    setVolumePreview(calculateVolumePreview([]))
+    const first = last && last.length > 0 ? last[0] : null
+    setSets(first ? [{ ...defaultSet(), weight: first.weight, reps: first.reps }] : [defaultSet()])
     setError(null)
     setModalOpen(true)
   }
@@ -67,11 +66,6 @@ export default function TodayPage() {
       updated[index] = { ...current, [field]: parseFloat(value) || 0 }
       return updated
     })
-    setVolumePreview(calculateVolumePreview(sets.map((s, i) => i === index ? { ...s, [field]: parseFloat(value) || 0 } : s)))
-  }
-
-  function calculateVolumePreview(currentSets: WorkoutSet[]): number {
-    return currentSets.reduce((total, set) => total + set.reps * set.weight, 0)
   }
 
   async function handleSaveSession(): Promise<void> {
@@ -137,7 +131,20 @@ export default function TodayPage() {
           <div className="flex w-full flex-col gap-8">
             {exercises.map((exercise) => {
               const last = exercise.lastLog
-              const volume = last ? last.reps * last.weight : 0
+
+              // Consolidate identical sets (same weight AND reps)
+              const grouped: Map<string, { weight: number; reps: number; count: number }> = new Map()
+              if (last) {
+                for (const s of last) {
+                  const key = `${s.weight}-${s.reps}`
+                  const existing = grouped.get(key)
+                  if (existing) {
+                    existing.count += 1
+                  } else {
+                    grouped.set(key, { weight: s.weight, reps: s.reps, count: 1 })
+                  }
+                }
+              }
 
               return (
                 <div
@@ -153,32 +160,19 @@ export default function TodayPage() {
                     </p>
                   </div>
 
-                  {last ? (
-                    <div className="mb-4 grid grid-cols-3 gap-4">
-                      <div className="border-4 border-on-surface bg-on-surface p-3">
-                        <p className="font-label-mono text-label-mono uppercase text-background">
-                          LAST WEIGHT
-                        </p>
-                        <p className="font-body-lg text-body-lg text-background">
-                          {last.weight} LB
-                        </p>
-                      </div>
-                      <div className="border-4 border-on-surface bg-on-surface p-3">
-                        <p className="font-label-mono text-label-mono uppercase text-background">
-                          LAST REPS
-                        </p>
-                        <p className="font-body-lg text-body-lg text-background">
-                          {last.reps}
-                        </p>
-                      </div>
-                      <div className="border-4 border-on-surface bg-primary p-3">
-                        <p className="font-label-mono text-label-mono uppercase text-on-primary">
-                          VOLUME
-                        </p>
-                        <p className="font-body-lg text-body-lg text-on-primary">
-                          {volume} LB
-                        </p>
-                      </div>
+                  {last && last.length > 0 ? (
+                    <div className="mb-4 flex flex-col gap-2">
+                      {Array.from(grouped.values()).map((g) => (
+                        <div
+                          key={`${g.weight}-${g.reps}`}
+                          className="flex items-center gap-4 border-4 border-on-surface bg-on-surface p-3"
+                        >
+                          <p className="font-body-lg text-body-lg text-background">
+                            {g.weight} LB x {g.reps}
+                            {g.count > 1 ? ` (${g.count} sets)` : ''}
+                          </p>
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <div className="mb-4 border-b-4 border-dashed border-on-surface pb-4">
@@ -221,7 +215,6 @@ export default function TodayPage() {
         <SetModal
           exerciseName={selectedExercise.exerciseName}
           sets={sets}
-          volumePreview={volumePreview}
           onAddSet={handleAddSet}
           onRemoveSet={handleRemoveSet}
           onSetChange={handleSetChange}
@@ -240,7 +233,6 @@ export default function TodayPage() {
 interface SetModalProps {
   exerciseName: string
   sets: WorkoutSet[]
-  volumePreview: number
   onAddSet: () => void
   onRemoveSet: (index: number) => void
   onSetChange: (index: number, field: keyof WorkoutSet, value: string) => void
@@ -252,7 +244,6 @@ interface SetModalProps {
 function SetModal({
   exerciseName,
   sets,
-  volumePreview,
   onAddSet,
   onRemoveSet,
   onSetChange,
@@ -322,15 +313,6 @@ function SetModal({
         >
           ADD SET
         </button>
-
-        <div className="mb-4 border-4 border-on-surface bg-on-surface p-3">
-          <p className="font-label-mono text-label-mono uppercase text-background">
-            VOLUME
-          </p>
-          <p className="font-body-lg text-body-lg text-background">
-            {volumePreview} LB
-          </p>
-        </div>
 
         <div className="flex gap-4">
           <button

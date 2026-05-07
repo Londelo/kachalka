@@ -44,7 +44,7 @@ describe('logWorkoutUseCase', () => {
     expect(repo.update).not.toHaveBeenCalled()
   })
 
-  it('appends sets to an existing log', () => {
+  it('replaces sets when re-saving for the same exercise/date', () => {
     const repo = makeRepo()
     const existingLog = {
       id: { value: 1 },
@@ -58,10 +58,7 @@ describe('logWorkoutUseCase', () => {
     repo.findByDateAndExercise.mockReturnValue(existingLog)
     const updatedLog = {
       ...existingLog,
-      sets: [
-        { reps: 5, weight: 100 },
-        { reps: 5, weight: 110 },
-      ],
+      sets: [{ reps: 5, weight: 110 }],
     }
     repo.update.mockReturnValue(updatedLog)
 
@@ -69,10 +66,8 @@ describe('logWorkoutUseCase', () => {
     const result = useCase.execute(1, 5, '2025-01-01', [{ reps: 5, weight: 110 }])
 
     expect(result).toEqual(updatedLog)
-    expect(repo.update).toHaveBeenCalledWith(1, [
-      { reps: 5, weight: 100 },
-      { reps: 5, weight: 110 },
-    ])
+    // Sets should be replaced, not appended — old sets should NOT be present
+    expect(repo.update).toHaveBeenCalledWith(1, [{ reps: 5, weight: 110 }])
     expect(repo.create).not.toHaveBeenCalled()
   })
 

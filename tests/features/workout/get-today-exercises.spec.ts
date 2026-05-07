@@ -85,7 +85,7 @@ describe('getTodayExercisesUseCase', () => {
     expect(result).toEqual([])
   })
 
-  it('includes lastLog for each exercise', () => {
+  it('returns all sets in lastLog as an array', () => {
     const routineRepo = makeRoutineRepo()
     const workoutRepo = makeWorkoutRepo()
     const exerciseRepo = makeExerciseRepo()
@@ -96,13 +96,21 @@ describe('getTodayExercisesUseCase', () => {
 
     exerciseRepo.findById.mockReturnValue({ id: { value: 5 }, name: 'Bench Press' })
     workoutRepo.findLatestForExercise.mockReturnValue({
-      sets: [{ weight: 225, reps: 10 }],
+      sets: [
+        { weight: 225, reps: 10 },
+        { weight: 235, reps: 8 },
+        { weight: 225, reps: 10 },
+      ],
     })
 
     const useCase = getTodayExercisesUseCase(routineRepo, workoutRepo, exerciseRepo)
     const result = useCase.execute(1, 0)
 
-    expect(result[0].lastLog).toEqual({ weight: 225, reps: 10 })
+    expect(result[0].lastLog).toEqual([
+      { weight: 225, reps: 10 },
+      { weight: 235, reps: 8 },
+      { weight: 225, reps: 10 },
+    ])
   })
 
   it('returns null lastLog when no previous workout', () => {
