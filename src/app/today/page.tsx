@@ -162,17 +162,40 @@ export default function TodayPage() {
 
                   {last && last.length > 0 ? (
                     <div className="mb-4 flex flex-col gap-2">
-                      {Array.from(grouped.values()).map((g) => (
-                        <div
-                          key={`${g.weight}-${g.reps}`}
-                          className="flex items-center gap-4 border-4 border-on-surface bg-on-surface p-3"
-                        >
-                          <p className="font-body-lg text-body-lg text-background">
-                            {g.weight} LB x {g.reps}
-                            {g.count > 1 ? ` (${g.count} sets)` : ''}
-                          </p>
-                        </div>
-                      ))}
+                      {(() => {
+                        let globalSetNum = 1
+                        return Array.from(grouped.values()).map((g) => {
+                          const start = globalSetNum
+                          const end = globalSetNum + g.count - 1
+                          globalSetNum = end + 1
+                          const setLabel =
+                            g.count === 1
+                              ? `SET ${String(start).padStart(2, '0')}`
+                              : `SET ${String(start).padStart(2, '0')}-${String(end).padStart(2, '0')}`
+                          return (
+                            <div
+                              key={`${g.weight}-${g.reps}`}
+                              className="flex items-center gap-2"
+                            >
+                              <div className="border-4 border-on-surface bg-primary p-3">
+                                <p className="font-body-lg text-body-lg font-bold text-on-primary">
+                                  {setLabel}
+                                </p>
+                              </div>
+                              <div className="border-4 border-on-surface bg-on-surface p-3">
+                                <p className="font-body-lg text-body-lg font-bold text-background">
+                                  {g.reps}
+                                </p>
+                              </div>
+                              <div className="border-4 border-on-surface bg-on-surface p-3">
+                                <p className="font-body-lg text-body-lg font-bold text-background">
+                                  {g.weight} LB
+                                </p>
+                              </div>
+                            </div>
+                          )
+                        })
+                      })()}
                     </div>
                   ) : (
                     <div className="mb-4 border-b-4 border-dashed border-on-surface pb-4">
