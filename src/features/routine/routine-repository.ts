@@ -4,7 +4,7 @@ export interface RoutineRepository {
   findById(id: number): RoutineAssignment | undefined
   findByUserAndDay(userId: number, dayOfWeek: number): RoutineAssignment | undefined
   findAllByUser(userId: number): RoutineAssignment[]
-  findAllByUserGroupedByDay(userId: number): Record<number, RoutineAssignment[]>
+  findAllByUserGroupedByDay(userId: number): Record<string, RoutineAssignment[]>
   create(assignment: RoutineAssignment): RoutineAssignment
   delete(id: number): void
   exists(id: number): boolean

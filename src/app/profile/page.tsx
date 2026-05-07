@@ -21,7 +21,7 @@ interface ExerciseOption {
 
 export default function ProfilePage() {
   const [selectedDay, setSelectedDay] = useState<number>(0)
-  const [routine, setRoutine] = useState<Record<number, RoutineAssignment[]> | null>(null)
+  const [routine, setRoutine] = useState<Record<string, RoutineAssignment[]> | null>(null)
   const [exercises, setExercises] = useState<ExerciseOption[]>([])
   const [selectedExerciseId, setSelectedExerciseId] = useState<number | null>(null)
   const [addingDay, setAddingDay] = useState<number | null>(null)
@@ -84,7 +84,10 @@ export default function ProfilePage() {
   }
 
   async function handleRemoveExercise(assignmentId: number) {
-    const result = await removeExerciseAction(assignmentId)
+    const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
+    const userId = cookieMatch ? parseInt(cookieMatch[1], 10) : 0
+    if (!userId) return
+    const result = await removeExerciseAction(userId, assignmentId)
     if (result.success) {
       await loadData()
     } else {
@@ -94,7 +97,8 @@ export default function ProfilePage() {
 
   function getAssignmentsForDay(dayIndex: number): RoutineAssignment[] {
     if (!routine) return []
-    return routine[dayIndex] ?? []
+    const dayName = DAYS[dayIndex]
+    return routine[dayName] ?? []
   }
 
   function isSelectedDay(dayIndex: number): boolean {
@@ -247,7 +251,7 @@ export default function ProfilePage() {
                         onClick={() => handleRemoveExercise(a.id.value)}
                         className="border-2 border-on-surface bg-error p-2 font-label-bold text-label-bold uppercase text-on-error transition-all active-press"
                       >
-                        REMOVE
+                        {exercises.find((ex) => ex.id === a.exerciseId)?.name ?? 'UNKNOWN EXERCISE'}
                       </button>
                     </div>
                   ))}

@@ -26,13 +26,14 @@ export async function assignExerciseAction(
 }
 
 export async function removeExerciseAction(
+  userId: number,
   assignmentId: number,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const db = getDatabase()
     const repo = createSqliteRoutineRepository(db)
     const useCase = removeExerciseUseCase(repo)
-    useCase.execute(assignmentId)
+    useCase.execute(userId, assignmentId)
     return { success: true }
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error'
@@ -42,7 +43,7 @@ export async function removeExerciseAction(
 
 export async function getUserRoutineAction(
   userId: number,
-): Promise<{ success: boolean; routine?: Record<number, RoutineAssignment[]>; error?: string }> {
+): Promise<{ success: boolean; routine?: Record<string, RoutineAssignment[]>; error?: string }> {
   try {
     const db = getDatabase()
     const repo = createSqliteRoutineRepository(db)

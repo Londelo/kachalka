@@ -55,7 +55,7 @@ export function createSqliteRoutineRepository(db: ReturnType<typeof Database>): 
       return R.map(mapRowToRoutineAssignment, rows)
     },
 
-    findAllByUserGroupedByDay(userId: number): Record<number, RoutineAssignment[]> {
+    findAllByUserGroupedByDay(userId: number): Record<string, RoutineAssignment[]> {
       const rows = queryDb
         .select()
         .from(schema.userRoutines)
@@ -81,10 +81,6 @@ export function createSqliteRoutineRepository(db: ReturnType<typeof Database>): 
           dayOfWeek: schema.userRoutines.dayOfWeek,
         })
         .get()
-
-      if (!inserted) {
-        throw new Error('Failed to create routine assignment')
-      }
 
       return {
         id: RoutineId.make(inserted.id),

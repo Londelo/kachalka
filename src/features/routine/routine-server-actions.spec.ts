@@ -124,7 +124,7 @@ describe('removeExerciseAction', () => {
     mockRemoveExercise.execute.mockReturnValue(undefined)
 
     const { removeExerciseAction } = await import('./routine-server-actions')
-    const result = await removeExerciseAction(42)
+    const result = await removeExerciseAction(1, 42)
 
     expect(result.success).toBe(true)
     expect(result.error).toBeUndefined()
@@ -136,7 +136,19 @@ describe('removeExerciseAction', () => {
     })
 
     const { removeExerciseAction } = await import('./routine-server-actions')
-    const result = await removeExerciseAction(999)
+    const result = await removeExerciseAction(1, 999)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Routine assignment not found')
+  })
+
+  it('returns failure when assignment belongs to another user', async () => {
+    mockRemoveExercise.execute.mockImplementation(() => {
+      throw new Error('Routine assignment not found')
+    })
+
+    const { removeExerciseAction } = await import('./routine-server-actions')
+    const result = await removeExerciseAction(1, 42)
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Routine assignment not found')
@@ -144,7 +156,7 @@ describe('removeExerciseAction', () => {
 
   it('returns failure for invalid assignmentId', async () => {
     const { removeExerciseAction } = await import('./routine-server-actions')
-    const result = await removeExerciseAction(-1)
+    const result = await removeExerciseAction(1, -1)
 
     expect(result.success).toBe(false)
     expect(result.error).toBeDefined()
