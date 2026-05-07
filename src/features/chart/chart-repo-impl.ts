@@ -8,15 +8,16 @@ import type { WorkoutSet } from '@/features/workout/types'
 import * as R from 'ramda'
 
 function mapRowToDataPoint(row: Record<string, unknown>): ChartDataPoint {
+  const sets = row.sets as WorkoutSet[]
   return {
     date: row.date as string,
     volume: R.sum(
       R.map(
         (s: WorkoutSet) => s.reps * s.weight,
-        JSON.parse(row.sets as string) as WorkoutSet[],
+        sets,
       ),
     ),
-    sets: JSON.parse(row.sets as string) as WorkoutSet[],
+    sets,
   }
 }
 
@@ -91,7 +92,7 @@ export class SqliteChartRepository implements ChartRepository {
         R.sum(
           R.map(
             (s: WorkoutSet) => s.reps * s.weight,
-            JSON.parse(row.sets as string) as WorkoutSet[],
+            row.sets as WorkoutSet[],
           ),
         ),
       rows,
@@ -139,7 +140,11 @@ export class SqliteChartRepository implements ChartRepository {
       .where(
         inArray(
           schema.exercises.id,
-          sql`SELECT DISTINCT exercise_id FROM ${schema.workoutLogs} WHERE user_id = ${userId}`,
+          this.queryDb
+            .select({ id: schema.workoutLogs.exerciseId })
+            .from(schema.workoutLogs)
+            .where(eq(schema.workoutLogs.userId, userId))
+            .groupBy(schema.workoutLogs.exerciseId),
         ),
       )
       .orderBy(schema.exercises.name)

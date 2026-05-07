@@ -76,9 +76,9 @@ export function seedProgressData(): void {
 
   const seedProgress = db.transaction(() => {
     // Grab the first user.
-    const { userId } = db
-      .prepare('SELECT user_id FROM users LIMIT 1')
-      .get() as { userId: number }
+    const { id: userId } = db
+      .prepare('SELECT id FROM users LIMIT 1')
+      .get() as { id: number }
 
     // Exercises to seed. "Barbell Curl" gets only 1-2 logs for the
     // "no data yet" edge case.
