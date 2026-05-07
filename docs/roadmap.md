@@ -314,6 +314,15 @@ View, edit, and delete past workout logs.
 
 **Design:** `docs/mocks/history.html` — "History Log" page (WAR LOGS). Convert to Next.js components preserving: hero header "WAR LOGS" with subtitle "CAMPAIGN HISTORY & PERFORMANCE DATA", date groups with left-bordered headers (4px left border, red accent), log entry cards with session number badge ("SESSION 082"), exercise name, 3-column metrics grid (VOLUME, SETS, INTENSITY), industrial image break with "NEVER SURRENDER" overlay, bottom nav with HISTORY pill highlighted.
 
+**Worktree instructions:**
+1. Create a branch: `git checkout -b feat/history`
+2. Create a worktree: `git worktree add ../kachalka-history feat/history`
+3. `cd ../kachalka-history` — all work happens in this worktree
+4. Implement all files listed above, commit changes within the worktree
+5. When done, stay in the worktree and run visual verification (Playwright MCP) against `localhost:3000`
+6. Return to the main repo: `cd ../kachalka`
+7. When both Phase 5 and Phase 6 are complete, merge: `git checkout main && git merge feat/history && git merge feat/progress`
+
 ---
 
 ### Phase 6 — Progress Chart
@@ -337,6 +346,15 @@ Bar chart of volume over time per exercise.
 - Time range filter: 1M / 3M / 6M / ALL toggle pills
 
 **Design:** `docs/mocks/stats.html` — "Force Progression" page. Convert to Next.js components preserving: italic uppercase "FORCE PROGRESSION" header, exercise dropdown with neo-brutalist styling, bar chart in bordered container with hover tooltips, peak volume metric ("ALL TIME PEAK: 12,450"), bento grid with INTENSITY SPLIT percentage bar, COMMANDER'S INTEL card with warning icon, SECONDARY PROGRESSION placeholder ("NO DATA FOR ESTIMATED 1RM"), bottom nav with PROGRESS pill highlighted.
+
+**Worktree instructions:**
+1. Create a branch: `git checkout -b feat/progress`
+2. Create a worktree: `git worktree add ../kachalka-progress feat/progress`
+3. `cd ../kachalka-progress` — all work happens in this worktree
+4. Implement all files listed above, commit changes within the worktree
+5. When done, stay in the worktree and run visual verification (Playwright MCP) against `localhost:3000`
+6. Return to the main repo: `cd ../kachalka`
+7. When both Phase 5 and Phase 6 are complete, merge: `git checkout main && git merge feat/history && git merge feat/progress`
 
 ---
 
