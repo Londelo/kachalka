@@ -66,10 +66,11 @@ export function createSqliteUserRepository(db: ReturnType<typeof Database>): Use
     },
 
     delete(id: number): void {
-      queryDb
-        .delete(schema.users)
-        .where(eq(schema.users.id, id))
-        .run()
+      // Cascade delete: remove all related records before deleting the user.
+      queryDb.delete(schema.workoutLogs).where(eq(schema.workoutLogs.userId, id)).run()
+      queryDb.delete(schema.userRoutines).where(eq(schema.userRoutines.userId, id)).run()
+      queryDb.delete(schema.exercises).where(eq(schema.exercises.userId, id)).run()
+      queryDb.delete(schema.users).where(eq(schema.users.id, id)).run()
     },
   }
 }

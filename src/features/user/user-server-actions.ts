@@ -32,3 +32,17 @@ export async function getUsersAction(): Promise<User[]> {
   const useCase = getUsersUseCase(repo)
   return useCase.execute()
 }
+
+export async function deleteUserAction(
+  userId: number,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const db = getDatabase()
+    const repo = createSqliteUserRepository(db)
+    repo.delete(userId)
+    return { success: true }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error'
+    return { success: false, error: message }
+  }
+}

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import './globals.css'
 import { runMigrations } from '@/db/migrate'
-import { seedDatabase } from '@/db/seed'
+import { seedDatabase, seedProgressData } from '@/db/seed'
 import Header from '@/app/components/header'
 import NavWrapper from '@/app/components/nav-wrapper.client'
 
@@ -13,6 +13,7 @@ export const metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   runMigrations()
   seedDatabase()
+  seedProgressData()
   return (
     <html lang="en">
       <head>
