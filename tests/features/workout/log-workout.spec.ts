@@ -12,6 +12,7 @@ function makeRepo(overrides: Partial<WorkoutRepository> = {}): WorkoutRepository
     update: vi.fn(),
     delete: vi.fn(),
     findByDayOfWeek: vi.fn(),
+    findHistoryByDate: vi.fn(),
     ...overrides,
   }
 }
@@ -25,7 +26,7 @@ describe('logWorkoutUseCase', () => {
     const repo = makeRepo()
     repo.findByDateAndExercise.mockReturnValue(undefined)
     const savedLog = {
-      id: { value: 1 },
+      id: 1,
       userId: 1,
       exerciseId: 5,
       date: '2025-01-01',
@@ -47,7 +48,7 @@ describe('logWorkoutUseCase', () => {
   it('replaces sets when re-saving for the same exercise/date', () => {
     const repo = makeRepo()
     const existingLog = {
-      id: { value: 1 },
+      id: 1,
       userId: 1,
       exerciseId: 5,
       date: '2025-01-01',
@@ -92,7 +93,7 @@ describe('logWorkoutUseCase', () => {
     const repo = makeRepo()
     repo.findByDateAndExercise.mockReturnValue(undefined)
     const savedLog = {
-      id: { value: 42 },
+      id: 42,
       userId: 1,
       exerciseId: 5,
       date: '2025-01-01',
@@ -105,7 +106,7 @@ describe('logWorkoutUseCase', () => {
     const useCase = logWorkoutUseCase(repo)
     const result = useCase.execute(1, 5, '2025-01-01', [{ reps: 5, weight: 100 }])
 
-    expect(result.id.value).toBe(42)
+    expect(result.id).toBe(42)
     expect(result).toBe(savedLog)
   })
 

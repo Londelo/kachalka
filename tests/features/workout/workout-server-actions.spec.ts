@@ -11,6 +11,7 @@ const mockWorkoutRepo = {
   update: vi.fn(),
   delete: vi.fn(),
   findByDayOfWeek: vi.fn(),
+  findHistoryByDate: vi.fn(),
 }
 
 const mockRoutineRepo = {
@@ -37,6 +38,14 @@ const mockDeleteWorkout = {
 }
 
 const mockGetTodayExercises = {
+  execute: vi.fn(),
+}
+
+const mockGetWorkoutHistory = {
+  execute: vi.fn(),
+}
+
+const mockGetUserVolume = {
   execute: vi.fn(),
 }
 
@@ -82,12 +91,22 @@ vi.mock('@/features/workout/get-today-exercises', () => ({
   getTodayExercisesUseCase: vi.fn(() => mockGetTodayExercises),
 }))
 
+vi.mock('@/features/workout/get-workout-history', () => ({
+  getWorkoutHistoryUseCase: vi.fn(() => mockGetWorkoutHistory),
+}))
+
+vi.mock('@/features/workout/get-user-volume', () => ({
+  getUserVolumeUseCase: vi.fn(() => mockGetUserVolume),
+}))
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockLogWorkout.execute.mockReset()
   mockUpdateWorkout.execute.mockReset()
   mockDeleteWorkout.execute.mockReset()
   mockGetTodayExercises.execute.mockReset()
+  mockGetWorkoutHistory.execute.mockReset()
+  mockGetUserVolume.execute.mockReset()
 })
 
 describe('logWorkoutAction', () => {
@@ -291,6 +310,129 @@ describe('getTodayExercisesAction', () => {
 
     const { getTodayExercisesAction } = await import('@/features/workout/workout-server-actions')
     const result = await getTodayExercisesAction(1, 0)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Unknown error')
+  })
+})
+
+describe('getHistoryAction', () => {
+  it('returns history on success', async () => {
+    const mockHistory = [
+      {
+        date: '2025-01-08',
+        logs: [
+          {
+            id: 2,
+            exerciseId: 5,
+            exerciseName: 'Squat',
+            sets: [{ reps: 5, weight: 105 }],
+            volume: 525,
+          },
+        ],
+      },
+    ]
+    mockGetWorkoutHistory.execute.mockReturnValue(mockHistory)
+
+    const { getHistoryAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getHistoryAction(1)
+
+    expect(result.success).toBe(true)
+    expect(result.history).toEqual(mockHistory)
+    expect(result.error).toBeUndefined()
+  })
+
+  it('returns empty array when user has no history', async () => {
+    mockGetWorkoutHistory.execute.mockReturnValue([])
+
+    const { getHistoryAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getHistoryAction(1)
+
+    expect(result.success).toBe(true)
+    expect(result.history).toEqual([])
+    expect(result.error).toBeUndefined()
+  })
+
+  it('returns error on failure', async () => {
+    mockGetWorkoutHistory.execute.mockImplementation(() => {
+      throw new Error('Database error')
+    })
+
+    const { getHistoryAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getHistoryAction(1)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Database error')
+    expect(result.history).toBeUndefined()
+  })
+
+  it('returns Unknown error for non-Error exceptions', async () => {
+    mockGetWorkoutHistory.execute.mockImplementation(() => {
+      throw 'string error'
+    })
+
+    const { getHistoryAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getHistoryAction(1)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Unknown error')
+  })
+})
+
+describe('deleteHistoryEntryAction', () => {
+  it('succeeds and deletes the log', async () => {
+    mockDeleteWorkout.execute.mockReturnValue(undefined)
+
+    const { deleteHistoryEntryAction } = await import('@/features/workout/workout-server-actions')
+    const result = await deleteHistoryEntryAction(1, 1)
+
+    expect(result.success).toBe(true)
+    expect(result.error).toBeUndefined()
+  })
+
+  it('returns error when log not found', async () => {
+    mockDeleteWorkout.execute.mockImplementation(() => {
+      throw new Error('Workout log not found')
+    })
+
+    const { deleteHistoryEntryAction } = await import('@/features/workout/workout-server-actions')
+    const result = await deleteHistoryEntryAction(999, 1)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Workout log not found')
+  })
+
+  it('returns error when not the owner', async () => {
+    mockDeleteWorkout.execute.mockImplementation(() => {
+      throw new Error('Only the owner can delete this workout log')
+    })
+
+    const { deleteHistoryEntryAction } = await import('@/features/workout/workout-server-actions')
+    const result = await deleteHistoryEntryAction(1, 1)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Only the owner can delete this workout log')
+  })
+
+  it('returns error for database errors', async () => {
+    mockDeleteWorkout.execute.mockImplementation(() => {
+      throw new Error('Connection refused')
+    })
+
+    const { deleteHistoryEntryAction } = await import('@/features/workout/workout-server-actions')
+    const result = await deleteHistoryEntryAction(1, 1)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Connection refused')
+  })
+
+  it('returns Unknown error for non-Error exceptions', async () => {
+    mockDeleteWorkout.execute.mockImplementation(() => {
+      throw 'string error'
+    })
+
+    const { deleteHistoryEntryAction } = await import('@/features/workout/workout-server-actions')
+    const result = await deleteHistoryEntryAction(1, 1)
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Unknown error')

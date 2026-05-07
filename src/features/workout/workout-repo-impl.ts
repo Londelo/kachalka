@@ -6,14 +6,22 @@ import type { WorkoutRepository } from '@/features/workout/workout-repository'
 import type { WorkoutLog, WorkoutSet } from '@/features/workout/types'
 import { and } from 'drizzle-orm'
 import * as R from 'ramda'
+import { calculateVolume } from '@/features/workout/workout-entity'
 
 function mapRowToWorkoutLog(row: Record<string, unknown>): WorkoutLog {
+  // Drizzle JSON mode auto-parses JSON columns in .select() queries,
+  // so row.sets may already be an array (not a string).
+  const setsValue = row.sets
+  const parsedSets = Array.isArray(setsValue)
+    ? (setsValue as WorkoutSet[])
+    : JSON.parse(setsValue as string) as WorkoutSet[]
+
   return {
-    id: { value: Number(row.id) },
+    id: Number(row.id),
     userId: Number(row.userId),
     exerciseId: Number(row.exerciseId),
     date: row.date as string,
-    sets: JSON.parse(row.sets as string) as WorkoutSet[],
+    sets: parsedSets,
     createdAt: row.created_at instanceof Date ? (row.created_at as Date).toISOString() : String(row.created_at),
     updatedAt: row.updated_at instanceof Date ? (row.updated_at as Date).toISOString() : String(row.updated_at),
   }
@@ -197,6 +205,77 @@ export function createSqliteWorkoutRepository(db: ReturnType<typeof Database>): 
 
       if (!row) return undefined
       return mapRowToWorkoutLog(row)
+    },
+
+    findHistoryByDate(userId: number): {
+      date: string
+      logs: {
+        id: number
+        exerciseId: number
+        exerciseName: string
+        sets: WorkoutSet[]
+        volume: number
+      }[]
+    }[] {
+      const rows = queryDb
+        .select({
+          logId: schema.workoutLogs.id,
+          userId: schema.workoutLogs.userId,
+          exerciseId: schema.workoutLogs.exerciseId,
+          date: schema.workoutLogs.date,
+          sets: schema.workoutLogs.sets,
+          exerciseName: schema.exercises.name,
+        })
+        .from(schema.workoutLogs)
+        .leftJoin(schema.exercises, eq(schema.exercises.id, schema.workoutLogs.exerciseId))
+        .where(eq(schema.workoutLogs.userId, userId))
+        .orderBy(desc(schema.workoutLogs.date))
+        .all()
+
+      const mapped = R.map((row: Record<string, unknown>) => {
+        // Unwrap Drizzle value objects to ensure plain serializable types
+        const logId = row.logId
+        const unwrappedLogId = typeof logId === 'object' && logId !== null && 'value' in logId
+          ? (logId as { value: number }).value
+          : Number(logId)
+
+        const exerciseId = row.exerciseId
+        const unwrappedExerciseId = typeof exerciseId === 'object' && exerciseId !== null && 'value' in exerciseId
+          ? (exerciseId as { value: number }).value
+          : Number(exerciseId)
+
+        const setsValue = row.sets
+        // Drizzle JSON mode auto-parses JSON columns in .select() queries,
+        // so setsValue may already be an array (not a string).
+        // It may also be a Drizzle {value: ...} wrapper.
+        let unwrappedSets: unknown
+        if (typeof setsValue === 'object' && setsValue !== null && 'value' in setsValue) {
+          unwrappedSets = (setsValue as { value: unknown }).value
+        } else {
+          unwrappedSets = setsValue
+        }
+        const parsedSets = Array.isArray(unwrappedSets)
+          ? (unwrappedSets as WorkoutSet[])
+          : JSON.parse(unwrappedSets as string) as WorkoutSet[]
+
+        return {
+          date: row.date as string,
+          id: unwrappedLogId,
+          exerciseId: unwrappedExerciseId,
+          exerciseName: typeof row.exerciseName === 'object' && row.exerciseName !== null && 'value' in row.exerciseName
+            ? (row.exerciseName as { value: string }).value
+            : (row.exerciseName as string),
+          sets: parsedSets,
+          volume: calculateVolume(parsedSets),
+        }
+      }, rows)
+
+      const grouped = R.groupBy((item: typeof mapped[number]) => item.date, mapped)
+
+      return R.values(grouped).map((logItems) => ({
+        date: logItems![0].date,
+        logs: logItems!.slice().map(({ date: _date, ...rest }) => rest),
+      }))
     },
   }
 }

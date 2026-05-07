@@ -74,7 +74,7 @@ describe('createSqliteWorkoutRepository', () => {
       sets: [{ reps: 5, weight: 100 }],
     })
 
-    expect(log.id.value).toBeGreaterThan(0)
+    expect(log.id).toBeGreaterThan(0)
     expect(log.userId).toBe(user.lastInsertRowid!)
     expect(log.exerciseId).toBe(exercise.lastInsertRowid!)
     expect(log.date).toBe('2025-01-01')
@@ -92,9 +92,9 @@ describe('createSqliteWorkoutRepository', () => {
       sets: [{ reps: 5, weight: 100 }],
     })
 
-    const found = repo.findById(inserted.id.value)
+    const found = repo.findById(inserted.id)
     expect(found).toBeDefined()
-    expect(found!.id.value).toBe(inserted.id.value)
+    expect(found!.id).toBe(inserted.id)
     expect(found!.userId).toBe(user.lastInsertRowid!)
   })
 
@@ -171,7 +171,7 @@ describe('createSqliteWorkoutRepository', () => {
       sets: [{ reps: 5, weight: 100 }],
     })
 
-    const updated = repo.update(inserted.id.value, [
+    const updated = repo.update(inserted.id, [
       { reps: 5, weight: 100 },
       { reps: 5, weight: 110 },
     ])!
@@ -275,5 +275,113 @@ describe('createSqliteWorkoutRepository', () => {
     const bobLatest = repo.findLatestForExercise(user2.lastInsertRowid!, exercise2.lastInsertRowid!)
     expect(bobLatest!.date).toBe('2025-01-15')
     expect(bobLatest!.sets[0].weight).toBe(200)
+  })
+
+  it('findHistoryByDate returns logs grouped by date, newest date first', () => {
+    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+
+    repo.create({ userId: user.lastInsertRowid!, exerciseId: exercise.lastInsertRowid!, date: '2025-01-01', sets: [{ reps: 5, weight: 100 }] })
+    repo.create({ userId: user.lastInsertRowid!, exerciseId: exercise.lastInsertRowid!, date: '2025-01-08', sets: [{ reps: 5, weight: 105 }] })
+    repo.create({ userId: user.lastInsertRowid!, exerciseId: exercise.lastInsertRowid!, date: '2025-01-15', sets: [{ reps: 5, weight: 110 }] })
+
+    const history = repo.findHistoryByDate(user.lastInsertRowid!)
+
+    expect(history).toHaveLength(3)
+    expect(history[0].date).toBe('2025-01-15')
+    expect(history[1].date).toBe('2025-01-08')
+    expect(history[2].date).toBe('2025-01-01')
+  })
+
+  it('findHistoryByDate returns groups with exercise names', () => {
+    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const squat = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+    const bench = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
+
+    repo.create({ userId: user.lastInsertRowid!, exerciseId: squat.lastInsertRowid!, date: '2025-01-01', sets: [{ reps: 5, weight: 100 }] })
+    repo.create({ userId: user.lastInsertRowid!, exerciseId: bench.lastInsertRowid!, date: '2025-01-01', sets: [{ reps: 3, weight: 80 }] })
+
+    const history = repo.findHistoryByDate(user.lastInsertRowid!)
+
+    expect(history).toHaveLength(1)
+    expect(history[0].logs).toHaveLength(2)
+    const names = history[0].logs.map((log) => log.exerciseName)
+    expect(names).toContain('Squat')
+    expect(names).toContain('Bench Press')
+  })
+
+  it('findHistoryByDate returns empty array when user has no logs', () => {
+    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+
+    const history = repo.findHistoryByDate(user.lastInsertRowid!)
+
+    expect(history).toEqual([])
+  })
+
+  it('findHistoryByDate calculates volume correctly per log', () => {
+    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+
+    repo.create({
+      userId: user.lastInsertRowid!,
+      exerciseId: exercise.lastInsertRowid!,
+      date: '2025-01-01',
+      sets: [
+        { reps: 5, weight: 100 },
+        { reps: 5, weight: 110 },
+      ],
+    })
+
+    const history = repo.findHistoryByDate(user.lastInsertRowid!)
+
+    expect(history).toHaveLength(1)
+    expect(history[0].logs[0].volume).toBe(1050) // 5*100 + 5*110
+  })
+
+  it('findHistoryByDate groups multiple exercises on the same date together', () => {
+    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const squat = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+    const deadlift = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Deadlift', user.lastInsertRowid!)
+
+    repo.create({ userId: user.lastInsertRowid!, exerciseId: squat.lastInsertRowid!, date: '2025-01-01', sets: [{ reps: 5, weight: 100 }] })
+    repo.create({ userId: user.lastInsertRowid!, exerciseId: deadlift.lastInsertRowid!, date: '2025-01-01', sets: [{ reps: 3, weight: 200 }] })
+
+    const history = repo.findHistoryByDate(user.lastInsertRowid!)
+
+    expect(history).toHaveLength(1)
+    expect(history[0].date).toBe('2025-01-01')
+    expect(history[0].logs).toHaveLength(2)
+  })
+
+  it('findHistoryByDate returns correct log ids', () => {
+    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+
+    const log1 = repo.create({ userId: user.lastInsertRowid!, exerciseId: exercise.lastInsertRowid!, date: '2025-01-01', sets: [{ reps: 5, weight: 100 }] })
+    const log2 = repo.create({ userId: user.lastInsertRowid!, exerciseId: exercise.lastInsertRowid!, date: '2025-01-08', sets: [{ reps: 5, weight: 105 }] })
+
+    const history = repo.findHistoryByDate(user.lastInsertRowid!)
+
+    const allLogs = history.flatMap((day) => day.logs)
+    const ids = allLogs.map((log) => log.id)
+    expect(ids).toContain(log1.id)
+    expect(ids).toContain(log2.id)
+  })
+
+  it('findHistoryByDate returns JSON-serializable data (no Drizzle value objects)', () => {
+    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+
+    repo.create({ userId: user.lastInsertRowid!, exerciseId: exercise.lastInsertRowid!, date: '2025-01-01', sets: [{ reps: 5, weight: 100 }] })
+
+    const history = repo.findHistoryByDate(user.lastInsertRowid!)
+
+    // Should not throw — catches any remaining Drizzle value objects
+    expect(() => JSON.stringify(history)).not.toThrow()
+    const serialized = JSON.parse(JSON.stringify(history))
+    expect(serialized).toHaveLength(1)
+    expect(serialized[0].logs[0].id).toBe(1)
+    expect(serialized[0].logs[0].exerciseName).toBe('Squat')
+    expect(serialized[0].logs[0].volume).toBe(500)
   })
 })

@@ -12,6 +12,7 @@ function makeRepo(overrides: Partial<WorkoutRepository> = {}): WorkoutRepository
     update: vi.fn(),
     delete: vi.fn(),
     findByDayOfWeek: vi.fn(),
+    findHistoryByDate: vi.fn(),
     ...overrides,
   }
 }
