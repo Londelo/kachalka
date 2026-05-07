@@ -169,8 +169,8 @@ export default function TodayPage() {
                           globalSetNum = end + 1
                           const setLabel =
                             g.count === 1
-                              ? `SET ${String(start).padStart(2, '0')}`
-                              : `SET ${String(start).padStart(2, '0')}-${String(end).padStart(2, '0')}`
+                              ? `SET: ${String(start).padStart(2, '0')}`
+                              : `SET: ${String(start).padStart(2, '0')}-${String(end).padStart(2, '0')}`
                           return (
                             <div
                               key={`${g.weight}-${g.reps}`}
