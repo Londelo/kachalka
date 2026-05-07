@@ -3,7 +3,7 @@ import './globals.css'
 import { runMigrations } from '@/db/migrate'
 import { seedDatabase } from '@/db/seed'
 import Header from '@/app/components/header'
-import BottomNav from '@/app/components/bottom-nav'
+import NavWrapper from '@/app/components/nav-wrapper.client'
 
 export const metadata = {
   title: 'IRON COMMAND',
@@ -28,7 +28,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="bg-background text-on-surface font-body-md">
         <Header />
         <main>{children}</main>
-        <BottomNav activeTab="CONFIG" />
+        <NavWrapper />
       </body>
     </html>
   )
