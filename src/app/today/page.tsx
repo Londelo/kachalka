@@ -96,7 +96,7 @@ export default function TodayPage() {
   }
 
   function defaultSet(): WorkoutSet {
-    return { reps: 1, weight: 0, rpe: 5 }
+    return { reps: 1, weight: 0 }
   }
 
   if (loading) {
@@ -269,17 +269,6 @@ function SetModal({
                 className="w-20 border-b-4 border-primary-container bg-background px-2 py-1 font-body-md text-body-md text-on-surface outline-none"
               />
               <span className="font-label-mono text-label-mono text-secondary">REPS</span>
-
-              <input
-                type="number"
-                value={set.rpe || ''}
-                onChange={(e) => onSetChange(index, 'rpe', e.target.value)}
-                placeholder="5"
-                min={1}
-                max={10}
-                className="w-20 border-b-4 border-primary-container bg-background px-2 py-1 font-body-md text-body-md text-on-surface outline-none"
-              />
-              <span className="font-label-mono text-label-mono text-secondary">RPE</span>
 
               <button
                 type="button"

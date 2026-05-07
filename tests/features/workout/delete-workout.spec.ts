@@ -28,7 +28,7 @@ describe('deleteWorkoutUseCase', () => {
       userId: 1,
       exerciseId: 5,
       date: '2025-01-01',
-      sets: [{ reps: 5, weight: 100, rpe: 7, rest: 60, note: '' }],
+      sets: [{ reps: 5, weight: 100 }],
       createdAt: '2025-01-01T00:00:00.000Z',
       updatedAt: '2025-01-01T00:00:00.000Z',
     })

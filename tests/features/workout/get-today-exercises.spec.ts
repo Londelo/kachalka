@@ -14,6 +14,7 @@ function makeWorkoutRepo(overrides: Partial<WorkoutRepository> = {}): WorkoutRep
     update: vi.fn(),
     delete: vi.fn(),
     findByDayOfWeek: vi.fn(),
+    findLatestForExercise: vi.fn(),
     ...overrides,
   }
 }
@@ -94,8 +95,8 @@ describe('getTodayExercisesUseCase', () => {
     ])
 
     exerciseRepo.findById.mockReturnValue({ id: { value: 5 }, name: 'Bench Press' })
-    workoutRepo.findByDateAndExercise.mockReturnValue({
-      sets: [{ weight: 225, reps: 10, rpe: 8, rest: 60 }],
+    workoutRepo.findLatestForExercise.mockReturnValue({
+      sets: [{ weight: 225, reps: 10 }],
     })
 
     const useCase = getTodayExercisesUseCase(routineRepo, workoutRepo, exerciseRepo)
@@ -114,7 +115,7 @@ describe('getTodayExercisesUseCase', () => {
     ])
 
     exerciseRepo.findById.mockReturnValue({ id: { value: 5 }, name: 'Bench Press' })
-    workoutRepo.findByDateAndExercise.mockReturnValue(undefined)
+    workoutRepo.findLatestForExercise.mockReturnValue(undefined)
 
     const useCase = getTodayExercisesUseCase(routineRepo, workoutRepo, exerciseRepo)
     const result = useCase.execute(1, 0)

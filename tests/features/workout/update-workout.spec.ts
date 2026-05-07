@@ -28,22 +28,22 @@ describe('updateWorkoutUseCase', () => {
       userId: 1,
       exerciseId: 5,
       date: '2025-01-01',
-      sets: [{ reps: 5, weight: 100, rpe: 7, rest: 60, note: '' }],
+      sets: [{ reps: 5, weight: 100 }],
       createdAt: '2025-01-01T00:00:00.000Z',
       updatedAt: '2025-01-01T00:00:00.000Z',
     }
     repo.findById.mockReturnValue(existingLog)
     const updatedLog = {
       ...existingLog,
-      sets: [{ reps: 5, weight: 110, rpe: 8, rest: 60, note: '' }],
+      sets: [{ reps: 5, weight: 110 }],
     }
     repo.update.mockReturnValue(updatedLog)
 
     const useCase = updateWorkoutUseCase(repo)
-    const result = useCase.execute(1, 1, [{ reps: 5, weight: 110, rpe: 8, rest: 60, note: '' }])
+    const result = useCase.execute(1, 1, [{ reps: 5, weight: 110 }])
 
     expect(result).toEqual(updatedLog)
-    expect(repo.update).toHaveBeenCalledWith(1, [{ reps: 5, weight: 110, rpe: 8, rest: 60, note: '' }])
+    expect(repo.update).toHaveBeenCalledWith(1, [{ reps: 5, weight: 110 }])
   })
 
   it('validates each set before updating', () => {
@@ -60,7 +60,7 @@ describe('updateWorkoutUseCase', () => {
 
     const useCase = updateWorkoutUseCase(repo)
 
-    expect(() => useCase.execute(1, 1, [{ reps: 5, weight: 0, rpe: 7, rest: 60, note: '' }])).toThrow('Weight must be greater than 0')
+    expect(() => useCase.execute(1, 1, [{ reps: 5, weight: 0 }])).toThrow('Weight must be greater than 0')
     expect(repo.update).not.toHaveBeenCalled()
   })
 
@@ -70,7 +70,7 @@ describe('updateWorkoutUseCase', () => {
 
     const useCase = updateWorkoutUseCase(repo)
 
-    expect(() => useCase.execute(999, 1, [{ reps: 5, weight: 100, rpe: 7, rest: 60, note: '' }])).toThrow('Workout log not found')
+    expect(() => useCase.execute(999, 1, [{ reps: 5, weight: 100 }])).toThrow('Workout log not found')
     expect(repo.update).not.toHaveBeenCalled()
   })
 
@@ -88,7 +88,7 @@ describe('updateWorkoutUseCase', () => {
 
     const useCase = updateWorkoutUseCase(repo)
 
-    expect(() => useCase.execute(1, 1, [{ reps: 5, weight: 100, rpe: 7, rest: 60, note: '' }])).toThrow('Only the owner can update this workout log')
+    expect(() => useCase.execute(1, 1, [{ reps: 5, weight: 100 }])).toThrow('Only the owner can update this workout log')
     expect(repo.update).not.toHaveBeenCalled()
   })
 })

@@ -4,59 +4,28 @@ import type { WorkoutSet } from '@/features/workout/types'
 
 describe('validateSet', () => {
   it('passes for a valid set', () => {
-    const validSet: WorkoutSet = { reps: 5, weight: 100, rpe: 7, rest: 60, note: 'good set' }
+    const validSet: WorkoutSet = { reps: 5, weight: 100}
     expect(() => validateSet(validSet)).not.toThrow()
   })
 
   it('throws when weight is 0', () => {
-    const set: WorkoutSet = { reps: 5, weight: 0, rpe: 7, rest: 60, note: '' }
+    const set: WorkoutSet = { reps: 5, weight: 0}
     expect(() => validateSet(set)).toThrow('Weight must be greater than 0')
   })
 
   it('throws when weight is negative', () => {
-    const set: WorkoutSet = { reps: 5, weight: -10, rpe: 7, rest: 60, note: '' }
+    const set: WorkoutSet = { reps: 5, weight: -10}
     expect(() => validateSet(set)).toThrow('Weight must be greater than 0')
   })
 
   it('throws when reps is 0', () => {
-    const set: WorkoutSet = { reps: 0, weight: 100, rpe: 7, rest: 60, note: '' }
+    const set: WorkoutSet = { reps: 0, weight: 100}
     expect(() => validateSet(set)).toThrow('Reps must be at least 1')
   })
 
   it('throws when reps is negative', () => {
-    const set: WorkoutSet = { reps: -1, weight: 100, rpe: 7, rest: 60, note: '' }
+    const set: WorkoutSet = { reps: -1, weight: 100}
     expect(() => validateSet(set)).toThrow('Reps must be at least 1')
-  })
-
-  it('throws when rpe is 0', () => {
-    const set: WorkoutSet = { reps: 5, weight: 100, rpe: 0, rest: 60, note: '' }
-    expect(() => validateSet(set)).toThrow('RPE must be between 1 and 10')
-  })
-
-  it('throws when rpe is less than 1', () => {
-    const set: WorkoutSet = { reps: 5, weight: 100, rpe: -1, rest: 60, note: '' }
-    expect(() => validateSet(set)).toThrow('RPE must be between 1 and 10')
-  })
-
-  it('throws when rpe is greater than 10', () => {
-    const set: WorkoutSet = { reps: 5, weight: 100, rpe: 11, rest: 60, note: '' }
-    expect(() => validateSet(set)).toThrow('RPE must be between 1 and 10')
-  })
-
-  it('passes when rpe is exactly 1', () => {
-    const set: WorkoutSet = { reps: 5, weight: 100, rpe: 1, rest: 60, note: '' }
-    expect(() => validateSet(set)).not.toThrow()
-  })
-
-  it('passes when rpe is exactly 10', () => {
-    const set: WorkoutSet = { reps: 5, weight: 100, rpe: 10, rest: 60, note: '' }
-    expect(() => validateSet(set)).not.toThrow()
-  })
-
-
-  it('passes when rest is 0', () => {
-    const set: WorkoutSet = { reps: 5, weight: 100, rpe: 7, rest: 0, note: '' }
-    expect(() => validateSet(set)).not.toThrow()
   })
 })
 
@@ -95,7 +64,7 @@ describe('WorkoutLog type structure', () => {
       userId: 1,
       exerciseId: 2,
       date: '2025-01-01',
-      sets: [{ reps: 5, weight: 100, rpe: 7, rest: 60, note: '' }],
+      sets: [{ reps: 5, weight: 100}],
       createdAt: '2025-01-01T00:00:00.000Z',
       updatedAt: '2025-01-01T00:00:00.000Z',
     }

@@ -45,7 +45,7 @@ const mockLog = {
   userId: 1,
   exerciseId: 5,
   date: '2025-01-01',
-  sets: [{ reps: 5, weight: 100, rpe: 7, rest: 60, note: '' }],
+  sets: [{ reps: 5, weight: 100 }],
   createdAt: '2025-01-01T00:00:00.000Z',
   updatedAt: '2025-01-01T00:00:00.000Z',
 }
@@ -95,7 +95,7 @@ describe('logWorkoutAction', () => {
     mockLogWorkout.execute.mockReturnValue(mockLog)
 
     const { logWorkoutAction } = await import('@/features/workout/workout-server-actions')
-    const result = await logWorkoutAction(1, 5, '2025-01-01', [{ reps: 5, weight: 100, rpe: 7, rest: 60, note: '' }])
+    const result = await logWorkoutAction(1, 5, '2025-01-01', [{ reps: 5, weight: 100 }])
 
     expect(result.success).toBe(true)
     expect(result.log).toEqual(mockLog)
@@ -121,7 +121,7 @@ describe('logWorkoutAction', () => {
     })
 
     const { logWorkoutAction } = await import('@/features/workout/workout-server-actions')
-    const result = await logWorkoutAction(1, 5, '2025-01-01', [{ reps: 5, weight: 0, rpe: 7, rest: 60, note: '' }])
+    const result = await logWorkoutAction(1, 5, '2025-01-01', [{ reps: 5, weight: 0 }])
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Weight must be greater than 0')
@@ -133,7 +133,7 @@ describe('logWorkoutAction', () => {
     })
 
     const { logWorkoutAction } = await import('@/features/workout/workout-server-actions')
-    const result = await logWorkoutAction(1, 5, '2025-01-01', [{ reps: 5, weight: 100, rpe: 7, rest: 60, note: '' }])
+    const result = await logWorkoutAction(1, 5, '2025-01-01', [{ reps: 5, weight: 100 }])
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Connection refused')
@@ -145,7 +145,7 @@ describe('logWorkoutAction', () => {
     })
 
     const { logWorkoutAction } = await import('@/features/workout/workout-server-actions')
-    const result = await logWorkoutAction(1, 5, '2025-01-01', [{ reps: 5, weight: 100, rpe: 7, rest: 60, note: '' }])
+    const result = await logWorkoutAction(1, 5, '2025-01-01', [{ reps: 5, weight: 100 }])
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Unknown error')
@@ -157,7 +157,7 @@ describe('updateWorkoutAction', () => {
     mockUpdateWorkout.execute.mockReturnValue(mockLog)
 
     const { updateWorkoutAction } = await import('@/features/workout/workout-server-actions')
-    const result = await updateWorkoutAction(1, 1, [{ reps: 5, weight: 110, rpe: 8, rest: 60, note: '' }])
+    const result = await updateWorkoutAction(1, 1, [{ reps: 5, weight: 110 }])
 
     expect(result.success).toBe(true)
     expect(result.log).toEqual(mockLog)
@@ -170,7 +170,7 @@ describe('updateWorkoutAction', () => {
     })
 
     const { updateWorkoutAction } = await import('@/features/workout/workout-server-actions')
-    const result = await updateWorkoutAction(999, 1, [{ reps: 5, weight: 100, rpe: 7, rest: 60, note: '' }])
+    const result = await updateWorkoutAction(999, 1, [{ reps: 5, weight: 100 }])
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Workout log not found')
@@ -182,7 +182,7 @@ describe('updateWorkoutAction', () => {
     })
 
     const { updateWorkoutAction } = await import('@/features/workout/workout-server-actions')
-    const result = await updateWorkoutAction(1, 1, [{ reps: 5, weight: 100, rpe: 7, rest: 60, note: '' }])
+    const result = await updateWorkoutAction(1, 1, [{ reps: 5, weight: 100 }])
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Only the owner can update this workout log')
@@ -194,7 +194,7 @@ describe('updateWorkoutAction', () => {
     })
 
     const { updateWorkoutAction } = await import('@/features/workout/workout-server-actions')
-    const result = await updateWorkoutAction(1, 1, [{ reps: 5, weight: 0, rpe: 7, rest: 60, note: '' }])
+    const result = await updateWorkoutAction(1, 1, [{ reps: 5, weight: 0 }])
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Weight must be greater than 0')

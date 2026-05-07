@@ -1,7 +1,6 @@
 export type WorkoutSet = {
   reps: number
   weight: number
-  rpe: number
 }
 
 export type WorkoutLog = {

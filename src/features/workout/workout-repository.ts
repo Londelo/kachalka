@@ -9,4 +9,5 @@ export interface WorkoutRepository {
   update(id: number, sets: WorkoutSet[]): WorkoutLog | undefined
   delete(id: number): void
   findByDayOfWeek(userId: number, dayOfWeek: number): { exerciseId: number; exerciseName: string; lastLog?: WorkoutLog }[]
+  findLatestForExercise(userId: number, exerciseId: number): WorkoutLog | undefined
 }

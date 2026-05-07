@@ -25,7 +25,7 @@ export function getTodayExercisesUseCase(
       return todayAssignments.map((assignment: RoutineAssignment) => {
         const exercise = exerciseRepo.findById(assignment.exerciseId)
         const lastLog = exercise
-          ? workoutRepo.findByDateAndExercise(userId, '', assignment.exerciseId)
+          ? workoutRepo.findLatestForExercise(userId, assignment.exerciseId)
           : null
 
         return {

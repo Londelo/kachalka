@@ -180,5 +180,23 @@ export function createSqliteWorkoutRepository(db: ReturnType<typeof Database>): 
 
       return results
     },
+
+    findLatestForExercise(userId: number, exerciseId: number): WorkoutLog | undefined {
+      const row = queryDb
+        .select()
+        .from(schema.workoutLogs)
+        .where(
+          and(
+            eq(schema.workoutLogs.userId, userId),
+            eq(schema.workoutLogs.exerciseId, exerciseId),
+          ),
+        )
+        .orderBy(desc(schema.workoutLogs.date))
+        .limit(1)
+        .get()
+
+      if (!row) return undefined
+      return mapRowToWorkoutLog(row)
+    },
   }
 }
