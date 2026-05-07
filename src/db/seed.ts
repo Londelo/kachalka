@@ -16,6 +16,8 @@ export function seedDatabase(): void {
   db.exec('DELETE FROM user_routines')
   db.exec('DELETE FROM exercises')
   db.exec('DELETE FROM users')
+  // Reset auto-increment counters so new rows always start at id=1
+  db.exec("DELETE FROM sqlite_sequence WHERE name IN ('users', 'exercises', 'workout_logs', 'user_routines')")
 
   const insertUser = db.prepare(
     'INSERT INTO users (name, email) VALUES (?, ?)',
