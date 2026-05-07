@@ -67,17 +67,17 @@ export function seedProgressData(): void {
   }
 
   const insertExercise = db.prepare(
-    `INSERT INTO exercises (name, userId) VALUES (?, ?)`,
+    `INSERT INTO exercises (name, user_id) VALUES (?, ?)`,
   )
 
   const insertLog = db.prepare(
-    `INSERT INTO workout_logs (userId, exerciseId, date, sets) VALUES (?, ?, ?, ?)`,
+    `INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)`,
   )
 
   const seedProgress = db.transaction(() => {
     // Grab the first user.
     const { userId } = db
-      .prepare('SELECT userId FROM users LIMIT 1')
+      .prepare('SELECT user_id FROM users LIMIT 1')
       .get() as { userId: number }
 
     // Exercises to seed. "Barbell Curl" gets only 1-2 logs for the
