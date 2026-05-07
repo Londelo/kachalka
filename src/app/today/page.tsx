@@ -294,35 +294,39 @@ function SetModal({
 
         <div className="mb-4 flex flex-col gap-4">
           {sets.map((set, index) => (
-            <div key={set.id} className="flex items-center gap-2">
+            <div key={set.id} className="flex w-full items-center gap-2">
               <span className="font-label-mono text-label-mono text-secondary">
                 SET {String(index + 1).padStart(2, '0')}
               </span>
 
-              <input
-                type="number"
-                value={set.weight || ''}
-                onChange={(e) => onSetChange(index, 'weight', e.target.value)}
-                placeholder="0"
-                className="w-20 border-b-4 border-primary-container bg-background px-2 py-1 font-body-md text-body-md text-on-surface outline-none"
-              />
-              <span className="font-label-mono text-label-mono text-secondary">LB</span>
+              <div className="flex items-center gap-1">
+                <span className="font-label-mono text-label-mono text-secondary">LB</span>
+                <input
+                  type="number"
+                  value={set.weight || ''}
+                  onChange={(e) => onSetChange(index, 'weight', e.target.value)}
+                  placeholder="0"
+                  className="w-20 border-b-4 border-primary-container bg-background px-2 py-1 font-body-md text-body-md text-on-surface outline-none"
+                />
+              </div>
 
-              <input
-                type="number"
-                value={set.reps || ''}
-                onChange={(e) => onSetChange(index, 'reps', e.target.value)}
-                placeholder="0"
-                className="w-20 border-b-4 border-primary-container bg-background px-2 py-1 font-body-md text-body-md text-on-surface outline-none"
-              />
-              <span className="font-label-mono text-label-mono text-secondary">REPS</span>
+              <div className="flex items-center gap-1">
+                <span className="font-label-mono text-label-mono text-secondary">REPS</span>
+                <input
+                  type="number"
+                  value={set.reps || ''}
+                  onChange={(e) => onSetChange(index, 'reps', e.target.value)}
+                  placeholder="0"
+                  className="w-20 border-b-4 border-primary-container bg-background px-2 py-1 font-body-md text-body-md text-on-surface outline-none"
+                />
+              </div>
 
               <button
                 type="button"
                 onClick={() => onRemoveSet(index)}
-                className="ml-2 border-4 border-on-surface bg-error p-2 text-on-primary neo-shadow transition-all active-press"
+                className="ml-2 border-4 border-on-surface bg-error p-1 text-on-primary neo-shadow transition-all active-press"
               >
-                <span className="material-symbols-outlined text-[20px]">delete</span>
+                <span className="material-symbols-outlined text-[16px]">delete</span>
               </button>
             </div>
           ))}
