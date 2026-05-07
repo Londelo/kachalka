@@ -175,19 +175,19 @@ export default function TodayPage() {
                           return (
                             <div
                               key={`${g.weight}-${g.reps}`}
-                              className="flex items-center gap-2"
+                              className="flex items-center gap-4"
                             >
-                              <div className="border-4 border-on-surface bg-primary p-3">
+                              <div className="flex-1 border-4 border-on-surface bg-primary p-3">
                                 <p className="font-body-lg text-body-lg font-bold text-on-primary">
                                   {setLabel}
                                 </p>
                               </div>
-                              <div className="border-4 border-on-surface bg-on-surface p-3">
+                              <div className="flex-1 border-4 border-on-surface bg-on-surface p-3">
                                 <p className="font-body-lg text-body-lg font-bold text-background">
-                                  {g.reps}
+                                  {g.reps} REPS
                                 </p>
                               </div>
-                              <div className="border-4 border-on-surface bg-on-surface p-3">
+                              <div className="flex-1 border-4 border-on-surface bg-on-surface p-3">
                                 <p className="font-body-lg text-body-lg font-bold text-background">
                                   {g.weight} LB
                                 </p>
