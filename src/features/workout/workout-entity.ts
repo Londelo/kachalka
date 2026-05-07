@@ -22,10 +22,6 @@ export function validateSet(set: WorkoutSet): void {
   if (set.rpe < 1 || set.rpe > 10) {
     throw new Error('RPE must be between 1 and 10')
   }
-
-  if (set.rest < 0) {
-    throw new Error('Rest must be non-negative')
-  }
 }
 
 export function calculateVolume(sets: { reps: number; weight: number }[]): number {

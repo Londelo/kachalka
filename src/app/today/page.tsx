@@ -96,7 +96,7 @@ export default function TodayPage() {
   }
 
   function defaultSet(): WorkoutSet {
-    return { reps: 1, weight: 0, rpe: 5, rest: 60, note: '' }
+    return { reps: 1, weight: 0, rpe: 5 }
   }
 
   if (loading) {
@@ -150,7 +150,7 @@ export default function TodayPage() {
                           LAST WEIGHT
                         </p>
                         <p className="font-body-lg text-body-lg text-background">
-                          {last.weight} KG
+                          {last.weight} LB
                         </p>
                       </div>
                       <div className="border-4 border-on-surface bg-on-surface p-3">
@@ -166,7 +166,7 @@ export default function TodayPage() {
                           VOLUME
                         </p>
                         <p className="font-body-lg text-body-lg text-on-primary">
-                          {volume} KG
+                          {volume} LB
                         </p>
                       </div>
                     </div>
@@ -259,7 +259,7 @@ function SetModal({
                 placeholder="0"
                 className="w-20 border-b-4 border-primary-container bg-background px-2 py-1 font-body-md text-body-md text-on-surface outline-none"
               />
-              <span className="font-label-mono text-label-mono text-secondary">KG</span>
+              <span className="font-label-mono text-label-mono text-secondary">LB</span>
 
               <input
                 type="number"
@@ -280,15 +280,6 @@ function SetModal({
                 className="w-20 border-b-4 border-primary-container bg-background px-2 py-1 font-body-md text-body-md text-on-surface outline-none"
               />
               <span className="font-label-mono text-label-mono text-secondary">RPE</span>
-
-              <input
-                type="number"
-                value={set.rest || ''}
-                onChange={(e) => onSetChange(index, 'rest', e.target.value)}
-                placeholder="60"
-                className="w-20 border-b-4 border-primary-container bg-background px-2 py-1 font-body-md text-body-md text-on-surface outline-none"
-              />
-              <span className="font-label-mono text-label-mono text-secondary">S</span>
 
               <button
                 type="button"
@@ -314,7 +305,7 @@ function SetModal({
             VOLUME
           </p>
           <p className="font-body-lg text-body-lg text-background">
-            {volumePreview} KG
+            {volumePreview} LB
           </p>
         </div>
 

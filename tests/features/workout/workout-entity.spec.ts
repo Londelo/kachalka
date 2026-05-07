@@ -53,10 +53,6 @@ describe('validateSet', () => {
     expect(() => validateSet(set)).not.toThrow()
   })
 
-  it('throws when rest is negative', () => {
-    const set: WorkoutSet = { reps: 5, weight: 100, rpe: 7, rest: -1, note: '' }
-    expect(() => validateSet(set)).toThrow('Rest must be non-negative')
-  })
 
   it('passes when rest is 0', () => {
     const set: WorkoutSet = { reps: 5, weight: 100, rpe: 7, rest: 0, note: '' }
