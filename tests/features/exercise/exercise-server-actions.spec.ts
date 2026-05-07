@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockDb = {}
 
@@ -60,10 +60,6 @@ vi.mock('@/features/exercise/list-exercises', () => ({
 }))
 
 beforeEach(() => {
-  vi.clearAllMocks()
-})
-
-afterEach(() => {
   vi.clearAllMocks()
 })
 
@@ -140,6 +136,18 @@ describe('createExerciseAction', () => {
     expect(result.success).toBe(false)
     expect(result.error).toBe('Exercise name cannot be empty')
   })
+
+  it('returns failure when error message is non-string', async () => {
+    mockCreateExercise.execute.mockImplementation(() => {
+      throw 'string error'
+    })
+
+    const { createExerciseAction } = await import('@/features/exercise/exercise-server-actions')
+    const result = await createExerciseAction('Squat', 1)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Unknown error')
+  })
 })
 
 describe('renameExerciseAction', () => {
@@ -190,6 +198,18 @@ describe('renameExerciseAction', () => {
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Name cannot be empty')
+  })
+
+  it('returns failure when error message is non-string', async () => {
+    mockRenameExercise.execute.mockImplementation(() => {
+      throw 'string error'
+    })
+
+    const { renameExerciseAction } = await import('@/features/exercise/exercise-server-actions')
+    const result = await renameExerciseAction(1, 'New', 1)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Unknown error')
   })
 })
 
@@ -251,6 +271,18 @@ describe('deleteExerciseAction', () => {
     expect(result.success).toBe(false)
     expect(result.error).toBe('Connection refused')
   })
+
+  it('returns failure when error message is non-string', async () => {
+    mockDeleteExercise.execute.mockImplementation(() => {
+      throw 'string error'
+    })
+
+    const { deleteExerciseAction } = await import('@/features/exercise/exercise-server-actions')
+    const result = await deleteExerciseAction(1, 1)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Unknown error')
+  })
 })
 
 describe('listExercisesAction', () => {
@@ -299,5 +331,17 @@ describe('listExercisesAction', () => {
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Connection refused')
+  })
+
+  it('returns failure when error message is non-string', async () => {
+    mockListExercises.execute.mockImplementation(() => {
+      throw 'string error'
+    })
+
+    const { listExercisesAction } = await import('@/features/exercise/exercise-server-actions')
+    const result = await listExercisesAction()
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Unknown error')
   })
 })

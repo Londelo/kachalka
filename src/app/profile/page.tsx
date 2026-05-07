@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import BottomNav from '@/app/components/bottom-nav'
 import {
   assignExerciseAction,
   removeExerciseAction,
@@ -10,9 +9,15 @@ import {
 import { listExercisesAction } from '@/features/exercise/exercise-server-actions'
 import type { RoutineAssignment, DayOfWeek } from '@/features/routine/routine-entity'
 import { numberToDayOfWeek } from '@/features/routine/routine-entity'
+import {
+  getAssignmentsForDay,
+  getDayLabel,
+  getExerciseCountForDay,
+  isDaySelected,
+  resolveDaySelection,
+} from '@/app/profile/profile-utils'
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-const DAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 
 interface ExerciseOption {
   id: number
@@ -21,10 +26,10 @@ interface ExerciseOption {
 
 export default function ProfilePage() {
   const [selectedDay, setSelectedDay] = useState<number>(0)
+  const [addingDay, setAddingDay] = useState<number | null>(null)
   const [routine, setRoutine] = useState<Record<string, RoutineAssignment[]> | null>(null)
   const [exercises, setExercises] = useState<ExerciseOption[]>([])
   const [selectedExerciseId, setSelectedExerciseId] = useState<number | null>(null)
-  const [addingDay, setAddingDay] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -95,186 +100,175 @@ export default function ProfilePage() {
     }
   }
 
-  function getAssignmentsForDay(dayIndex: number): RoutineAssignment[] {
-    if (!routine) return []
-    const dayName = DAYS[dayIndex]
-    return routine[dayName] ?? []
-  }
-
-  function isSelectedDay(dayIndex: number): boolean {
-    return selectedDay === dayIndex && !addingDay
+  function handleDayClick(clickedDayIndex: number) {
+    const { nextSelectedDay, nextAddingDay } = resolveDaySelection(selectedDay, addingDay, clickedDayIndex)
+    setSelectedDay(nextSelectedDay)
+    setAddingDay(nextAddingDay)
   }
 
   if (loading) {
     return (
       <>
-        <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-8 pb-[140px]">
+        <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[100px] pb-[140px]">
           <div className="mb-8 w-full text-center">
             <h1 className="font-headline-xl text-headline-xl font-black uppercase text-on-surface">
-              PROFILE
+              MY BATTLE PLAN
             </h1>
-            <p className="mt-2 font-label-mono text-label-mono text-on-surface">LOADING ROUTINE...</p>
+            <p className="mt-2 font-label-mono text-label-mono text-on-surface">LOADING BATTLE PLAN...</p>
           </div>
-          <p className="font-label-mono text-label-mono text-on-surface">Loading...</p>
         </main>
-        <BottomNav activeTab="PROFILE" />
       </>
     )
   }
 
+  const assignments = getAssignmentsForDay(routine, selectedDay)
+
   return (
     <>
-      <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-8 pb-[140px]">
+      <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[100px] pb-[140px]">
         {/* Hero Header */}
-        <div className="mb-8 w-full text-center">
+        <section className="space-y-xs pt-md">
           <h1 className="font-headline-xl text-headline-xl font-black uppercase text-on-surface">
-            PROFILE
+            MY BATTLE PLAN
           </h1>
-          <div className="mt-2 h-1 w-full bg-on-surface" />
-          <p className="mt-2 font-label-mono text-label-mono text-on-surface">
-            ASSIGN EXERCISES TO YOUR WEEKLY ROUTINE
-          </p>
-        </div>
+          <span className="font-label-bold text-label-bold text-primary bg-on-surface text-background inline-block px-2 py-1">
+            WEEKLY CAMPAIGN ASSIGNMENT
+          </span>
+        </section>
 
         {/* Error */}
         {error && (
-          <div className="mb-4 w-full rounded border-2 border-error bg-error-container p-3">
+          <div className="mb-4 w-full border-2 border-error bg-error-container p-3">
             <p className="font-label-bold text-label-bold text-error">{error}</p>
           </div>
         )}
 
         {/* Day Selector */}
-        <div className="mb-6 flex w-full justify-between gap-1">
-          {DAYS.map((day, index) => (
-            <button
-              key={day}
-              type="button"
-              onClick={() => {
-                if (isSelectedDay(index)) {
-                  setAddingDay(index)
-                } else {
-                  setSelectedDay(index)
-                  setAddingDay(null)
-                }
-              }}
-              className={`flex-1 border-4 border-on-surface px-1 py-2 font-label-bold text-label-bold uppercase transition-all active-press ${
-                isSelectedDay(index)
-                  ? 'bg-primary text-on-primary neo-shadow-sm'
-                  : 'bg-surface text-on-surface'
-              }`}
-            >
-              {DAY_LABELS[index]}
-            </button>
-          ))}
-        </div>
+        <section className="flex gap-2 overflow-x-auto pb-2">
+          {DAYS.map((_, dayIndex) => {
+            const selected = isDaySelected(selectedDay, addingDay, dayIndex)
+            return (
+              <button
+                key={DAYS[dayIndex]}
+                type="button"
+                onClick={() => handleDayClick(dayIndex)}
+                className={`flex-1 min-w-[60px] border-2 border-on-surface py-3 font-label-bold text-label-bold uppercase transition-colors ${
+                  selected
+                    ? 'bg-primary text-on-primary shadow-[2px_2px_0px_0px_rgba(27,29,14,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]'
+                    : 'bg-surface-container-low text-on-surface hover:bg-surface-variant'
+                }`}
+              >
+                {getDayLabel(dayIndex)}
+              </button>
+            )
+          })}
+        </section>
 
-        {/* Add Exercise Section */}
-        {addingDay !== null && (
-          <div className="mb-6 w-full border-4 border-on-surface bg-surface p-4 neo-shadow">
-            <h3 className="mb-3 font-headline-md text-headline-md font-black uppercase text-on-surface">
-              ADD TO {DAY_LABELS[addingDay]}
-            </h3>
+        {/* Exercise Display — Selected Day Only */}
+        {isDaySelected(selectedDay, addingDay, selectedDay) && (
+          <section className="space-y-3">
+            <div className="flex items-center gap-1">
+              <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
+                emoji_events
+              </span>
+              <h3 className="font-headline-md text-headline-md uppercase">CURRENT ASSETS</h3>
+            </div>
 
-            {exercises.length === 0 ? (
-              <p className="font-label-mono text-label-mono text-on-surface">NO EXERCISES AVAILABLE</p>
+            {assignments.length > 0 ? (
+              <div className="space-y-3">
+                {assignments.map((a, idx) => (
+                  <div
+                    key={a.id.value}
+                    className="bg-surface-container border-2 border-on-surface py-3 px-4 flex justify-between items-start shadow-[4px_4px_0px_0px_rgba(27,29,14,1)] relative overflow-hidden"
+                  >
+                    <div className={`absolute top-0 left-0 w-2 h-full ${idx % 2 === 0 ? 'bg-primary' : 'bg-secondary'}`} />
+                    <div className="pl-2 space-y-1">
+                      <p className="font-label-mono text-label-mono text-on-surface-variant uppercase">EXERCISE</p>
+                      <h4 className="font-headline-md text-headline-md leading-none">
+                        {exercises.find((ex) => ex.id === a.exerciseId)?.name ?? 'UNKNOWN EXERCISE'}
+                      </h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveExercise(a.id.value)}
+                      className="bg-primary text-on-primary border-2 border-on-surface p-1 active:shadow-none active:translate-x-[1px] active:translate-y-[1px]"
+                    >
+                      <span className="material-symbols-outlined">close</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
             ) : (
-              <>
-                <select
-                  value={selectedExerciseId ?? ''}
-                  onChange={(e) => setSelectedExerciseId(e.target.value ? parseInt(e.target.value, 10) : null)}
-                  className="mb-3 w-full border-4 border-on-surface bg-surface p-2 font-label-mono text-label-mono"
-                >
-                  <option value="">SELECT EXERCISE...</option>
-                  {exercises.map((ex) => (
-                    <option key={ex.id} value={ex.id}>
-                      {ex.name}
-                    </option>
-                  ))}
-                </select>
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleAddExercise}
-                    disabled={selectedExerciseId === null}
-                    className="flex-1 border-4 border-on-surface bg-primary p-2 font-label-bold text-label-bold uppercase text-on-primary transition-all active-press disabled:opacity-50"
-                  >
-                    ADD
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAddingDay(null)
-                      setSelectedExerciseId(null)
-                    }}
-                    className="border-4 border-on-surface bg-surface p-2 font-label-bold text-label-bold uppercase text-on-surface transition-all active-press"
-                  >
-                    CANCEL
-                  </button>
-                </div>
-              </>
+              <div className="opacity-40 grayscale border-2 border-on-surface p-xl flex flex-col items-center text-center gap-3">
+                <span className="material-symbols-outlined text-[64px]">block</span>
+                <p className="font-headline-md text-headline-md uppercase leading-tight">
+                  NO ASSIGNMENTS — DEPLOY EXERCISES TO BEGIN YOUR CAMPAIGN
+                </p>
+              </div>
             )}
-          </div>
+          </section>
         )}
 
-        {/* Exercise List */}
-        {DAYS.map((day, dayIndex) => {
-          const assignments = getAssignmentsForDay(dayIndex)
-
-          return (
-            <div key={day} className="mb-6 w-full">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="font-headline-md text-headline-md font-black uppercase text-on-surface">
-                  {DAY_LABELS[dayIndex]}
-                </h3>
-                <span className="rounded border-2 border-on-surface bg-surface px-2 py-1 font-label-mono text-[10px] font-bold uppercase text-on-surface">
-                  {assignments.length}
-                </span>
+        {/* Add Exercise Panel */}
+        {addingDay !== null && (
+          <section className="bg-surface-container-highest border-4 border-on-surface py-6 px-4 neo-shadow-lg space-y-3">
+            <h3 className="font-headline-md text-headline-md uppercase tracking-tight">REINFORCE LINEUP</h3>
+            <label className="font-label-bold text-label-bold uppercase block">SELECT EXERCISE</label>
+            <div className="relative">
+              <select
+                value={selectedExerciseId ?? ''}
+                onChange={(e) => setSelectedExerciseId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                className="w-full bg-background border-2 border-on-surface p-md font-body-lg appearance-none focus:border-primary focus:ring-0"
+              >
+                <option value="">CHOOSE DRILL...</option>
+                {exercises.map((ex) => (
+                  <option key={ex.id} value={ex.id}>
+                    {ex.name}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                <span className="material-symbols-outlined">expand_more</span>
               </div>
-
-              {assignments.length === 0 ? (
-                <div className="flex min-h-[60px] items-center justify-center border-4 border-dashed border-on-surface bg-surface p-4">
-                  <p className="font-label-mono text-label-mono text-on-surface">NO EXERCISES ASSIGNED</p>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {assignments.map((a) => (
-                    <div
-                      key={a.id.value}
-                      className="flex items-center justify-between border-4 border-on-surface bg-surface p-3 neo-shadow-sm"
-                    >
-                      <span className="font-label-bold text-label-bold text-on-surface">
-                        {exercises.find((ex) => ex.id === a.exerciseId)?.name ?? 'UNKNOWN EXERCISE'}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveExercise(a.id.value)}
-                        className="border-2 border-on-surface bg-error p-2 font-label-bold text-label-bold uppercase text-on-error transition-all active-press"
-                      >
-                        {exercises.find((ex) => ex.id === a.exerciseId)?.name ?? 'UNKNOWN EXERCISE'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {assignments.length === 0 && !addingDay && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedDay(dayIndex)
-                    setAddingDay(dayIndex)
-                  }}
-                  className="mt-2 w-full border-4 border-on-surface bg-primary p-2 font-label-bold text-label-bold uppercase text-on-primary transition-all neo-shadow-sm active-press"
-                >
-                  ADD EXERCISE
-                </button>
-              )}
             </div>
-          )
-        })}
+            <button
+              type="button"
+              onClick={handleAddExercise}
+              disabled={selectedExerciseId === null}
+              className="w-full bg-primary-container text-on-primary-container border-4 border-on-surface py-md font-headline-md uppercase neo-shadow active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all disabled:opacity-50"
+            >
+              DEPLOY
+            </button>
+          </section>
+        )}
+
+        {/* Quick-Add Card */}
+        <section className="border-2 border-dashed border-on-surface-variant p-lg flex flex-col items-center justify-center gap-2 bg-surface-container-lowest hover:bg-surface-container transition-colors cursor-pointer">
+          <span className="material-symbols-outlined text-[48px] text-on-surface-variant">add_box</span>
+          <span className="font-label-bold text-label-bold uppercase">CREATE NEW EXERCISE SPEC</span>
+        </section>
+
+        {/* Campaign Logistics Grid */}
+        <section className="space-y-3 pt-4">
+          <h3 className="font-label-bold text-label-bold uppercase">CAMPAIGN LOGISTICS</h3>
+          <div className="grid grid-cols-7 border-2 border-on-surface">
+            {DAYS.map((day, i) => {
+              const count = getExerciseCountForDay(routine, i)
+              return (
+                <div
+                  key={day}
+                  className={`${i === selectedDay ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface'} ${
+                    i < 6 ? 'border-r' : ''
+                  } flex flex-col items-center py-2`}
+                >
+                  <span className="font-label-mono text-label-mono">{getDayLabel(i)}</span>
+                  <span className="font-headline-md text-headline-md">{count}</span>
+                </div>
+              )
+            })}
+          </div>
+        </section>
       </main>
-      <BottomNav activeTab="PROFILE" />
     </>
   )
 }

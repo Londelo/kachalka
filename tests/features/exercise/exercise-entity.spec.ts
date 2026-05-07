@@ -3,51 +3,21 @@ import { ExerciseId, createExercise } from '@/features/exercise/exercise-entity'
 
 describe('ExerciseId', () => {
   describe('make', () => {
-    it('creates an ExerciseId from a positive integer', () => {
-      const id = ExerciseId.make(1)
-      expect(id).toEqual({ value: 1 })
+    it('creates an ExerciseId from a non-negative integer', () => {
+      expect(ExerciseId.make(0)).toEqual({ value: 0 })
+      expect(ExerciseId.make(1)).toEqual({ value: 1 })
+      expect(ExerciseId.make(999999)).toEqual({ value: 999999 })
     })
 
-    it('creates an ExerciseId from zero', () => {
-      const id = ExerciseId.make(0)
-      expect(id).toEqual({ value: 0 })
-    })
-
-    it('creates an ExerciseId from a large integer', () => {
-      const id = ExerciseId.make(999999)
-      expect(id).toEqual({ value: 999999 })
-    })
-
-    it('rejects negative numbers', () => {
+    it('rejects negative numbers, floats, NaN, Infinity, strings, null, and undefined', () => {
       expect(() => ExerciseId.make(-1)).toThrow()
-    })
-
-    it('rejects negative numbers beyond -1', () => {
       expect(() => ExerciseId.make(-100)).toThrow()
-    })
-
-    it('rejects floats', () => {
       expect(() => ExerciseId.make(1.5)).toThrow()
-    })
-
-    it('rejects strings', () => {
-      expect(() => ExerciseId.make('1' as unknown as number)).toThrow()
-    })
-
-    it('rejects null', () => {
-      expect(() => ExerciseId.make(null as unknown as number)).toThrow()
-    })
-
-    it('rejects undefined', () => {
-      expect(() => ExerciseId.make(undefined as unknown as number)).toThrow()
-    })
-
-    it('rejects NaN', () => {
       expect(() => ExerciseId.make(NaN)).toThrow()
-    })
-
-    it('rejects Infinity', () => {
       expect(() => ExerciseId.make(Infinity)).toThrow()
+      expect(() => ExerciseId.make('1' as unknown as number)).toThrow()
+      expect(() => ExerciseId.make(null as unknown as number)).toThrow()
+      expect(() => ExerciseId.make(undefined as unknown as number)).toThrow()
     })
   })
 })
@@ -62,19 +32,10 @@ describe('createExercise', () => {
     })
   })
 
-  it('trims leading whitespace from name', () => {
-    const exercise = createExercise('  Push-up', 1)
-    expect(exercise.name).toBe('Push-up')
-  })
-
-  it('trims trailing whitespace from name', () => {
-    const exercise = createExercise('Pull-up  ', 1)
-    expect(exercise.name).toBe('Pull-up')
-  })
-
-  it('trims both leading and trailing whitespace', () => {
-    const exercise = createExercise('  Deadlift  ', 2)
-    expect(exercise.name).toBe('Deadlift')
+  it('trims leading, trailing, and both whitespace from name', () => {
+    expect(createExercise('  Push-up', 1).name).toBe('Push-up')
+    expect(createExercise('Pull-up  ', 1).name).toBe('Pull-up')
+    expect(createExercise('  Deadlift  ', 2).name).toBe('Deadlift')
   })
 
   it('rejects empty string', () => {

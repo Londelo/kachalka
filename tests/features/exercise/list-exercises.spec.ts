@@ -27,9 +27,10 @@ describe('listExercisesUseCase', () => {
     expect(result).toEqual([])
   })
 
-  it('returns a single exercise', () => {
+  it('returns exercises from the repo', () => {
     const exercises = [
       { id: { value: 1 }, name: 'Squat', ownerId: { value: 1 } },
+      { id: { value: 2 }, name: 'Bench Press', ownerId: { value: 1 } },
     ]
     const repo = makeRepo()
     repo.findAll.mockReturnValue(exercises)
@@ -38,30 +39,6 @@ describe('listExercisesUseCase', () => {
     const result = useCase.execute()
 
     expect(result).toEqual(exercises)
-    expect(repo.findAll).toHaveBeenCalled()
-  })
-
-  it('returns multiple exercises from the repo', () => {
-    const exercises = [
-      { id: { value: 1 }, name: 'Squat', ownerId: { value: 1 } },
-      { id: { value: 2 }, name: 'Bench Press', ownerId: { value: 1 } },
-      { id: { value: 3 }, name: 'Deadlift', ownerId: { value: 1 } },
-    ]
-    const repo = makeRepo()
-    repo.findAll.mockReturnValue(exercises)
-
-    const useCase = listExercisesUseCase(repo)
-    const result = useCase.execute()
-
-    expect(result).toHaveLength(3)
-  })
-
-  it('delegates to repo.findAll', () => {
-    const repo = makeRepo()
-    repo.findAll.mockReturnValue([])
-
-    listExercisesUseCase(repo).execute()
-
     expect(repo.findAll).toHaveBeenCalledTimes(1)
   })
 })

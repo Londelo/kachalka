@@ -10,7 +10,7 @@ const TABS = [
   { id: 'WORKOUT', label: 'WORKOUT', icon: 'fitness_center', href: '/today' },
   { id: 'HISTORY', label: 'HISTORY', icon: 'calendar_today', href: '/history' },
   { id: 'PROGRESS', label: 'PROGRESS', icon: 'monitoring', href: '/progress' },
-  { id: 'PROFILE', label: 'PROFILE', icon: 'workspace_premium', href: '/profile' },
+  { id: 'PROFILE', label: 'PROFILE', icon: 'settings', href: '/profile' },
   { id: 'CONFIG', label: 'CONFIG', icon: 'settings', href: '/config' },
 ]
 

@@ -83,6 +83,20 @@ describe('renameExerciseUseCase', () => {
     expect(repo.updateName).not.toHaveBeenCalled()
   })
 
+  it('accepts a new name of exactly 100 characters', () => {
+    const repo = makeRepo()
+    const name100 = 'a'.repeat(100)
+    const existingExercise = { id: { value: 1 }, name: 'Squat', ownerId: { value: 1 } }
+    const updatedExercise = { id: { value: 1 }, name: name100, ownerId: { value: 1 } }
+    repo.findById.mockReturnValue(existingExercise)
+    repo.updateName.mockReturnValue(updatedExercise)
+
+    const useCase = renameExerciseUseCase(repo)
+    const result = useCase.execute(1, name100, 1)
+
+    expect(result.name).toBe(name100)
+  })
+
   it('trims the new name before saving', () => {
     const repo = makeRepo()
     const existingExercise = { id: { value: 1 }, name: 'Squat', ownerId: { value: 1 } }

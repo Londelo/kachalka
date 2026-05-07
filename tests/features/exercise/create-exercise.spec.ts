@@ -55,6 +55,18 @@ describe('createExerciseUseCase', () => {
     expect(() => useCase.execute(longName, 1)).toThrow('Exercise name too long')
   })
 
+  it('accepts names of exactly 100 characters', () => {
+    const repo = makeRepo()
+    const name100 = 'a'.repeat(100)
+    const persistedExercise = { id: { value: 1 }, name: name100, ownerId: { value: 1 } }
+    repo.create.mockReturnValue(persistedExercise)
+
+    const useCase = createExerciseUseCase(repo)
+    const result = useCase.execute(name100, 1)
+
+    expect(result.name).toBe(name100)
+  })
+
   it('propagates repo.create errors', () => {
     const repo = makeRepo()
     repo.create.mockImplementation(() => {
