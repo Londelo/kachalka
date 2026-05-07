@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { logWorkoutAction, getTodayExercisesAction } from '@/features/workout/workout-server-actions'
 import type { WorkoutSet } from '@/features/workout/types'
 import { jsDayToAppIndex } from '@/shared/utils/date'
@@ -24,6 +24,7 @@ export default function TodayPage() {
   const [sets, setSets] = useState<WorkoutSet[]>([defaultSet()])
   const [volumePreview, setVolumePreview] = useState(0)
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const backdropRef = useRef<HTMLDivElement>(null)
 
   // Load exercises on mount
@@ -33,7 +34,6 @@ export default function TodayPage() {
       const dayOfWeek = jsDayToAppIndex(new Date().getDay())
       getTodayExercisesAction(userId, dayOfWeek).then((res) => {
         if (res.success && res.exercises) {
-          console.log('[TRACING] exercises loaded:', JSON.stringify(res.exercises, null, 2))
           setExercises(res.exercises)
         }
         setLoading(false)
@@ -48,15 +48,12 @@ export default function TodayPage() {
     const last = exercise.lastLog
     setSets(last ? [{ ...defaultSet(), weight: last.weight, reps: last.reps }] : [defaultSet()])
     setVolumePreview(calculateVolumePreview([]))
+    setError(null)
     setModalOpen(true)
   }
 
   function handleAddSet(): void {
-    setSets((prev) => {
-      const next = [...prev, defaultSet()]
-      console.log('[TRACING] handleAddSet - new sets array length:', next.length, 'sets:', JSON.stringify(next))
-      return next
-    })
+    setSets((prev) => [...prev, defaultSet()])
   }
 
   function handleRemoveSet(index: number): void {
@@ -84,14 +81,19 @@ export default function TodayPage() {
     if (!userId) return
 
     const today = new Date().toISOString().split('T')[0]
-    console.log('[TRACING] handleSaveSession - sets before send:', JSON.stringify(sets, null, 2))
-    await logWorkoutAction(userId, selectedExercise.exerciseId, today, sets)
+    const res = await logWorkoutAction(userId, selectedExercise.exerciseId, today, sets)
+
+    if (!res.success) {
+      setError(res.error ?? 'Failed to save workout')
+      setSubmitting(false)
+      return
+    }
 
     // Refresh exercises
     const dayOfWeek = jsDayToAppIndex(new Date().getDay())
-    const res = await getTodayExercisesAction(userId, dayOfWeek)
-    if (res.success && res.exercises) {
-      setExercises(res.exercises)
+    const exRes = await getTodayExercisesAction(userId, dayOfWeek)
+    if (exRes.success && exRes.exercises) {
+      setExercises(exRes.exercises)
     }
 
     setModalOpen(false)
@@ -104,7 +106,7 @@ export default function TodayPage() {
   }
 
   function defaultSet(): WorkoutSet {
-    return { reps: 1, weight: 0 }
+    return { id: crypto.randomUUID(), reps: 1, weight: 0 }
   }
 
   if (loading) {
@@ -200,6 +202,21 @@ export default function TodayPage() {
         )}
       </main>
 
+      {error && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-sm border-4 border-on-surface bg-background p-6 neo-shadow-lg text-center">
+            <p className="mb-4 font-body-lg text-body-lg text-error">{error}</p>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              className="w-full border-4 border-on-surface bg-primary p-3 font-label-bold text-label-bold uppercase text-on-primary neo-shadow transition-all active-press"
+            >
+              DISMISS
+            </button>
+          </div>
+        </div>
+      )}
+
       {modalOpen && selectedExercise && (
         <SetModal
           exerciseName={selectedExercise.exerciseName}
@@ -264,7 +281,7 @@ function SetModal({
 
         <div className="mb-4 flex flex-col gap-4">
           {sets.map((set, index) => (
-            <div key={index} className="flex items-center gap-2">
+            <div key={set.id} className="flex items-center gap-2">
               <span className="font-label-mono text-label-mono text-secondary">
                 SET {String(index + 1).padStart(2, '0')}
               </span>

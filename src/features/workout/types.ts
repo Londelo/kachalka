@@ -1,4 +1,5 @@
 export type WorkoutSet = {
+  id: string
   reps: number
   weight: number
 }

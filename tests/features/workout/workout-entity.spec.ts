@@ -8,14 +8,14 @@ describe('validateSet', () => {
     expect(() => validateSet(validSet)).not.toThrow()
   })
 
-  it('throws when weight is 0', () => {
+  it('allows weight of 0', () => {
     const set: WorkoutSet = { reps: 5, weight: 0}
-    expect(() => validateSet(set)).toThrow('Weight must be greater than 0')
+    expect(() => validateSet(set)).not.toThrow()
   })
 
   it('throws when weight is negative', () => {
     const set: WorkoutSet = { reps: 5, weight: -10}
-    expect(() => validateSet(set)).toThrow('Weight must be greater than 0')
+    expect(() => validateSet(set)).toThrow('Weight must be non-negative')
   })
 
   it('throws when reps is 0', () => {

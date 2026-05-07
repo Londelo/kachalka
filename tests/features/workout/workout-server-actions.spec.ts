@@ -117,14 +117,14 @@ describe('logWorkoutAction', () => {
 
   it('returns failure when weight is invalid', async () => {
     mockLogWorkout.execute.mockImplementation(() => {
-      throw new Error('Weight must be greater than 0')
+      throw new Error('Weight must be non-negative')
     })
 
     const { logWorkoutAction } = await import('@/features/workout/workout-server-actions')
-    const result = await logWorkoutAction(1, 5, '2025-01-01', [{ reps: 5, weight: 0 }])
+    const result = await logWorkoutAction(1, 5, '2025-01-01', [{ reps: 5, weight: -10 }])
 
     expect(result.success).toBe(false)
-    expect(result.error).toBe('Weight must be greater than 0')
+    expect(result.error).toBe('Weight must be non-negative')
   })
 
   it('returns failure for database errors', async () => {
@@ -190,14 +190,14 @@ describe('updateWorkoutAction', () => {
 
   it('returns failure for invalid sets', async () => {
     mockUpdateWorkout.execute.mockImplementation(() => {
-      throw new Error('Weight must be greater than 0')
+      throw new Error('Weight must be non-negative')
     })
 
     const { updateWorkoutAction } = await import('@/features/workout/workout-server-actions')
-    const result = await updateWorkoutAction(1, 1, [{ reps: 5, weight: 0 }])
+    const result = await updateWorkoutAction(1, 1, [{ reps: 5, weight: -10 }])
 
     expect(result.success).toBe(false)
-    expect(result.error).toBe('Weight must be greater than 0')
+    expect(result.error).toBe('Weight must be non-negative')
   })
 })
 

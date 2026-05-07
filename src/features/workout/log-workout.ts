@@ -5,7 +5,6 @@ import { validateSet, createEmptyLog } from '@/features/workout/workout-entity'
 export function logWorkoutUseCase(repo: WorkoutRepository) {
   return {
     execute(userId: number, exerciseId: number, date: string, sets: WorkoutSet[]): WorkoutLog {
-      console.log('[TRACING] logWorkoutUseCase.execute - incoming sets:', JSON.stringify(sets, null, 2))
       if (sets.length === 0) {
         throw new Error('Must log at least one set')
       }

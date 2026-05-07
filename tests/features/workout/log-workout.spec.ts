@@ -89,7 +89,7 @@ describe('logWorkoutUseCase', () => {
     const repo = makeRepo()
     const useCase = logWorkoutUseCase(repo)
 
-    expect(() => useCase.execute(1, 5, '2025-01-01', [{ reps: 5, weight: 0 }])).toThrow('Weight must be greater than 0')
+    expect(() => useCase.execute(1, 5, '2025-01-01', [{ reps: 5, weight: -10 }])).toThrow('Weight must be non-negative')
     expect(repo.create).not.toHaveBeenCalled()
   })
 

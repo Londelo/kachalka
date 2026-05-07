@@ -26,3 +26,8 @@ export function dayOfWeekToIndex(day: string): number {
   }
   return DAY_INDEX[day]
 }
+
+/** Convert Date.getDay() (Sun=0) to app index (Mon=0) */
+export function jsDayToAppIndex(jsDay: number): number {
+  return (jsDay - 1 + 7) % 7
+}

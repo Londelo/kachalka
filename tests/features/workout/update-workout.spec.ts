@@ -60,7 +60,7 @@ describe('updateWorkoutUseCase', () => {
 
     const useCase = updateWorkoutUseCase(repo)
 
-    expect(() => useCase.execute(1, 1, [{ reps: 5, weight: 0 }])).toThrow('Weight must be greater than 0')
+    expect(() => useCase.execute(1, 1, [{ reps: 5, weight: -10 }])).toThrow('Weight must be non-negative')
     expect(repo.update).not.toHaveBeenCalled()
   })
 

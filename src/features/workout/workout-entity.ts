@@ -11,8 +11,8 @@ export type WorkoutLog = {
 }
 
 export function validateSet(set: WorkoutSet): void {
-  if (set.weight <= 0) {
-    throw new Error('Weight must be greater than 0')
+  if (set.weight < 0) {
+    throw new Error('Weight must be non-negative')
   }
 
   if (set.reps < 1) {
