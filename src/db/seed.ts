@@ -3,10 +3,17 @@ import { getDatabase } from '@/config/db'
 export function seedDatabase(): void {
   const db = getDatabase()
 
-  // Only seed when the database is empty so existing workout data
-  // is preserved across dev restarts and server restarts.
-  const { count } = db.prepare('SELECT COUNT(*) AS count FROM users').get() as { count: number }
-  if ((count as number) > 0) {
+  // Guard against missing tables (e.g. fresh DB created by drizzle-kit push
+  // before migrations have run). If the table doesn't exist, skip seeding —
+  // the migration will create the tables and this function will be called
+  // again on the next request.
+  try {
+    const { count } = db.prepare('SELECT COUNT(*) AS count FROM users').get() as { count: number }
+    if ((count as number) > 0) {
+      return
+    }
+  } catch {
+    // Tables don't exist yet — migrations will create them.
     return
   }
 
@@ -48,10 +55,10 @@ export function seedDatabase(): void {
       {
         date: '2025-01-13',
         sets: JSON.stringify([
-          { reps: 8, weight: 0 },
-          { reps: 7, weight: 0 },
-          { reps: 6, weight: 0 },
-          { reps: 5, weight: 0 },
+          { reps: 8, weight: 185 },
+          { reps: 7, weight: 185 },
+          { reps: 6, weight: 185 },
+          { reps: 5, weight: 185 },
         ]),
         created: 1736726400,
         updated: 1736726400,
@@ -70,9 +77,9 @@ export function seedDatabase(): void {
       {
         date: '2025-01-15',
         sets: JSON.stringify([
-          { reps: 8, weight: 0 },
-          { reps: 7, weight: 0 },
-          { reps: 6, weight: 0 },
+          { reps: 8, weight: 185 },
+          { reps: 7, weight: 185 },
+          { reps: 6, weight: 185 },
         ]),
         created: 1736906400,
         updated: 1736906400,
@@ -91,11 +98,11 @@ export function seedDatabase(): void {
       {
         date: '2025-01-20',
         sets: JSON.stringify([
-          { reps: 10, weight: 0 },
-          { reps: 9, weight: 0 },
-          { reps: 8, weight: 0 },
-          { reps: 7, weight: 0 },
-          { reps: 6, weight: 0 },
+          { reps: 10, weight: 185 },
+          { reps: 9, weight: 185 },
+          { reps: 8, weight: 185 },
+          { reps: 7, weight: 185 },
+          { reps: 6, weight: 185 },
         ]),
         created: 1737361200,
         updated: 1737361200,
@@ -130,20 +137,26 @@ export function seedDatabase(): void {
 export function seedProgressData(): void {
   const db = getDatabase()
 
-  // Skip if the progress exercises are already seeded — preserves existing data.
-  const progressExerciseCount = db
-    .prepare(
-      "SELECT COUNT(*) AS count FROM exercises WHERE name IN ('Bench Press','Squat','Deadlift','Overhead Press','Barbell Row','Barbell Curl')",
-    )
-    .get() as { count: number }
-  if ((progressExerciseCount.count as number) > 0) return
+  // Skip if tables don't exist yet — migrations will create them.
+  try {
+    // Skip if the progress exercises are already seeded — preserves existing data.
+    const progressExerciseCount = db
+      .prepare(
+        "SELECT COUNT(*) AS count FROM exercises WHERE name IN ('Bench Press','Squat','Deadlift','Overhead Press','Barbell Row','Barbell Curl')",
+      )
+      .get() as { count: number }
+    if ((progressExerciseCount.count as number) > 0) return
 
-  // Need at least one user to attach logs to.
-  const { count: userCount } = db
-    .prepare('SELECT COUNT(*) AS count FROM users')
-    .get() as { count: number }
-  if (userCount === 0) {
-    console.warn('seedProgressData: no users found — skipping')
+    // Need at least one user to attach logs to.
+    const { count: userCount } = db
+      .prepare('SELECT COUNT(*) AS count FROM users')
+      .get() as { count: number }
+    if (userCount === 0) {
+      console.warn('seedProgressData: no users found — skipping')
+      return
+    }
+  } catch {
+    // Tables don't exist yet — migrations will create them.
     return
   }
 
