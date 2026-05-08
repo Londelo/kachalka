@@ -4,6 +4,7 @@ import { runMigrations } from '@/db/migrate'
 import { seedDatabase } from '@/db/seed'
 import Header from '@/app/components/header'
 import NavWrapper from '@/app/components/nav-wrapper.client'
+import UserAuthGuard from '@/app/components/user-auth-guard.client'
 
 export const metadata = {
   title: 'IRON COMMAND',
@@ -27,7 +28,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="bg-background text-on-surface font-body-md">
         <Header />
-        <main>{children}</main>
+        <main>
+          <UserAuthGuard />
+          {children}
+        </main>
         <NavWrapper />
       </body>
     </html>
