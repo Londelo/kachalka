@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { getHistoryAction, deleteHistoryEntryAction } from '@/features/workout/workout-server-actions'
 import { calculateVolume } from '@/features/workout/workout-entity'
 
@@ -16,6 +17,7 @@ type HistoryEntry = {
 }
 
 export default function HistoryPageClient() {
+  const router = useRouter()
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState<number | null>(null)
@@ -30,7 +32,7 @@ export default function HistoryPageClient() {
   useEffect(() => {
     const userId = getStoredUserId()
     if (!userId) {
-      setLoading(false)
+      router.push('/')
       return
     }
     getHistoryAction(userId).then((res) => {

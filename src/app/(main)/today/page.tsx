@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { logWorkoutAction, getTodayExercisesAction } from '@/features/workout/workout-server-actions'
 import type { WorkoutSet } from '@/features/workout/types'
 import { jsDayToAppIndex } from '@/shared/utils/date'
@@ -17,6 +18,7 @@ interface ExerciseItem {
 }
 
 export default function TodayPage() {
+  const router = useRouter()
   const [exercises, setExercises] = useState<ExerciseItem[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -29,17 +31,17 @@ export default function TodayPage() {
   // Load exercises on mount
   useEffect(() => {
     const userId = getStoredUserId()
-    if (userId) {
-      const dayOfWeek = jsDayToAppIndex(new Date().getDay())
-      getTodayExercisesAction(userId, dayOfWeek).then((res) => {
-        if (res.success && res.exercises) {
-          setExercises(res.exercises)
-        }
-        setLoading(false)
-      })
-    } else {
-      setLoading(false)
+    if (!userId) {
+      router.push('/')
+      return
     }
+    const dayOfWeek = jsDayToAppIndex(new Date().getDay())
+    getTodayExercisesAction(userId, dayOfWeek).then((res) => {
+      if (res.success && res.exercises) {
+        setExercises(res.exercises)
+      }
+      setLoading(false)
+    })
   }, [])
 
   function handleLogSet(exercise: ExerciseItem): void {

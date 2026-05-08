@@ -10,4 +10,14 @@ export interface WorkoutRepository {
   delete(id: number): void
   findByDayOfWeek(userId: number, dayOfWeek: number): { exerciseId: number; exerciseName: string; lastLog?: WorkoutLog }[]
   findLatestForExercise(userId: number, exerciseId: number): WorkoutLog | undefined
+  findHistoryByDate(userId: number): {
+    date: string
+    logs: {
+      id: number
+      exerciseId: number
+      exerciseName: string
+      sets: WorkoutSet[]
+      volume: number
+    }[]
+  }[]
 }

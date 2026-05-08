@@ -7,6 +7,8 @@ import { logWorkoutUseCase } from '@/features/workout/log-workout'
 import { updateWorkoutUseCase } from '@/features/workout/update-workout'
 import { deleteWorkoutUseCase } from '@/features/workout/delete-workout'
 import { getTodayExercisesUseCase } from '@/features/workout/get-today-exercises'
+import { getWorkoutHistoryUseCase } from '@/features/workout/get-workout-history'
+import { getUserVolumeUseCase } from '@/features/workout/get-user-volume'
 import { createSqliteExerciseRepository } from '@/features/exercise/exercise-repo-impl'
 import type { WorkoutLog, WorkoutSet } from '@/features/workout/types'
 
@@ -82,5 +84,47 @@ export async function getTodayExercisesAction(
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error'
     return { success: false, error: message, exercises: null }
+  }
+}
+
+type HistoryEntry = {
+  date: string
+  logs: {
+    id: number
+    exerciseId: number
+    exerciseName: string
+    sets: WorkoutSet[]
+    volume: number
+  }[]
+}
+
+export async function getHistoryAction(
+  userId: number,
+): Promise<{ success: boolean; history?: HistoryEntry[]; error?: string }> {
+  try {
+    const db = getDatabase()
+    const repo = createSqliteWorkoutRepository(db)
+    const useCase = getWorkoutHistoryUseCase(repo)
+    const history = useCase.execute(userId)
+    return { success: true, history }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error'
+    return { success: false, error: message }
+  }
+}
+
+export async function deleteHistoryEntryAction(
+  logId: number,
+  userId: number,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const db = getDatabase()
+    const repo = createSqliteWorkoutRepository(db)
+    const useCase = deleteWorkoutUseCase(repo)
+    useCase.execute(logId, userId)
+    return { success: true }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error'
+    return { success: false, error: message }
   }
 }

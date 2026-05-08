@@ -16,7 +16,7 @@ export function logWorkoutUseCase(repo: WorkoutRepository) {
       const existing = repo.findByDateAndExercise(userId, date, exerciseId)
 
       if (existing) {
-        return repo.update(existing.id.value, sets)!
+        return repo.update(existing.id, sets)!
       }
 
       const unsaved = createEmptyLog(userId, exerciseId, date)
