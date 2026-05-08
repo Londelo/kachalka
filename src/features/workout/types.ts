@@ -5,7 +5,7 @@ export type WorkoutSet = {
 }
 
 export type WorkoutLog = {
-  id: { value: number }
+  id: number
   userId: number
   exerciseId: number
   date: string

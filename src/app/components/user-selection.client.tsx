@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import NewRecruitButton from '@/app/components/new-recruit-button'
 import { createUserAction } from '@/features/user/user-server-actions'
@@ -14,6 +14,12 @@ export default function UserSelectionClient({
 }: UserSelectionClientProps) {
   const router = useRouter()
   const [users, setUsers] = useState(initialUsers)
+
+  useEffect(() => {
+    const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
+    if (cookieMatch || initialUsers.length === 0) return
+    setCookie('kachalka.userId', String(initialUsers[0].id.value))
+  }, [initialUsers])
 
   function handleSelect(userId: number): void {
     setCookie('kachalka.userId', String(userId))

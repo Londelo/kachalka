@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   assignExerciseAction,
   removeExerciseAction,
@@ -25,6 +26,7 @@ interface ExerciseOption {
 }
 
 export default function ProfilePage() {
+  const router = useRouter()
   const [selectedDay, setSelectedDay] = useState<number>(0)
   const [addingDay, setAddingDay] = useState<number | null>(null)
   const [routine, setRoutine] = useState<Record<string, RoutineAssignment[]> | null>(null)
@@ -32,6 +34,13 @@ export default function ProfilePage() {
   const [selectedExerciseId, setSelectedExerciseId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
+    if (!cookieMatch) {
+      router.push('/')
+    }
+  }, [router])
 
   const loadData = useCallback(async () => {
     setLoading(true)

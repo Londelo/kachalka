@@ -16,6 +16,8 @@ export function seedDatabase(): void {
   db.exec('DELETE FROM user_routines')
   db.exec('DELETE FROM exercises')
   db.exec('DELETE FROM users')
+  // Reset auto-increment counters so new rows always start at id=1
+  db.exec("DELETE FROM sqlite_sequence WHERE name IN ('users', 'exercises', 'workout_logs', 'user_routines')")
 
   const insertUser = db.prepare(
     'INSERT INTO users (name, email) VALUES (?, ?)',
@@ -25,6 +27,9 @@ export function seedDatabase(): void {
   )
   const insertRoutine = db.prepare(
     'INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)',
+  )
+  const insertWorkoutLog = db.prepare(
+    'INSERT INTO workout_logs (user_id, exercise_id, date, sets, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
   )
 
   const seedBruno = db.transaction(() => {
@@ -37,6 +42,80 @@ export function seedDatabase(): void {
     for (let day = 0; day <= 6; day++) {
       insertRoutine.run(userId, exerciseId, day)
     }
+
+    // Workout logs — realistic pull-up history across multiple dates
+    const workoutLogs = [
+      {
+        date: '2025-01-13',
+        sets: JSON.stringify([
+          { reps: 8, weight: 0 },
+          { reps: 7, weight: 0 },
+          { reps: 6, weight: 0 },
+          { reps: 5, weight: 0 },
+        ]),
+        created: 1736726400,
+        updated: 1736726400,
+      },
+      {
+        date: '2025-01-15',
+        sets: JSON.stringify([
+          { reps: 5, weight: 135 },
+          { reps: 5, weight: 140 },
+          { reps: 4, weight: 145 },
+          { reps: 3, weight: 155 },
+        ]),
+        created: 1736899200,
+        updated: 1736899200,
+      },
+      {
+        date: '2025-01-15',
+        sets: JSON.stringify([
+          { reps: 8, weight: 0 },
+          { reps: 7, weight: 0 },
+          { reps: 6, weight: 0 },
+        ]),
+        created: 1736906400,
+        updated: 1736906400,
+      },
+      {
+        date: '2025-01-18',
+        sets: JSON.stringify([
+          { reps: 5, weight: 140 },
+          { reps: 5, weight: 145 },
+          { reps: 5, weight: 150 },
+          { reps: 3, weight: 160 },
+        ]),
+        created: 1737172400,
+        updated: 1737172400,
+      },
+      {
+        date: '2025-01-20',
+        sets: JSON.stringify([
+          { reps: 10, weight: 0 },
+          { reps: 9, weight: 0 },
+          { reps: 8, weight: 0 },
+          { reps: 7, weight: 0 },
+          { reps: 6, weight: 0 },
+        ]),
+        created: 1737361200,
+        updated: 1737361200,
+      },
+      {
+        date: '2025-01-22',
+        sets: JSON.stringify([
+          { reps: 5, weight: 145 },
+          { reps: 5, weight: 150 },
+          { reps: 4, weight: 155 },
+          { reps: 3, weight: 165 },
+        ]),
+        created: 1737547200,
+        updated: 1737547200,
+      },
+    ]
+
+    for (const log of workoutLogs) {
+      insertWorkoutLog.run(userId, exerciseId, log.date, log.sets, log.created, log.updated)
+    }
   })
 
   seedBruno()
@@ -46,16 +125,18 @@ export function seedDatabase(): void {
  * Seed workout log data for Progress page testing.
  *
  * Creates exercises and realistic workout logs spanning 6+ months.
- * Safe to run multiple times — skips if workout_logs already has data.
+ * Safe to run multiple times — skips if all 6 progress exercises already exist.
  */
 export function seedProgressData(): void {
   const db = getDatabase()
 
-  // Skip if workout logs already exist — preserves existing data.
-  const { count } = db
-    .prepare('SELECT COUNT(*) AS count FROM workout_logs')
+  // Skip if the progress exercises are already seeded — preserves existing data.
+  const progressExerciseCount = db
+    .prepare(
+      "SELECT COUNT(*) AS count FROM exercises WHERE name IN ('Bench Press','Squat','Deadlift','Overhead Press','Barbell Row','Barbell Curl')",
+    )
     .get() as { count: number }
-  if (count > 0) return
+  if ((progressExerciseCount.count as number) > 0) return
 
   // Need at least one user to attach logs to.
   const { count: userCount } = db
@@ -305,3 +386,8 @@ export function seedProgressData(): void {
 
   seedProgress()
 }
+
+// Run seeds when the module is loaded.
+// Bruno first (creates the user), then progress data (creates exercises + logs).
+seedDatabase()
+seedProgressData()
