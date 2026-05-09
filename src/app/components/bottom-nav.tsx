@@ -11,7 +11,6 @@ const TABS = [
   { id: 'HISTORY', label: 'HISTORY', icon: 'calendar_today', href: '/history' },
   { id: 'PROGRESS', label: 'PROGRESS', icon: 'monitoring', href: '/progress' },
   { id: 'PROFILE', label: 'PROFILE', icon: 'settings', href: '/profile' },
-  { id: 'CONFIG', label: 'CONFIG', icon: 'settings', href: '/config' },
 ]
 
 export default function BottomNav({ activeTab }: BottomNavProps) {
