@@ -55,7 +55,7 @@ function ExerciseCard({
       className="border-4 border-on-surface bg-tertiary-fixed p-6 neo-shadow transition-all active-press"
       data-id={`exercise-card-${exercise.exerciseId}`}
     >
-      {/* Header: exercise name + toggle button */}
+      {/* Header: exercise name + VIEWING PAST badge + toggle button */}
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="font-headline-md text-headline-md uppercase text-on-surface">
@@ -63,10 +63,15 @@ function ExerciseCard({
           </h2>
           <p className="font-label-mono text-label-mono text-secondary">EXERCISE</p>
         </div>
+        {viewMode === 'past' && (
+          <span className="mr-2 border-4 border-on-surface bg-surface-container p-2 neo-shadow font-label-bold text-label-bold uppercase text-on-surface">
+            VIEWING PAST
+          </span>
+        )}
         <button
           type="button"
           onClick={onToggleView}
-          className="border-4 border-on-surface bg-on-surface p-2 font-label-mono text-label-mono uppercase"
+          className="border-4 border-on-surface bg-surface-container-low p-2 font-label-mono text-label-mono uppercase neo-shadow"
           data-id={`toggle-view-${exercise.exerciseId}`}
         >
           {viewMode === 'past' ? 'CURRENT SESSION' : 'PAST SESSION'}
@@ -121,28 +126,36 @@ function ExerciseCard({
                     </span>
                   </div>
 
-                  {/* Weight box */}
+                  {/* Weight input */}
                   <div className="flex flex-1 flex-row items-center border-b-4 border-primary p-2 gap-1">
                     <span className="font-label-mono text-label-mono text-secondary">LB:</span>
-                    <input
-                      type="number"
-                      value={set.weight || ''}
-                      onChange={(e) => onSetChange(index, 'weight', e.target.value)}
-                      placeholder="0"
-                      className="w-full bg-transparent font-body-md text-body-md text-on-surface outline-none"
-                    />
+                    <div
+                      className="border-4 border-on-surface bg-surface-container p-2 neo-shadow font-body text-on-surface"
+                    >
+                      <input
+                        type="number"
+                        value={set.weight || ''}
+                        onChange={(e) => onSetChange(index, 'weight', e.target.value)}
+                        placeholder="0"
+                        className="w-full bg-transparent font-body-md text-body-md text-on-surface outline-none"
+                      />
+                    </div>
                   </div>
 
-                  {/* Reps box */}
+                  {/* Reps input */}
                   <div className="flex flex-1 flex-row items-center border-b-4 border-primary p-2 gap-1">
                     <span className="font-label-mono text-label-mono text-secondary">REPS:</span>
-                    <input
-                      type="number"
-                      value={set.reps || ''}
-                      onChange={(e) => onSetChange(index, 'reps', e.target.value)}
-                      placeholder="0"
-                      className="w-full bg-transparent font-body-md text-body-md text-on-surface outline-none"
-                    />
+                    <div
+                      className="border-4 border-on-surface bg-surface-container p-2 neo-shadow font-body text-on-surface"
+                    >
+                      <input
+                        type="number"
+                        value={set.reps || ''}
+                        onChange={(e) => onSetChange(index, 'reps', e.target.value)}
+                        placeholder="0"
+                        className="w-full bg-transparent font-body-md text-body-md text-on-surface outline-none"
+                      />
+                    </div>
                   </div>
 
                   {/* Delete button */}
@@ -161,7 +174,7 @@ function ExerciseCard({
           <button
             type="button"
             onClick={onAddSet}
-            className="mb-4 w-full border-4 border-on-surface bg-surface-container p-3 font-label-bold text-label-bold uppercase text-on-surface neo-shadow transition-all active-press"
+            className="mb-4 w-full border-4 border-on-surface bg-primary p-3 font-label-bold text-label-bold uppercase text-on-primary neo-shadow transition-all active-press"
           >
             ADD A SET
           </button>
