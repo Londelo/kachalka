@@ -118,7 +118,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <>
-        <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[100px] pb-[140px]">
+        <main id="profile-loading" className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[100px] pb-[140px]">
           <div className="mb-8 w-full text-center">
             <h1 className="font-headline-xl text-headline-xl font-black uppercase text-on-surface">
               MY BATTLE PLAN
@@ -134,9 +134,9 @@ export default function ProfilePage() {
 
   return (
     <>
-      <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[100px] pb-[140px]">
+      <main id="profile-page" className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[100px] pb-[140px]">
         {/* Hero Header */}
-        <section className="space-y-xs pt-md">
+        <section id="profile-header" className="space-y-xs pt-md">
           <h1 className="font-headline-xl text-headline-xl font-black uppercase text-on-surface">
             MY BATTLE PLAN
           </h1>
@@ -147,13 +147,13 @@ export default function ProfilePage() {
 
         {/* Error */}
         {error && (
-          <div className="mb-4 w-full border-2 border-error bg-error-container p-3">
+          <div id="profile-error" className="mb-4 w-full border-2 border-error bg-error-container p-3">
             <p className="font-label-bold text-label-bold text-error">{error}</p>
           </div>
         )}
 
         {/* Day Selector */}
-        <section className="flex gap-2 overflow-x-auto pb-2">
+        <section id="profile-day-selector" className="flex gap-2 overflow-x-auto pb-2">
           {DAYS.map((_, dayIndex) => {
             const selected = isDaySelected(selectedDay, addingDay, dayIndex)
             return (
@@ -175,7 +175,7 @@ export default function ProfilePage() {
 
         {/* Exercise Display — Selected Day Only */}
         {isDaySelected(selectedDay, addingDay, selectedDay) && (
-          <section className="space-y-3">
+          <section id="profile-current-assets" className="space-y-3">
             <div className="flex items-center gap-1">
               <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
                 emoji_events
@@ -184,10 +184,11 @@ export default function ProfilePage() {
             </div>
 
             {assignments.length > 0 ? (
-              <div className="space-y-3">
+              <div id="profile-assignment-list" className="space-y-3">
                 {assignments.map((a, idx) => (
                   <div
                     key={a.id.value}
+                    id={`assignment-card-${a.id.value}`}
                     className="bg-surface-container border-2 border-on-surface py-3 px-4 flex justify-between items-start shadow-[4px_4px_0px_0px_rgba(27,29,14,1)] relative overflow-hidden"
                   >
                     <div className={`absolute top-0 left-0 w-2 h-full ${idx % 2 === 0 ? 'bg-primary' : 'bg-secondary'}`} />
@@ -220,7 +221,7 @@ export default function ProfilePage() {
 
         {/* Add Exercise Panel */}
         {addingDay !== null && (
-          <section className="bg-surface-container-highest border-4 border-on-surface py-6 px-4 neo-shadow-lg space-y-3">
+          <section id="profile-add-exercise-panel" className="bg-surface-container-highest border-4 border-on-surface py-6 px-4 neo-shadow-lg space-y-3">
             <h3 className="font-headline-md text-headline-md uppercase tracking-tight">REINFORCE LINEUP</h3>
             <label className="font-label-bold text-label-bold uppercase block">SELECT EXERCISE</label>
             <div className="relative">
@@ -252,13 +253,13 @@ export default function ProfilePage() {
         )}
 
         {/* Quick-Add Card */}
-        <section className="border-2 border-dashed border-on-surface-variant p-lg flex flex-col items-center justify-center gap-2 bg-surface-container-lowest hover:bg-surface-container transition-colors cursor-pointer">
+        <section id="profile-quick-add" className="border-2 border-dashed border-on-surface-variant p-lg flex flex-col items-center justify-center gap-2 bg-surface-container-lowest hover:bg-surface-container transition-colors cursor-pointer">
           <span className="material-symbols-outlined text-[48px] text-on-surface-variant">add_box</span>
           <span className="font-label-bold text-label-bold uppercase">CREATE NEW EXERCISE SPEC</span>
         </section>
 
         {/* Campaign Logistics Grid */}
-        <section className="space-y-3 pt-4">
+        <section id="profile-campaign-logistics" className="space-y-3 pt-4">
           <h3 className="font-label-bold text-label-bold uppercase">CAMPAIGN LOGISTICS</h3>
           <div className="grid grid-cols-7 border-2 border-on-surface">
             {DAYS.map((day, i) => {

@@ -28,7 +28,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="bg-background text-on-surface font-body-md">
         <Header />
-        <main>{children}</main>
+        <main id="app-main">{children}</main>
         <NavWrapper />
       </body>
     </html>

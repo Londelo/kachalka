@@ -106,7 +106,7 @@ export default function TodayPage() {
 
   if (loading) {
     return (
-      <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[120px] pb-[140px]">
+      <main id="today-loading" className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[120px] pb-[140px]">
         <p className="text-on-surface">Loading...</p>
       </main>
     )
@@ -114,8 +114,8 @@ export default function TodayPage() {
 
   return (
     <>
-      <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[120px] pb-[140px]">
-        <div className="mb-8 w-full text-center">
+      <main id="today-page" className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[120px] pb-[140px]">
+        <div id="today-title" className="mb-8 w-full text-center">
           <h1 className="font-headline-xl text-headline-xl uppercase text-on-surface">
             TODAY&apos;S BATTLE
           </h1>
@@ -123,13 +123,13 @@ export default function TodayPage() {
         </div>
 
         {exercises.length === 0 ? (
-          <div className="w-full border-4 border-on-surface bg-surface-container p-6 text-center neo-shadow">
+          <div id="today-empty" className="w-full border-4 border-on-surface bg-surface-container p-6 text-center neo-shadow">
             <p className="font-body-lg text-body-lg text-on-surface">
               No workout scheduled. Set up your routine in Config.
             </p>
           </div>
         ) : (
-          <div className="flex w-full flex-col gap-8">
+          <div id="today-exercise-list" className="flex w-full flex-col gap-8">
             {exercises.map((exercise) => {
               const last = exercise.lastLog
 
@@ -150,6 +150,7 @@ export default function TodayPage() {
               return (
                 <div
                   key={exercise.exerciseId}
+                  id={`exercise-card-${exercise.exerciseId}`}
                   className="border-4 border-on-surface bg-tertiary-fixed p-6 neo-shadow transition-all active-press"
                 >
                   <div className="mb-4">
@@ -207,6 +208,7 @@ export default function TodayPage() {
                   )}
 
                   <button
+                    id={`log-set-btn-${exercise.exerciseId}`}
                     type="button"
                     onClick={() => handleLogSet(exercise)}
                     className="w-full border-4 border-on-surface bg-primary p-4 font-label-bold text-label-bold uppercase text-on-primary neo-shadow transition-all active-press"
@@ -221,7 +223,7 @@ export default function TodayPage() {
       </main>
 
       {error && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50">
+        <div id="today-error-modal" className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50">
           <div className="w-full max-w-sm border-4 border-on-surface bg-background p-6 neo-shadow-lg text-center">
             <p className="mb-4 font-body-lg text-body-lg text-error">{error}</p>
             <button
@@ -237,6 +239,7 @@ export default function TodayPage() {
 
       {modalOpen && selectedExercise && (
         <SetModal
+          modalId="today-set-modal"
           exerciseName={selectedExercise.exerciseName}
           sets={sets}
           onAddSet={handleAddSet}
@@ -255,6 +258,7 @@ export default function TodayPage() {
 }
 
 interface SetModalProps {
+  modalId: string
   exerciseName: string
   sets: WorkoutSet[]
   onAddSet: () => void
@@ -266,6 +270,7 @@ interface SetModalProps {
 }
 
 function SetModal({
+  modalId,
   exerciseName,
   sets,
   onAddSet,
@@ -279,6 +284,7 @@ function SetModal({
 
   return (
     <div
+      id={modalId}
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
       onClickCapture={(e) => {
         if (contentRef.current && !contentRef.current.contains(e.target as Node)) {

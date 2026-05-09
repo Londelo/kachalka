@@ -27,15 +27,15 @@ export default function UserSelectionClient({
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[120px] pb-[140px]">
-      <div className="mb-12 w-full text-center">
+    <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[120px] pb-[140px]" id="user-selection-main">
+      <div className="mb-12 w-full text-center" id="user-selection-title">
         <h2 className="font-headline-xl text-headline-xl uppercase text-on-surface">
           SELECT COMMANDER
         </h2>
         <div className="mt-2 h-1 w-full bg-on-surface" />
       </div>
 
-      <div className="grid w-full grid-cols-1 gap-8 md:grid-cols-2">
+      <div className="grid w-full grid-cols-1 gap-8 md:grid-cols-2" id="user-cards-grid">
         {users.map((user, index) => (
           <UserCard
             key={user.id.value}
@@ -48,7 +48,7 @@ export default function UserSelectionClient({
         <QuickAddCard />
       </div>
 
-      <div className="mt-8 w-full px-6">
+      <div className="mt-8 w-full px-6" id="quick-add-area">
         <NewRecruitButton />
       </div>
     </main>
@@ -118,6 +118,7 @@ function QuickAddCard() {
     <button
       type="button"
       className="flex cursor-pointer items-center justify-center border-4 border-dashed border-on-surface bg-surface-variant p-6 neo-shadow transition-colors hover:bg-on-surface hover:text-background active-press"
+      id="quick-add-card"
     >
       <div className="text-center">
         <span className="material-symbols-outlined mb-2 block text-[48px]">add_circle</span>

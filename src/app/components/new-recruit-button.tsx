@@ -38,6 +38,7 @@ export default function NewRecruitButton({ variant = 'expanded' }: NewRecruitBut
         type="button"
         onClick={() => setOpen(true)}
         className="flex w-full items-center justify-center gap-4 border-4 border-on-surface bg-primary py-3 text-headline-md font-headline-md uppercase font-bold text-on-primary transition-all neo-shadow-sm active-press"
+        id="new-recruit-button"
       >
         <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
           person_add
@@ -48,8 +49,8 @@ export default function NewRecruitButton({ variant = 'expanded' }: NewRecruitBut
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-sm border-4 border-on-surface bg-surface-container-high p-6 neo-shadow">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" id="new-recruit-modal-overlay">
+      <div className="w-full max-w-sm border-4 border-on-surface bg-surface-container-high p-6 neo-shadow" id="new-recruit-modal">
         <h3 className="mb-4 font-headline-md text-headline-md font-black uppercase text-on-surface">
           NEW RECRUIT
         </h3>
@@ -67,6 +68,7 @@ export default function NewRecruitButton({ variant = 'expanded' }: NewRecruitBut
             handleCreate()
           }}
           className="flex gap-2"
+          id="new-recruit-form"
         >
           <input
             type="text"
@@ -79,6 +81,7 @@ export default function NewRecruitButton({ variant = 'expanded' }: NewRecruitBut
           <button
             type="submit"
             className="border-4 border-on-surface bg-primary px-4 py-2 font-label-bold text-label-bold uppercase text-on-primary transition-all active-press"
+            id="new-recruit-submit"
           >
             {creating ? '...' : 'ADD'}
           </button>
@@ -88,6 +91,7 @@ export default function NewRecruitButton({ variant = 'expanded' }: NewRecruitBut
           type="button"
           onClick={() => setOpen(false)}
           className="mt-3 w-full border-2 border-on-surface bg-surface px-3 py-2 font-label-bold text-label-bold uppercase text-on-surface hover:bg-surface-container transition-colors"
+          id="new-recruit-cancel"
         >
           CANCEL
         </button>

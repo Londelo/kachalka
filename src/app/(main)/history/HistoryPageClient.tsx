@@ -81,16 +81,16 @@ export default function HistoryPageClient() {
 
   if (loading) {
     return (
-      <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[120px] pb-[140px]">
+      <main id="history-loading" className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[120px] pb-[140px]">
         <p className="font-label-bold text-label-bold text-on-surface">Loading war logs...</p>
       </main>
     )
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[120px] pb-[140px]">
+    <main id="history-page" className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[120px] pb-[140px]">
       {/* Hero Header */}
-      <section className="mb-10 w-full text-center">
+      <section id="history-header" className="mb-10 w-full text-center">
         <h1 className="font-headline-xl text-headline-xl font-black uppercase text-on-surface">
           WAR LOGS
         </h1>
@@ -102,7 +102,7 @@ export default function HistoryPageClient() {
 
       {/* Empty state */}
       {history.length === 0 && (
-        <div className="w-full border-4 border-on-surface bg-surface-container p-8 text-center neo-shadow">
+        <div id="history-empty" className="w-full border-4 border-on-surface bg-surface-container p-8 text-center neo-shadow">
           <span className="mb-4 block text-center text-[64px] opacity-40 grayscale">
             <span className="material-symbols-outlined">inbox</span>
           </span>
@@ -117,7 +117,7 @@ export default function HistoryPageClient() {
 
       {/* History list */}
       {history.length > 0 && history.map((dateEntry, dateIdx) => (
-        <section key={dateEntry.date} className="w-full">
+        <section key={dateEntry.date} id={`history-date-${dateEntry.date}`} className="w-full">
           {/* Date group header */}
           <div className="mb-4 flex items-center gap-3">
             <div className="h-6 w-1 shrink-0 bg-primary" />
@@ -127,13 +127,14 @@ export default function HistoryPageClient() {
           </div>
 
           {/* Log cards */}
-          <div className="flex flex-col gap-4">
+          <div id="history-log-list" className="flex flex-col gap-4">
             {dateEntry.logs.map((log, logIdx) => {
               const sessionNum = dateIdx + 1
               const intensity = calcIntensity(log.sets)
               return (
                 <div
                   key={log.id}
+                  id={`history-log-card-${log.id}`}
                   className="relative border-4 border-on-surface bg-tertiary-fixed p-5 neo-shadow transition-all active-press"
                   onClick={() => setSelectedLog({ log, date: dateEntry.date, sessionNum })}
                 >
@@ -219,7 +220,7 @@ export default function HistoryPageClient() {
 
       {/* Delete confirmation dialog */}
       {deleteConfirm !== null && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50">
+        <div id="history-delete-confirm" className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50">
           <div className="w-full max-w-sm border-4 border-on-surface bg-background p-6 neo-shadow-lg">
             <p className="mb-4 font-headline-md text-headline-md uppercase text-on-surface">
               CONFIRM DELETION
@@ -254,6 +255,7 @@ export default function HistoryPageClient() {
       {/* Set detail modal */}
       {selectedLog && (
         <div
+          id="history-set-detail-modal"
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
           onClickCapture={(e) => {
             if (e.target === e.currentTarget) {

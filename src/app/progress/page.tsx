@@ -102,16 +102,16 @@ export default function ProgressPage() {
 
   return (
     <>
-      <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[100px] pb-[140px]">
+      <main id="progress-page" className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[100px] pb-[140px]">
         {/* Header */}
-        <section className="space-y-xs pt-md">
+        <section id="progress-header" className="space-y-xs pt-md">
           <h1 className="font-headline-xl text-headline-xl font-black italic uppercase text-on-surface">
             FORCE Progression
           </h1>
         </section>
 
         {/* Exercise Dropdown */}
-        <div className="mt-md w-full space-y-4">
+        <div id="progress-exercise-selector" className="mt-md w-full space-y-4">
           <label className="font-label-bold text-label-bold uppercase block text-on-surface">
             SELECT EXERCISE
           </label>
@@ -136,7 +136,7 @@ export default function ProgressPage() {
 
         {/* Time Range Pills */}
         {selectedExerciseId && (
-          <div className="mt-4 flex w-full gap-2">
+          <div id="progress-range-pills" className="mt-4 flex w-full gap-2">
             {(['1M', '3M', '6M', 'ALL'] as const).map((r) => (
               <button
                 key={r}
@@ -156,14 +156,14 @@ export default function ProgressPage() {
 
         {/* Loading State */}
         {loading && (
-          <div className="mt-8 w-full text-center">
+          <div id="progress-loading" className="mt-8 w-full text-center">
             <p className="font-label-bold text-label-bold text-on-surface-variant">LOADING PROGRESSION DATA...</p>
           </div>
         )}
 
         {/* Empty State */}
         {!loading && dataPoints.length === 0 && selectedExerciseId && (
-          <div className="mt-8 w-full border-4 border-on-surface bg-surface-container-low p-8 text-center shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
+          <div id="progress-empty" className="mt-8 w-full border-4 border-on-surface bg-surface-container-low p-8 text-center shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
             <span className="material-symbols-outlined text-[48px] text-on-surface-variant">analytics</span>
             <p className="mt-2 font-headline-md text-headline-md uppercase text-on-surface-variant">
               NO DATA YET
@@ -176,7 +176,7 @@ export default function ProgressPage() {
 
         {/* Bar Chart */}
         {!loading && dataPoints.length > 0 && (
-          <section className="mt-6 w-full">
+          <section id="progress-bar-chart" className="mt-6 w-full">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
                 show_chart
@@ -230,9 +230,9 @@ export default function ProgressPage() {
 
         {/* Stats Cards Row */}
         {!loading && selectedExerciseId && (
-          <section className="mt-6 w-full space-y-4">
+          <section id="progress-stats" className="mt-6 w-full space-y-4">
             {/* Peak Volume Card */}
-            <div className="border-4 border-on-surface bg-background p-4 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
+            <div id="progress-peak-volume" className="border-4 border-on-surface bg-background p-4 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
                   emoji_events
@@ -246,7 +246,7 @@ export default function ProgressPage() {
 
             {/* Intensity Split Card */}
             {intensitySplit.length > 0 && (
-              <div className="border-4 border-on-surface bg-background p-4 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
+              <div id="progress-intensity-split" className="border-4 border-on-surface bg-background p-4 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
                     donut_large
@@ -274,7 +274,7 @@ export default function ProgressPage() {
 
             {/* Commander's Intel Card */}
             {dataPoints.length === 0 ? (
-              <div className="border-4 border-on-surface bg-error-container p-4 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
+              <div id="progress-intel-no-data" className="border-4 border-on-surface bg-error-container p-4 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
                 <div className="flex items-start gap-3">
                   <span className="material-symbols-outlined text-error" style={{ fontVariationSettings: "'FILL' 1" }}>
                     warning
@@ -288,7 +288,7 @@ export default function ProgressPage() {
                 </div>
               </div>
             ) : dataPoints.length <= 2 ? (
-              <div className="border-4 border-on-surface bg-error-container p-4 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
+              <div id="progress-intel-insufficient" className="border-4 border-on-surface bg-error-container p-4 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
                 <div className="flex items-start gap-3">
                   <span className="material-symbols-outlined text-error" style={{ fontVariationSettings: "'FILL' 1" }}>
                     warning
@@ -302,7 +302,7 @@ export default function ProgressPage() {
                 </div>
               </div>
             ) : (
-              <div className="border-4 border-on-surface bg-surface-container-low p-4 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
+              <div id="progress-intel-ok" className="border-4 border-on-surface bg-surface-container-low p-4 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
                 <div className="flex items-start gap-3">
                   <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
                     info
@@ -318,7 +318,7 @@ export default function ProgressPage() {
             )}
 
             {/* Secondary Progression Card */}
-            <div className="border-4 border-on-surface bg-surface-container p-4 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
+            <div id="progress-secondary" className="border-4 border-on-surface bg-surface-container p-4 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-on-surface-variant">trending_flat</span>
                 <h3 className="font-label-bold text-label-bold uppercase text-on-surface-variant">SECONDARY PROGRESSION</h3>
@@ -332,7 +332,7 @@ export default function ProgressPage() {
 
         {/* No Exercise Selected State */}
         {!selectedExerciseId && !loading && (
-          <div className="mt-12 w-full text-center">
+          <div id="no-selection-state" className="mt-12 w-full text-center">
             <span className="material-symbols-outlined text-[64px] text-on-surface-variant">bar_chart</span>
             <p className="mt-3 font-headline-md text-headline-md uppercase text-on-surface-variant">
               SELECT AN EXERCISE TO VIEW PROGRESSION
