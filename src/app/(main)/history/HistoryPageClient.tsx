@@ -116,107 +116,128 @@ export default function HistoryPageClient() {
       )}
 
       {/* History list */}
-      {history.length > 0 && history.map((dateEntry, dateIdx) => (
-        <section key={dateEntry.date} id={`history-date-${dateEntry.date}`} className="w-full">
-          {/* Date group header */}
-          <div className="mb-4 flex items-center gap-3">
-            <div className="h-6 w-1 shrink-0 bg-primary" />
-            <h2 className="font-label-bold text-label-bold uppercase text-primary">
-              {formatDate(dateEntry.date)}
-            </h2>
-          </div>
+      {history.length > 0 && history.map((dateEntry, dateIdx) => {
+        const sessionNum = dateIdx + 1
 
-          {/* Log cards */}
-          <div id="history-log-list" className="flex flex-col gap-4">
-            {dateEntry.logs.map((log, logIdx) => {
-              const sessionNum = dateIdx + 1
-              const intensity = calcIntensity(log.sets)
-              return (
-                <div
-                  key={log.id}
-                  id={`history-log-card-${log.id}`}
-                  className="relative border-4 border-on-surface bg-tertiary-fixed p-5 neo-shadow transition-all active-press"
-                  onClick={() => setSelectedLog({ log, date: dateEntry.date, sessionNum })}
-                >
-                  {/* Session badge */}
-                  <div className="mb-3 flex items-center justify-between">
-                    <div className="border-4 border-on-surface bg-primary px-3 py-1 neo-shadow-sm">
-                      <span className="font-label-bold text-label-bold uppercase text-on-primary">
-                        SESSION {String(sessionNum).padStart(3, '0')}
-                      </span>
-                    </div>
+        // Aggregate metrics across all exercises in this session
+        const totalVolume = dateEntry.logs.reduce((sum, log) => sum + log.volume, 0)
+        const totalSets = dateEntry.logs.reduce((sum, log) => sum + log.sets.length, 0)
+        const totalReps = dateEntry.logs.reduce(
+          (sum, log) => sum + log.sets.reduce((s, set) => s + set.reps, 0),
+          0,
+        )
+
+        return (
+          <section key={dateEntry.date} id={`history-date-${dateEntry.date}`} className="mb-8 w-full">
+            {/* Session card */}
+            <div
+              id={`history-log-list`}
+              className="border-4 border-on-surface bg-tertiary-fixed p-5"
+            >
+              {/* Date badge */}
+              <div className="mb-4 border-4 border-on-surface bg-primary px-3 py-1">
+                <span className="font-label-bold text-label-bold uppercase text-on-primary">
+                  {formatDate(dateEntry.date)}
+                </span>
+              </div>
+
+              {/* Exercise list — each row is clickable */}
+              <div className="flex flex-col gap-3">
+                {dateEntry.logs.map((log) => {
+                  const exerciseSets = log.sets.length
+                  const exerciseReps = log.sets.reduce((sum, s) => sum + s.reps, 0)
+                  const exerciseMaxWeight = calcIntensity(log.sets)
+                  return (
                     <button
+                      key={log.id}
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setDeleteConfirm(log.id)
-                      }}
-                      className="border-4 border-on-surface bg-error p-2 neo-shadow-sm transition-all active-press"
-                      title="DELETE"
+                      id={`history-exercise-btn-${log.id}`}
+                      className="w-full border-4 border-on-surface bg-surface-container p-4 text-left neo-shadow transition-all active-press"
+                      onClick={() =>
+                        setSelectedLog({ log, date: dateEntry.date, sessionNum })
+                      }
                     >
-                      <span className="material-symbols-outlined text-[18px] text-on-primary">
-                        delete
-                      </span>
+                      <div className="flex items-center justify-between">
+                        <span className="font-headline-md text-headline-md uppercase text-on-surface">
+                          {log.exerciseName}
+                        </span>
+                        <div className="flex gap-4">
+                          <div className="text-right">
+                            <p className="font-label-mono text-label-mono text-secondary">
+                              {exerciseSets}
+                            </p>
+                            <p className="font-label-mono text-label-mono uppercase text-secondary">
+                              SETS
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-label-mono text-label-mono text-secondary">
+                              {exerciseReps}
+                            </p>
+                            <p className="font-label-mono text-label-mono uppercase text-secondary">
+                              REPS
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-label-mono text-label-mono text-secondary">
+                              {exerciseMaxWeight}
+                            </p>
+                            <p className="font-label-mono text-label-mono uppercase text-secondary">
+                              MAX LB
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </button>
-                  </div>
+                  )
+                })}
+              </div>
 
-                  {/* Exercise name */}
-                  <h3 className="mb-3 font-headline-md text-headline-md uppercase text-on-surface">
-                    {log.exerciseName}
-                  </h3>
-
-                  {/* 3-column metrics grid */}
-                  <div className="mb-4 grid grid-cols-3 gap-3">
-                    {/* Volume */}
-                    <div className="border-4 border-on-surface bg-on-surface p-3">
-                      <p className="font-label-mono text-label-mono uppercase text-background">
-                        VOLUME
-                      </p>
-                      <p className="mt-1 font-headline-md text-headline-md font-black text-tertiary-fixed">
-                        {log.volume.toLocaleString()}
-                      </p>
-                      <p className="font-label-mono text-label-mono text-background">
-                        LB TOTAL
-                      </p>
-                    </div>
-
-                    {/* Sets */}
-                    <div className="border-4 border-on-surface bg-on-surface p-3">
-                      <p className="font-label-mono text-label-mono uppercase text-background">
-                        SETS
-                      </p>
-                      <p className="mt-1 font-headline-md text-headline-md font-black text-tertiary-fixed">
-                        {log.sets.length}
-                      </p>
-                      <p className="font-label-mono text-label-mono text-background">
-                        COMPLETED
-                      </p>
-                    </div>
-
-                    {/* Intensity */}
-                    <div className="border-4 border-on-surface bg-on-surface p-3">
-                      <p className="font-label-mono text-label-mono uppercase text-background">
-                        INTENSITY
-                      </p>
-                      <p className="mt-1 font-headline-md text-headline-md font-black text-tertiary-fixed">
-                        {intensity}
-                      </p>
-                      <p className="font-label-mono text-label-mono text-background">
-                        MAX LB
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Tap hint */}
-                  <p className="font-label-mono text-label-mono text-secondary">
-                    TAP FOR SET DETAILS
+              {/* Aggregate metadata row */}
+              <div className="mt-4 grid grid-cols-3 gap-3">
+                {/* Total Volume */}
+                <div className="border-4 border-on-surface bg-on-surface p-3">
+                  <p className="font-label-mono text-label-mono uppercase text-background">
+                    VOLUME
+                  </p>
+                  <p className="mt-1 font-headline-md text-headline-md font-black text-tertiary-fixed">
+                    {totalVolume.toLocaleString()}
+                  </p>
+                  <p className="font-label-mono text-label-mono text-background">
+                    LB TOTAL
                   </p>
                 </div>
-              )
-            })}
-          </div>
-        </section>
-      ))}
+
+                {/* Total Sets */}
+                <div className="border-4 border-on-surface bg-on-surface p-3">
+                  <p className="font-label-mono text-label-mono uppercase text-background">
+                    SETS
+                  </p>
+                  <p className="mt-1 font-headline-md text-headline-md font-black text-tertiary-fixed">
+                    {totalSets}
+                  </p>
+                  <p className="font-label-mono text-label-mono text-background">
+                    COMPLETED
+                  </p>
+                </div>
+
+                {/* Total Reps */}
+                <div className="border-4 border-on-surface bg-on-surface p-3">
+                  <p className="font-label-mono text-label-mono uppercase text-background">
+                    REPS
+                  </p>
+                  <p className="mt-1 font-headline-md text-headline-md font-black text-tertiary-fixed">
+                    {totalReps}
+                  </p>
+                  <p className="font-label-mono text-label-mono text-background">
+                    COMPLETED
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+        )
+      })}
 
       {/* Delete confirmation dialog */}
       {deleteConfirm !== null && (
@@ -270,9 +291,11 @@ export default function HistoryPageClient() {
                 <h3 className="font-headline-md text-headline-md uppercase text-on-surface">
                   {selectedLog.log.exerciseName}
                 </h3>
-                <p className="font-label-mono text-label-mono text-secondary">
-                  SESSION {String(selectedLog.sessionNum).padStart(3, '0')}
-                </p>
+                <div className="mt-1 border-4 border-on-surface bg-primary px-2 py-0.5 neo-shadow-sm inline-block">
+                  <span className="font-label-bold text-label-bold uppercase text-on-primary">
+                    {formatDate(selectedLog.date)}
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
@@ -283,15 +306,10 @@ export default function HistoryPageClient() {
               </button>
             </div>
 
-            {/* Session date */}
-            <p className="mb-4 font-label-bold text-label-bold uppercase text-primary">
-              {formatDate(selectedLog.date)}
-            </p>
-
             {/* Set rows */}
             <div className="mb-6 flex flex-col gap-3">
               {selectedLog.log.sets.map((set, idx) => (
-                <div key={set.id} className="flex items-center gap-3">
+                <div key={idx} className="flex items-center gap-3">
                   {/* Set number */}
                   <div className="flex min-w-[80px] flex-1 items-center border-b-4 border-primary pb-2 pt-1">
                     <span className="font-label-mono text-label-mono text-secondary">SET:</span>
