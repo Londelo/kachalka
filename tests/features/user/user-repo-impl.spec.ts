@@ -22,6 +22,35 @@ function runMigration(db: Database): void {
       is_active INTEGER NOT NULL DEFAULT 1
     )
   `)
+  db.exec(`
+    CREATE TABLE exercises (
+      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      name TEXT NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+      updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+    )
+  `)
+  db.exec(`
+    CREATE TABLE user_routines (
+      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      exercise_id INTEGER NOT NULL REFERENCES exercises(id),
+      day_of_week INTEGER NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+    )
+  `)
+  db.exec(`
+    CREATE TABLE workout_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      exercise_id INTEGER NOT NULL REFERENCES exercises(id),
+      date TEXT NOT NULL,
+      sets TEXT NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+      updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+    )
+  `)
 }
 
 describe('createSqliteUserRepository', () => {

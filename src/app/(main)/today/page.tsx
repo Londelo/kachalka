@@ -29,7 +29,6 @@ function getStoredUserId(): number | null {
 
 function ExerciseCard({
   exercise,
-  userId,
   viewMode,
   sets,
   saving,
@@ -40,7 +39,6 @@ function ExerciseCard({
   onSetChange,
 }: {
   exercise: ExerciseItem
-  userId: number
   viewMode: ViewMode
   sets: WorkoutSet[]
   saving: boolean
@@ -52,7 +50,7 @@ function ExerciseCard({
 }) {
   return (
     <div
-      className="border-4 border-on-surface bg-tertiary-fixed p-6 neo-shadow transition-all active-press"
+      className="border-4 border-on-surface bg-tertiary-fixed p-6"
       data-id={`exercise-card-${exercise.exerciseId}`}
     >
       {/* Header: exercise name + VIEWING PAST badge + toggle button */}
@@ -64,14 +62,14 @@ function ExerciseCard({
           <p className="font-label-mono text-label-mono text-secondary">EXERCISE</p>
         </div>
         {viewMode === 'past' && (
-          <span className="mr-2 border-4 border-on-surface bg-surface-container p-2 neo-shadow font-label-bold text-label-bold uppercase text-on-surface">
-            VIEWING PAST
+          <span className="mr-2 font-headline-md text-headline-md uppercase text-secondary">
+            VIEWING LAST SESSION
           </span>
         )}
         <button
           type="button"
           onClick={onToggleView}
-          className="border-4 border-on-surface bg-surface-container-low p-2 font-label-mono text-label-mono uppercase neo-shadow"
+          className={`border-4 border-on-surface bg-surface-container-low p-2 font-label-mono text-label-mono uppercase ${viewMode === 'past' ? '' : 'neo-shadow'}`}
           data-id={`toggle-view-${exercise.exerciseId}`}
         >
           {viewMode === 'past' ? 'CURRENT SESSION' : 'PAST SESSION'}
@@ -83,17 +81,17 @@ function ExerciseCard({
         <div className="mb-4 flex flex-col gap-3">
           {exercise.lastLog.map((s, idx) => (
             <div key={idx} className="flex items-center gap-3">
-              <div className="flex flex-1 flex-row items-center border-b-4 border-primary p-2 gap-1">
+              <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background p-2 gap-2">
                 <span className="font-label-mono text-label-mono text-secondary">SET:</span>
                 <span className="font-body-md text-body-md text-on-surface">
                   {String(idx + 1).padStart(2, '0')}
                 </span>
               </div>
-              <div className="flex flex-1 flex-row items-center border-b-4 border-primary p-2 gap-1">
+              <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background p-2 gap-2">
                 <span className="font-label-mono text-label-mono text-secondary">LB:</span>
                 <span className="font-body-md text-body-md text-on-surface">{s.weight}</span>
               </div>
-              <div className="flex flex-1 flex-row items-center border-b-4 border-primary p-2 gap-1">
+              <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background p-2 gap-2">
                 <span className="font-label-mono text-label-mono text-secondary">REPS:</span>
                 <span className="font-body-md text-body-md text-on-surface">{s.reps}</span>
               </div>
@@ -119,7 +117,7 @@ function ExerciseCard({
               {sets.map((set, index) => (
                 <div key={set.id} className="flex items-center gap-3">
                   {/* Set number box */}
-                  <div className="flex flex-1 flex-row items-center border-b-4 border-primary p-2 gap-1">
+                  <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background p-2 gap-2">
                     <span className="font-label-mono text-label-mono text-secondary">SET:</span>
                     <span className="font-body-md text-body-md text-on-surface">
                       {String(index + 1).padStart(2, '0')}
@@ -127,35 +125,27 @@ function ExerciseCard({
                   </div>
 
                   {/* Weight input */}
-                  <div className="flex flex-1 flex-row items-center border-b-4 border-primary p-2 gap-1">
+                  <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
                     <span className="font-label-mono text-label-mono text-secondary">LB:</span>
-                    <div
-                      className="border-4 border-on-surface bg-surface-container p-2 neo-shadow font-body text-on-surface"
-                    >
-                      <input
-                        type="number"
-                        value={set.weight || ''}
-                        onChange={(e) => onSetChange(index, 'weight', e.target.value)}
-                        placeholder="0"
-                        className="w-full bg-transparent font-body-md text-body-md text-on-surface outline-none"
-                      />
-                    </div>
+                    <input
+                      type="number"
+                      value={set.weight || ''}
+                      onChange={(e) => onSetChange(index, 'weight', e.target.value)}
+                      placeholder="0"
+                      className="w-full bg-transparent [-moz-appearance:textfield] appearance-none font-body-md text-body-md text-on-surface outline-none [-webkit-appearance:none]"
+                    />
                   </div>
 
                   {/* Reps input */}
-                  <div className="flex flex-1 flex-row items-center border-b-4 border-primary p-2 gap-1">
+                  <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
                     <span className="font-label-mono text-label-mono text-secondary">REPS:</span>
-                    <div
-                      className="border-4 border-on-surface bg-surface-container p-2 neo-shadow font-body text-on-surface"
-                    >
-                      <input
-                        type="number"
-                        value={set.reps || ''}
-                        onChange={(e) => onSetChange(index, 'reps', e.target.value)}
-                        placeholder="0"
-                        className="w-full bg-transparent font-body-md text-body-md text-on-surface outline-none"
-                      />
-                    </div>
+                    <input
+                      type="number"
+                      value={set.reps || ''}
+                      onChange={(e) => onSetChange(index, 'reps', e.target.value)}
+                      placeholder="0"
+                      className="w-full bg-transparent [-moz-appearance:textfield] appearance-none font-body-md text-body-md text-on-surface outline-none [-webkit-appearance:none]"
+                    />
                   </div>
 
                   {/* Delete button */}
@@ -205,6 +195,9 @@ export default function TodayPage() {
   const [savingExercises, setSavingExercises] = useState<Set<number>>(new Set())
   const [errors, setErrors] = useState<Map<number, string>>(new Map())
   const debounceTimersRef = useRef<Map<number, NodeJS.Timeout>>(new Map())
+  const exerciseSetsRef = useRef<Map<number, WorkoutSet[]>>(new Map())
+  // Keep ref in sync with state so debounced callbacks always read fresh data
+  exerciseSetsRef.current = exerciseSets
 
   // Load exercises on mount
   useEffect(() => {
@@ -267,7 +260,7 @@ export default function TodayPage() {
     const userId = getStoredUserId()
     if (!userId) return
 
-    const sets = exerciseSets.get(exerciseId)
+    const sets = exerciseSetsRef.current.get(exerciseId)
     if (!sets) return
 
     // Filter out sets where both weight and reps are 0
@@ -367,7 +360,7 @@ export default function TodayPage() {
         {exercises.length === 0 ? (
           <div className="w-full border-4 border-on-surface bg-surface-container p-6 text-center neo-shadow">
             <p className="font-body-lg text-body-lg text-on-surface">
-              No workout scheduled. Set up your routine in Config.
+              No workout scheduled. Set up your routine in Profile.
             </p>
           </div>
         ) : (
@@ -382,7 +375,6 @@ export default function TodayPage() {
                 <ExerciseCard
                   key={exercise.exerciseId}
                   exercise={exercise}
-                  userId={getStoredUserId() ?? 0}
                   viewMode={viewMode}
                   sets={sets}
                   saving={saving}

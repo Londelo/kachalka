@@ -131,7 +131,7 @@ export default function HistoryPageClient() {
           <section key={dateEntry.date} id={`history-date-${dateEntry.date}`} className="mb-8 w-full">
             {/* Session card */}
             <div
-              id={`history-log-list`}
+              id={`history-log-list-${dateEntry.date}`}
               className="border-4 border-on-surface bg-tertiary-fixed p-5"
             >
               {/* Date badge */}
