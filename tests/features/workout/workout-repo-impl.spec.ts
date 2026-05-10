@@ -67,16 +67,18 @@ describe('createSqliteWorkoutRepository', () => {
     const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
 
+    const userId = Number(user.lastInsertRowid)
+    const exerciseId = Number(exercise.lastInsertRowid)
     const log = repo.create({
-      userId: user.lastInsertRowid!,
-      exerciseId: exercise.lastInsertRowid!,
+      userId,
+      exerciseId,
       date: '2025-01-01',
-      sets: [{ reps: 5, weight: 100 }],
+      sets: [{ id: 's1', reps: 5, weight: 100 }],
     })
 
     expect(log.id).toBeGreaterThan(0)
-    expect(log.userId).toBe(user.lastInsertRowid!)
-    expect(log.exerciseId).toBe(exercise.lastInsertRowid!)
+    expect(log.userId).toBe(Number(user.lastInsertRowid))
+    expect(log.exerciseId).toBe(Number(exercise.lastInsertRowid))
     expect(log.date).toBe('2025-01-01')
     expect(log.sets).toHaveLength(1)
   })
@@ -84,18 +86,20 @@ describe('createSqliteWorkoutRepository', () => {
   it('returns a log when findById finds it', () => {
     const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+    const userId = Number(user.lastInsertRowid)
+    const exerciseId = Number(exercise.lastInsertRowid)
 
     const inserted = repo.create({
-      userId: user.lastInsertRowid!,
-      exerciseId: exercise.lastInsertRowid!,
+      userId,
+      exerciseId,
       date: '2025-01-01',
-      sets: [{ reps: 5, weight: 100 }],
+      sets: [{ id: 's1', reps: 5, weight: 100 }],
     })
 
     const found = repo.findById(inserted.id)
     expect(found).toBeDefined()
     expect(found!.id).toBe(inserted.id)
-    expect(found!.userId).toBe(user.lastInsertRowid!)
+    expect(found!.userId).toBe(Number(user.lastInsertRowid))
   })
 
   it('returns undefined when findById for non-existent log', () => {
@@ -106,15 +110,12 @@ describe('createSqliteWorkoutRepository', () => {
   it('finds a log by userId, date, and exerciseId', () => {
     const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+    const userId = Number(user.lastInsertRowid)
+    const exerciseId = Number(exercise.lastInsertRowid)
 
-    repo.create({
-      userId: user.lastInsertRowid!,
-      exerciseId: exercise.lastInsertRowid!,
-      date: '2025-01-01',
-      sets: [{ reps: 5, weight: 100 }],
-    })
+    repo.create({ userId, exerciseId, date: '2025-01-01', sets: [{ id: 's1', reps: 5, weight: 100 }] })
 
-    const found = repo.findByDateAndExercise(user.lastInsertRowid!, '2025-01-01', exercise.lastInsertRowid!)
+    const found = repo.findByDateAndExercise(userId, '2025-01-01', exerciseId)
     expect(found).toBeDefined()
     expect(found!.date).toBe('2025-01-01')
   })
@@ -122,15 +123,12 @@ describe('createSqliteWorkoutRepository', () => {
   it('returns undefined when findByDateAndExercise does not match', () => {
     const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+    const userId = Number(user.lastInsertRowid)
+    const exerciseId = Number(exercise.lastInsertRowid)
 
-    repo.create({
-      userId: user.lastInsertRowid!,
-      exerciseId: exercise.lastInsertRowid!,
-      date: '2025-01-01',
-      sets: [{ reps: 5, weight: 100 }],
-    })
+    repo.create({ userId, exerciseId, date: '2025-01-01', sets: [{ id: 's1', reps: 5, weight: 100 }] })
 
-    const found = repo.findByDateAndExercise(user.lastInsertRowid!, '2025-02-02', exercise.lastInsertRowid!)
+    const found = repo.findByDateAndExercise(userId, '2025-02-02', exerciseId)
     expect(found).toBeUndefined()
   })
 
@@ -138,42 +136,44 @@ describe('createSqliteWorkoutRepository', () => {
     const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
     const ex1 = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
     const ex2 = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
+    const userId = Number(user.lastInsertRowid)
+    const ex1Id = Number(ex1.lastInsertRowid)
+    const ex2Id = Number(ex2.lastInsertRowid)
 
-    repo.create({ userId: user.lastInsertRowid!, exerciseId: ex1.lastInsertRowid!, date: '2025-01-01', sets: [{ reps: 5, weight: 100 }] })
-    repo.create({ userId: user.lastInsertRowid!, exerciseId: ex2.lastInsertRowid!, date: '2025-01-01', sets: [{ reps: 3, weight: 80 }] })
-    repo.create({ userId: user.lastInsertRowid!, exerciseId: ex1.lastInsertRowid!, date: '2025-01-02', sets: [{ reps: 5, weight: 105 }] })
+    repo.create({ userId, exerciseId: ex1Id, date: '2025-01-01', sets: [{ id: 's1', reps: 5, weight: 100 }] })
+    repo.create({ userId, exerciseId: ex2Id, date: '2025-01-01', sets: [{ id: 's2', reps: 3, weight: 80 }] })
+    repo.create({ userId, exerciseId: ex1Id, date: '2025-01-02', sets: [{ id: 's3', reps: 5, weight: 105 }] })
 
-    const logs = repo.findByDate(user.lastInsertRowid!, '2025-01-01')
+    const logs = repo.findByDate(userId, '2025-01-01')
     expect(logs).toHaveLength(2)
   })
 
   it('finds all logs for a user across dates', () => {
     const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+    const userId = Number(user.lastInsertRowid)
+    const exerciseId = Number(exercise.lastInsertRowid)
 
-    db!.prepare('INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)').run(user.lastInsertRowid!, exercise.lastInsertRowid!, 0)
+    db!.prepare('INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)').run(userId, exerciseId, 0)
 
-    repo.create({ userId: user.lastInsertRowid!, exerciseId: exercise.lastInsertRowid!, date: '2025-01-01', sets: [{ reps: 5, weight: 100 }] })
-    repo.create({ userId: user.lastInsertRowid!, exerciseId: exercise.lastInsertRowid!, date: '2025-01-02', sets: [{ reps: 5, weight: 105 }] })
+    repo.create({ userId, exerciseId, date: '2025-01-01', sets: [{ id: 's1', reps: 5, weight: 100 }] })
+    repo.create({ userId, exerciseId, date: '2025-01-02', sets: [{ id: 's2', reps: 5, weight: 105 }] })
 
-    const all = repo.findAllByUser(user.lastInsertRowid!)
+    const all = repo.findAllByUser(userId)
     expect(all).toHaveLength(2)
   })
 
   it('updates sets on an existing log', () => {
     const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+    const userId = Number(user.lastInsertRowid)
+    const exerciseId = Number(exercise.lastInsertRowid)
 
-    const inserted = repo.create({
-      userId: user.lastInsertRowid!,
-      exerciseId: exercise.lastInsertRowid!,
-      date: '2025-01-01',
-      sets: [{ reps: 5, weight: 100 }],
-    })
+    const inserted = repo.create({ userId, exerciseId, date: '2025-01-01', sets: [{ id: 's1', reps: 5, weight: 100 }] })
 
     const updated = repo.update(inserted.id, [
-      { reps: 5, weight: 100 },
-      { reps: 5, weight: 110 },
+      { id: 's1', reps: 5, weight: 100 },
+      { id: 's2', reps: 5, weight: 110 },
     ])!
 
     expect(updated).toBeDefined()
@@ -182,20 +182,17 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('returns undefined when update for non-existent log', () => {
-    const result = repo.update(999, [{ reps: 5, weight: 100 }])
+    const result = repo.update(999, [{ id: 's1', reps: 5, weight: 100 }])
     expect(result).toBeUndefined()
   })
 
   it('deletes a log', () => {
     const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+    const userId = Number(user.lastInsertRowid)
+    const exerciseId = Number(exercise.lastInsertRowid)
 
-    const inserted = repo.create({
-      userId: user.lastInsertRowid!,
-      exerciseId: exercise.lastInsertRowid!,
-      date: '2025-01-01',
-      sets: [{ reps: 5, weight: 100 }],
-    })
+    const inserted = repo.create({ userId, exerciseId, date: '2025-01-01', sets: [{ id: 's1', reps: 5, weight: 100 }] })
 
     repo.delete(inserted.id.value)
 

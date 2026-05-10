@@ -1,15 +1,16 @@
-import type { ChartDataPoint, IntensitySplit } from '@/features/chart/chart-entity'
+import type { ChartDataPoint, IntensitySplit, RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
 
 export interface ChartRepository {
   getVolumeByDate(
     userId: number,
-    exerciseId: number,
-    range?: '1M' | '3M' | '6M' | 'ALL',
+    exerciseId?: number | null,
+    range?: RangeFilter,
+    granularity?: TimeGranularity,
   ): ChartDataPoint[]
-  getPeakVolume(userId: number, exerciseId: number): number
+  getPeakVolume(userId: number, exerciseId?: number | null): number
   getIntensitySplit(
     userId: number,
-    exerciseId: number,
+    exerciseId?: number | null,
   ): IntensitySplit[]
   getExercisesWithLogs(userId: number): { id: number; name: string }[]
 }

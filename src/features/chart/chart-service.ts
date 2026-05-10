@@ -1,5 +1,5 @@
 import type { ChartRepository } from '@/features/chart/chart-repository'
-import type { ChartDataPoint, IntensitySplit } from '@/features/chart/chart-entity'
+import type { ChartDataPoint, IntensitySplit, RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
 
 type ExerciseInfo = { id: number; name: string }
 
@@ -13,16 +13,25 @@ export class ChartService {
   getExerciseProgress(
     userId: number,
     exerciseId: number,
-    range?: '1M' | '3M' | '6M' | 'ALL',
+    range?: RangeFilter,
+    granularity?: TimeGranularity,
   ): ChartDataPoint[] {
-    return this.repo.getVolumeByDate(userId, exerciseId, range)
+    return this.repo.getVolumeByDate(userId, exerciseId, range, granularity)
   }
 
-  getPeakVolume(userId: number, exerciseId: number): number {
+  getAllExercisesProgress(
+    userId: number,
+    range?: RangeFilter,
+    granularity?: TimeGranularity,
+  ): ChartDataPoint[] {
+    return this.repo.getVolumeByDate(userId, null, range, granularity)
+  }
+
+  getPeakVolume(userId: number, exerciseId?: number | null): number {
     return this.repo.getPeakVolume(userId, exerciseId)
   }
 
-  getIntensitySplit(userId: number, exerciseId: number): IntensitySplit[] {
+  getIntensitySplit(userId: number, exerciseId?: number | null): IntensitySplit[] {
     return this.repo.getIntensitySplit(userId, exerciseId)
   }
 

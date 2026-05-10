@@ -4,15 +4,15 @@ import type { WorkoutRepository } from '@/features/workout/workout-repository'
 
 function makeRepo(overrides: Partial<WorkoutRepository> = {}): WorkoutRepository {
   return {
-    findById: vi.fn(),
-    create: vi.fn(),
-    findByDateAndExercise: vi.fn(),
-    findByDate: vi.fn(),
-    findAllByUser: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-    findByDayOfWeek: vi.fn(),
-    findHistoryByDate: vi.fn(),
+    findById: vi.fn() as any,
+    create: vi.fn() as any,
+    findByDateAndExercise: vi.fn() as any,
+    findByDate: vi.fn() as any,
+    findAllByUser: vi.fn() as any,
+    update: vi.fn() as any,
+    delete: vi.fn() as any,
+    findByDayOfWeek: vi.fn() as any,
+    findHistoryByDate: vi.fn() as any,
     ...overrides,
   }
 }
@@ -25,11 +25,11 @@ describe('deleteWorkoutUseCase', () => {
   it('deletes a log when user is the owner', () => {
     const repo = makeRepo()
     repo.findById.mockReturnValue({
-      id: { value: 1 },
+      id: 1,
       userId: 1,
       exerciseId: 5,
       date: '2025-01-01',
-      sets: [{ reps: 5, weight: 100 }],
+      sets: [{ id: 's1', reps: 5, weight: 100 }],
       createdAt: '2025-01-01T00:00:00.000Z',
       updatedAt: '2025-01-01T00:00:00.000Z',
     })
@@ -54,7 +54,7 @@ describe('deleteWorkoutUseCase', () => {
   it('throws if log not owned by user', () => {
     const repo = makeRepo()
     repo.findById.mockReturnValue({
-      id: { value: 1 },
+      id: 1,
       userId: 2,
       exerciseId: 5,
       date: '2025-01-01',
