@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/seed-bruno-data.js && next dev",
+    "seed": "node scripts/seed-bruno-data.js",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
