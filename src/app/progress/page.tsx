@@ -92,6 +92,13 @@ export default function ProgressPage() {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
+  function formatTooltipDate(dateStr: string): string {
+    const d = new Date(dateStr + 'T00:00:00')
+    const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const dayPart = d.toLocaleDateString('en-US', { weekday: 'short' })
+    return `${datePart}, ${dayPart.toUpperCase()}`
+  }
+
   function formatVolume(v: number): string {
     return v.toLocaleString('en-US')
   }
@@ -220,7 +227,7 @@ export default function ProgressPage() {
                         const data = payload[0].payload as DataPoint
                         return (
                           <div className="border-4 border-on-surface bg-background p-3 font-label-bold text-label-bold text-on-surface shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
-                            <div className="mb-1 text-primary">{formatDate(data.date)}</div>
+                            <div className="mb-1 text-primary">{formatTooltipDate(data.date)}</div>
                             {data.exercises.map((ex, i) => {
                               const totalSets = ex.sets.length
                               const totalReps = ex.sets.reduce((sum, s) => sum + s.reps, 0)

@@ -13,10 +13,10 @@ import { numberToDayOfWeek } from '@/features/routine/routine-entity'
 import {
   getAssignmentsForDay,
   getDayLabel,
-  getExerciseCountForDay,
   isDaySelected,
   resolveDaySelection,
 } from '@/app/profile/profile-utils'
+import NewRecruitButton from '@/app/components/new-recruit-button'
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -136,13 +136,11 @@ export default function ProfilePage() {
     <>
       <main id="profile-page" className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[100px] pb-[140px]">
         {/* Hero Header */}
-        <section id="profile-header" className="space-y-xs pt-md">
+        <section id="profile-header" className="flex items-start justify-between space-y-xs pt-md">
           <h1 className="font-headline-xl text-headline-xl font-black uppercase text-on-surface">
             MY BATTLE PLAN
           </h1>
-          <span className="font-label-bold text-label-bold text-primary bg-on-surface text-background inline-block px-2 py-1">
-            WEEKLY CAMPAIGN ASSIGNMENT
-          </span>
+          <NewRecruitButton variant="compact" />
         </section>
 
         {/* Error */}
@@ -184,12 +182,12 @@ export default function ProfilePage() {
             </div>
 
             {assignments.length > 0 ? (
-              <div id="profile-assignment-list" className="space-y-3">
+              <div id="profile-assignment-list" className="w-full space-y-3">
                 {assignments.map((a, idx) => (
                   <div
                     key={a.id.value}
                     id={`assignment-card-${a.id.value}`}
-                    className="bg-surface-container border-2 border-on-surface py-3 px-4 flex justify-between items-start shadow-[4px_4px_0px_0px_rgba(27,29,14,1)] relative overflow-hidden"
+                    className="bg-surface-container border-2 border-on-surface py-3 px-4 flex justify-between items-start relative overflow-hidden"
                   >
                     <div className={`absolute top-0 left-0 w-2 h-full ${idx % 2 === 0 ? 'bg-primary' : 'bg-secondary'}`} />
                     <div className="pl-2 space-y-1">
@@ -201,7 +199,7 @@ export default function ProfilePage() {
                     <button
                       type="button"
                       onClick={() => handleRemoveExercise(a.id.value)}
-                      className="bg-primary text-on-primary border-2 border-on-surface p-1 active:shadow-none active:translate-x-[1px] active:translate-y-[1px]"
+                      className="bg-primary text-on-primary border-2 border-on-surface p-1 flex items-center justify-center active:shadow-none active:translate-x-[1px] active:translate-y-[1px]"
                     >
                       <span className="material-symbols-outlined">close</span>
                     </button>
@@ -252,32 +250,6 @@ export default function ProfilePage() {
           </section>
         )}
 
-        {/* Quick-Add Card */}
-        <section id="profile-quick-add" className="border-2 border-dashed border-on-surface-variant p-lg flex flex-col items-center justify-center gap-2 bg-surface-container-lowest hover:bg-surface-container transition-colors cursor-pointer">
-          <span className="material-symbols-outlined text-[48px] text-on-surface-variant">add_box</span>
-          <span className="font-label-bold text-label-bold uppercase">CREATE NEW EXERCISE SPEC</span>
-        </section>
-
-        {/* Campaign Logistics Grid */}
-        <section id="profile-campaign-logistics" className="space-y-3 pt-4">
-          <h3 className="font-label-bold text-label-bold uppercase">CAMPAIGN LOGISTICS</h3>
-          <div className="grid grid-cols-7 border-2 border-on-surface">
-            {DAYS.map((day, i) => {
-              const count = getExerciseCountForDay(routine, i)
-              return (
-                <div
-                  key={day}
-                  className={`${i === selectedDay ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface'} ${
-                    i < 6 ? 'border-r' : ''
-                  } flex flex-col items-center py-2`}
-                >
-                  <span className="font-label-mono text-label-mono">{getDayLabel(i)}</span>
-                  <span className="font-headline-md text-headline-md">{count}</span>
-                </div>
-              )
-            })}
-          </div>
-        </section>
       </main>
     </>
   )
