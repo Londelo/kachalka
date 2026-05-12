@@ -48,6 +48,19 @@ while (d <= today) {
 
 console.log(`  Generated ${sessions.length} sessions from ${sessions[0]} to ${sessions[sessions.length - 1]}`)
 
+// ---- Phase 3.5: CREATE ROUTINES ----
+console.log('\n=== CREATING ROUTINES ===')
+const insertRoutine = db.prepare(
+  'INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)',
+)
+const workoutDays = [1, 3, 5] // Mon, Wed, Fri
+for (const day of workoutDays) {
+  for (const name of exerciseNames) {
+    insertRoutine.run(userId, exerciseIds[name], day)
+  }
+}
+console.log(`  Created ${workoutDays.length} workout days × ${exerciseNames.length} exercises = ${workoutDays.length * exerciseNames.length} routines`)
+
 // ---- Phase 4: INSERT WORKOUT LOGS ----
 console.log('\n=== INSERTING WORKOUT LOGS ===')
 const insertLog = db.prepare(
