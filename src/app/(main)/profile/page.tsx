@@ -136,11 +136,11 @@ export default function ProfilePage() {
     <>
       <main id="profile-page" className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[100px] pb-[140px]">
         {/* Hero Header */}
-        <section id="profile-header" className="flex items-start justify-between space-y-xs pt-md">
+        <section id="profile-header" className="mb-6 flex items-start justify-between space-y-xs pt-md">
           <h1 className="font-headline-xl text-headline-xl font-black uppercase text-on-surface">
             MY BATTLE PLAN
           </h1>
-          <NewRecruitButton variant="compact" />
+          <NewRecruitButton variant="compact" label="NEW EXERCISE" />
         </section>
 
         {/* Error */}
@@ -151,7 +151,7 @@ export default function ProfilePage() {
         )}
 
         {/* Day Selector */}
-        <section id="profile-day-selector" className="flex gap-2 overflow-x-auto pb-2">
+        <section id="profile-day-selector" className="mb-6 flex gap-2 overflow-x-auto pb-2">
           {DAYS.map((_, dayIndex) => {
             const selected = isDaySelected(selectedDay, addingDay, dayIndex)
             return (
@@ -173,7 +173,7 @@ export default function ProfilePage() {
 
         {/* Exercise Display — Selected Day Only */}
         {isDaySelected(selectedDay, addingDay, selectedDay) && (
-          <section id="profile-current-assets" className="space-y-3">
+          <section id="profile-current-assets" className="mb-6 space-y-3">
             <div className="flex items-center gap-1">
               <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
                 emoji_events
@@ -219,7 +219,7 @@ export default function ProfilePage() {
 
         {/* Add Exercise Panel */}
         {addingDay !== null && (
-          <section id="profile-add-exercise-panel" className="bg-surface-container-highest border-4 border-on-surface py-6 px-4 neo-shadow-lg space-y-3">
+          <section id="profile-add-exercise-panel" className="mb-6 bg-surface-container-highest border-4 border-on-surface py-6 px-4 neo-shadow-lg space-y-3">
             <h3 className="font-headline-md text-headline-md uppercase tracking-tight">REINFORCE LINEUP</h3>
             <label className="font-label-bold text-label-bold uppercase block">SELECT EXERCISE</label>
             <div className="relative">

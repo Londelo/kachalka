@@ -6,9 +6,10 @@ import { createUserAction } from '@/features/user/user-server-actions'
 
 interface NewRecruitButtonProps {
   variant?: 'compact' | 'expanded'
+  label?: string
 }
 
-export default function NewRecruitButton({ variant = 'expanded' }: NewRecruitButtonProps) {
+export default function NewRecruitButton({ variant = 'expanded', label }: NewRecruitButtonProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
@@ -32,9 +33,11 @@ export default function NewRecruitButton({ variant = 'expanded' }: NewRecruitBut
     setCreating(false)
   }
 
-  const compactClasses =
-    'flex h-12 w-12 cursor-pointer items-center justify-center border-4 border-on-surface bg-error text-2xl font-black text-on-error transition-all active-press' +
-    (open ? '' : ' neo-shadow')
+  const compactClasses = label
+    ? 'flex cursor-pointer items-center border-4 border-on-surface bg-error px-3 py-2 font-black text-on-error shadow transition-all active-press' +
+      (open ? '' : ' neo-shadow')
+    : 'flex h-12 w-12 cursor-pointer items-center justify-center border-4 border-on-surface bg-error text-2xl font-black text-on-error transition-all active-press' +
+      (open ? '' : ' neo-shadow')
 
   const expandedClasses =
     'flex w-full items-center justify-center gap-4 border-4 border-on-surface bg-primary py-3 text-headline-md font-headline-md uppercase font-bold text-on-primary transition-all neo-shadow-sm active-press'
@@ -48,7 +51,7 @@ export default function NewRecruitButton({ variant = 'expanded' }: NewRecruitBut
         id="new-recruit-button"
       >
         {variant === 'compact' ? (
-          '+'
+          label ?? '+'
         ) : (
           <div>
             <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
