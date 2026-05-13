@@ -178,28 +178,30 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Day Selector */}
-        <section id="profile-day-selector" className="mb-6 flex flex-wrap gap-2">
-          {DAYS.map((_, dayIndex) => {
-            const selected = isDaySelected(selectedDay, addingDay, dayIndex)
-            return (
-              <button
-                key={DAYS[dayIndex]}
-                type="button"
-                onClick={() => handleDayClick(dayIndex)}
-                className={`flex-1 min-w-0 border-2 border-on-surface py-3 font-label-bold text-label-bold uppercase transition-colors ${
-                  selected
-                    ? 'bg-primary text-on-primary shadow-[2px_2px_0px_0px_rgba(27,29,14,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]'
-                    : 'bg-surface-container-low text-on-surface hover:bg-surface-variant'
-                }`}
-              >
-                {getDayLabel(dayIndex)}
-              </button>
-            )
-          })}
-        </section>
+        {/* Unified workspace: day selector + exercise display */}
+        <div id="profile-workspace" className="mx-auto w-full max-w-3xl">
+          {/* Day Selector */}
+          <section id="profile-day-selector" className="mb-6 flex flex-wrap gap-2">
+            {DAYS.map((_, dayIndex) => {
+              const selected = isDaySelected(selectedDay, addingDay, dayIndex)
+              return (
+                <button
+                  key={DAYS[dayIndex]}
+                  type="button"
+                  onClick={() => handleDayClick(dayIndex)}
+                  className={`flex-1 min-w-0 border-2 border-on-surface py-3 font-label-bold text-label-bold uppercase transition-colors ${
+                    selected
+                      ? 'bg-primary text-on-primary shadow-[2px_2px_0px_0px_rgba(27,29,14,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]'
+                      : 'bg-surface-container-low text-on-surface hover:bg-surface-variant'
+                  }`}
+                >
+                  {getDayLabel(dayIndex)}
+                </button>
+              )
+            })}
+          </section>
 
-        {/* Exercise Display — Selected Day Only */}
+          {/* Exercise Display — Selected Day Only */}
         {isDaySelected(selectedDay, addingDay, selectedDay) && (
           <section id="profile-current-assets" className="mb-6 space-y-3">
             <div className="flex items-center gap-1">
@@ -248,7 +250,7 @@ export default function ProfilePage() {
                 </button>
               </div>
             ) : (
-              <div className="opacity-40 grayscale border-2 border-on-surface p-xl flex flex-col items-center text-center gap-3">
+              <div className="w-full opacity-40 grayscale border-2 border-on-surface p-xl flex flex-col items-center text-center gap-3">
                 <span className="material-symbols-outlined text-[64px]">block</span>
                 <p className="font-headline-md text-headline-md uppercase leading-tight">
                   NO ASSIGNMENTS — DEPLOY EXERCISES TO BEGIN YOUR CAMPAIGN
@@ -257,6 +259,7 @@ export default function ProfilePage() {
             )}
           </section>
         )}
+        </div>
 
         {/* Inline Add Exercise Panel — removed (replaced by modal) */}
 
