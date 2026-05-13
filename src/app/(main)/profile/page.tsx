@@ -29,6 +29,7 @@ export default function ProfilePage() {
   const router = useRouter()
   const [selectedDay, setSelectedDay] = useState<number>(0)
   const [addingDay, setAddingDay] = useState<number | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
   const [routine, setRoutine] = useState<Record<string, RoutineAssignment[]> | null>(null)
   const [exercises, setExercises] = useState<ExerciseOption[]>([])
   const [selectedExerciseId, setSelectedExerciseId] = useState<number | null>(null)
@@ -97,6 +98,25 @@ export default function ProfilePage() {
     }
   }
 
+  async function handleModalAddExercise() {
+    if (selectedExerciseId === null) return
+    if (addingDay === null) return
+
+    const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
+    const userId = cookieMatch ? parseInt(cookieMatch[1], 10) : 0
+    if (!userId) return
+
+    const result = await assignExerciseAction(userId, selectedExerciseId, numberToDayOfWeek(addingDay))
+
+    if (result.success && result.assignment) {
+      await loadData()
+      setModalOpen(false)
+      setSelectedExerciseId(null)
+    } else {
+      setError(result.error ?? 'Failed to add exercise')
+    }
+  }
+
   async function handleRemoveExercise(assignmentId: number) {
     const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
     const userId = cookieMatch ? parseInt(cookieMatch[1], 10) : 0
@@ -115,10 +135,19 @@ export default function ProfilePage() {
     setAddingDay(nextAddingDay)
   }
 
+  function handleModalClose() {
+    setModalOpen(false)
+    setSelectedExerciseId(null)
+  }
+
+  function handleAddExistingClick() {
+    setModalOpen(true)
+  }
+
   if (loading) {
     return (
       <>
-        <main id="profile-loading" className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[100px] pb-[140px]">
+        <main id="profile-loading" className="mx-auto flex w-full flex-col items-center px-6 pt-[100px] pb-[140px]">
           <div className="mb-8 w-full text-center">
             <h1 className="font-headline-xl text-headline-xl font-black uppercase text-on-surface">
               MY BATTLE PLAN
@@ -134,13 +163,12 @@ export default function ProfilePage() {
 
   return (
     <>
-      <main id="profile-page" className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[100px] pb-[140px]">
+      <main id="profile-page" className="mx-auto flex w-full flex-col items-center px-6 pt-[100px] pb-[140px]">
         {/* Hero Header */}
-        <section id="profile-header" className="mb-6 flex items-start justify-between space-y-xs pt-md">
+        <section id="profile-header" className="mb-6 flex flex-wrap items-start justify-between pt-md">
           <h1 className="font-headline-xl text-headline-xl font-black uppercase text-on-surface">
             MY BATTLE PLAN
           </h1>
-          <NewRecruitButton variant="compact" label="NEW EXERCISE" />
         </section>
 
         {/* Error */}
@@ -151,7 +179,7 @@ export default function ProfilePage() {
         )}
 
         {/* Day Selector */}
-        <section id="profile-day-selector" className="mb-6 flex gap-2 overflow-x-auto pb-2">
+        <section id="profile-day-selector" className="mb-6 flex flex-wrap gap-2">
           {DAYS.map((_, dayIndex) => {
             const selected = isDaySelected(selectedDay, addingDay, dayIndex)
             return (
@@ -159,7 +187,7 @@ export default function ProfilePage() {
                 key={DAYS[dayIndex]}
                 type="button"
                 onClick={() => handleDayClick(dayIndex)}
-                className={`flex-1 min-w-[60px] border-2 border-on-surface py-3 font-label-bold text-label-bold uppercase transition-colors ${
+                className={`flex-1 min-w-0 border-2 border-on-surface py-3 font-label-bold text-label-bold uppercase transition-colors ${
                   selected
                     ? 'bg-primary text-on-primary shadow-[2px_2px_0px_0px_rgba(27,29,14,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]'
                     : 'bg-surface-container-low text-on-surface hover:bg-surface-variant'
@@ -187,24 +215,37 @@ export default function ProfilePage() {
                   <div
                     key={a.id.value}
                     id={`assignment-card-${a.id.value}`}
-                    className="bg-surface-container border-2 border-on-surface py-3 px-4 flex justify-between items-start relative overflow-hidden"
+                    className="w-full bg-surface-container border-2 border-on-surface py-3 px-4 flex justify-between items-start relative overflow-hidden"
                   >
                     <div className={`absolute top-0 left-0 w-2 h-full ${idx % 2 === 0 ? 'bg-primary' : 'bg-secondary'}`} />
-                    <div className="pl-2 space-y-1">
+                    <div className="pl-2 flex flex-1 flex-col">
                       <p className="font-label-mono text-label-mono text-on-surface-variant uppercase">EXERCISE</p>
-                      <h4 className="font-headline-md text-headline-md leading-none">
+                      <h4 className="break-words flex-1 font-headline-md text-headline-md leading-none">
                         {exercises.find((ex) => ex.id === a.exerciseId)?.name ?? 'UNKNOWN EXERCISE'}
                       </h4>
                     </div>
                     <button
                       type="button"
                       onClick={() => handleRemoveExercise(a.id.value)}
-                      className="bg-primary text-on-primary border-2 border-on-surface p-1 flex items-center justify-center active:shadow-none active:translate-x-[1px] active:translate-y-[1px]"
+                      className="shrink-0 bg-primary text-on-primary border-2 border-on-surface p-1 flex items-center justify-center active:shadow-none active:translate-x-[1px] active:translate-y-[1px]"
                     >
                       <span className="material-symbols-outlined">close</span>
                     </button>
                   </div>
                 ))}
+
+                {/* New Recruit Button — last item in assignment list */}
+                <NewRecruitButton variant="compact" label="NEW EXERCISE" />
+
+                {/* Add Existing Exercise Button — last item in assignment list */}
+                <button
+                  type="button"
+                  onClick={handleAddExistingClick}
+                  className="w-full flex items-center justify-center gap-2 border-4 border-on-surface bg-primary py-3 font-headline-md font-headline-md uppercase font-bold text-on-primary transition-all neo-shadow-sm active-press"
+                >
+                  <span className="material-symbols-outlined">add_circle</span>
+                  ADD EXISTING EXERCISE
+                </button>
               </div>
             ) : (
               <div className="opacity-40 grayscale border-2 border-on-surface p-xl flex flex-col items-center text-center gap-3">
@@ -217,39 +258,66 @@ export default function ProfilePage() {
           </section>
         )}
 
-        {/* Add Exercise Panel */}
-        {addingDay !== null && (
-          <section id="profile-add-exercise-panel" className="mb-6 bg-surface-container-highest border-4 border-on-surface py-6 px-4 neo-shadow-lg space-y-3">
-            <h3 className="font-headline-md text-headline-md uppercase tracking-tight">REINFORCE LINEUP</h3>
-            <label className="font-label-bold text-label-bold uppercase block">SELECT EXERCISE</label>
-            <div className="relative">
-              <select
-                value={selectedExerciseId ?? ''}
-                onChange={(e) => setSelectedExerciseId(e.target.value ? parseInt(e.target.value, 10) : null)}
-                className="w-full bg-background border-2 border-on-surface p-md font-body-lg appearance-none focus:border-primary focus:ring-0"
-              >
-                <option value="">CHOOSE DRILL...</option>
-                {exercises.map((ex) => (
-                  <option key={ex.id} value={ex.id}>
-                    {ex.name}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                <span className="material-symbols-outlined">expand_more</span>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={handleAddExercise}
-              disabled={selectedExerciseId === null}
-              className="w-full bg-primary-container text-on-primary-container border-4 border-on-surface py-md font-headline-md uppercase neo-shadow active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all disabled:opacity-50"
+        {/* Inline Add Exercise Panel — removed (replaced by modal) */}
+
+        {/* Add Existing Exercise Modal */}
+        {modalOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" onClick={handleModalClose}>
+            <div
+              className="w-full max-w-md border-4 border-on-surface bg-surface-container-high p-6 flex flex-col neo-shadow sm:max-w-sm"
+              id="add-existing-exercise-modal"
+              onClick={(e) => e.stopPropagation()}
             >
-              DEPLOY
-            </button>
-          </section>
+              <h3 className="mb-4 font-headline-md text-headline-md font-black uppercase text-on-surface">
+                REINFORCE LINEUP
+              </h3>
+
+              {error && (
+                <p className="mb-3 rounded border-2 border-error bg-error-container p-2 text-sm text-error">
+                  {error}
+                </p>
+              )}
+
+              <label className="mb-1 block font-label-bold text-label-bold uppercase">SELECT EXERCISE</label>
+              <div className="relative mb-4">
+                <select
+                  value={selectedExerciseId ?? ''}
+                  onChange={(e) => setSelectedExerciseId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                  className="w-full bg-background border-2 border-on-surface p-md font-body-lg appearance-none focus:border-primary focus:ring-0"
+                >
+                  <option value="">CHOOSE DRILL...</option>
+                  {exercises.map((ex) => (
+                    <option key={ex.id} value={ex.id}>
+                      {ex.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <span className="material-symbols-outlined">expand_more</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleModalAddExercise}
+                disabled={selectedExerciseId === null}
+                className="w-full bg-primary-container text-on-primary-container border-4 border-on-surface py-md font-headline-md uppercase neo-shadow active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all disabled:opacity-50"
+              >
+                DEPLOY
+              </button>
+
+              <button
+                type="button"
+                onClick={handleModalClose}
+                className="mt-3 w-full border-2 border-on-surface bg-surface px-3 py-2 font-label-bold text-label-bold uppercase text-on-surface hover:bg-surface-container transition-colors"
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
         )}
 
+        {/* Inline Add Exercise Panel — replaced by modal */}
       </main>
     </>
   )
