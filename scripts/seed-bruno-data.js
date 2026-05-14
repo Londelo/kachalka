@@ -4,10 +4,17 @@ const fs = require('fs')
 const path = require('path')
 
 const dbPath = path.join(__dirname, '..', 'data', 'kachalka.db')
+
+// Delete the entire DB to start fresh
+if (fs.existsSync(dbPath)) {
+  fs.unlinkSync(dbPath)
+  console.log('=== DELETED EXISTING DB ===')
+}
+
 const db = new Database(dbPath)
 db.pragma('foreign_keys = ON')
 
-// Run migrations to create schema before seeding
+// Run migrations to create schema
 console.log('\n=== RUNNING MIGRATIONS ===')
 const migrationsDir = path.join(__dirname, '..', 'src', 'db', 'migrations')
 const sqlFiles = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort()
