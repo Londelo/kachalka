@@ -304,22 +304,6 @@ export default function PlanPage() {
         )}
         </div>
 
-        {/* Toggle button between select/new modes — always visible when a day is selected */}
-        {isDaySelected(selectedDay, addingDay, selectedDay) && (
-          <div className="mt-4 flex flex-col items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                toggleModalMode()
-                setShowModal(true)
-              }}
-              className="w-full flex items-center justify-center gap-2 border-4 border-on-surface bg-surface-container py-3 font-headline-md font-headline-md uppercase font-bold text-on-surface transition-all active-press"
-            >
-              {modalMode === 'select' ? 'ADD EXERCISE' : 'SELECT EXERCISE'}
-            </button>
-          </div>
-        )}
-
         {/* Add Existing Exercise Modal */}
         {showModal && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" onClick={handleModalClose}>
@@ -429,6 +413,22 @@ export default function PlanPage() {
                 </>
               )}
             </div>
+
+            {/* Toggle button — floating below modal container, visible when modal is closed */}
+            {!showModal && isDaySelected(selectedDay, addingDay, selectedDay) && (
+              <div className="mt-3 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    toggleModalMode()
+                    setShowModal(true)
+                  }}
+                  className="w-full max-w-sm border-4 border-on-surface bg-background py-3 font-headline-md uppercase font-bold text-on-surface transition-all active-press"
+                >
+                  {modalMode === 'select' ? 'ADD EXERCISE' : 'SELECT EXERCISE'}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </main>
