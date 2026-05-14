@@ -37,6 +37,7 @@ export default function PlanPage() {
   const [exercises, setExercises] = useState<ExerciseOption[]>([])
   const [selectedExerciseId, setSelectedExerciseId] = useState<number | null>(null)
   const [newExerciseName, setNewExerciseName] = useState('')
+  const [creatingExercise, setCreatingExercise] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -141,16 +142,22 @@ export default function PlanPage() {
     const userId = cookieMatch ? parseInt(cookieMatch[1], 10) : 0
     if (!userId) return
 
+    setCreatingExercise(true)
     const result = await createExerciseAction(newExerciseName.trim(), userId)
-    if (result.success && result.exercise) {
-      setNewExerciseName('')
-      await loadData()
-      // Switch to select mode and open modal to assign the new exercise
-      setModalMode('select')
-      setShowModal(true)
+    if (result.success && result.exercise && addingDay !== null) {
+      // Auto-assign to selected day
+      const assignResult = await assignExerciseAction(userId, result.exercise.id.value, numberToDayOfWeek(addingDay))
+      if (assignResult.success) {
+        setNewExerciseName('')
+        setShowModal(false)
+        await loadData()
+      } else {
+        setError(assignResult.error ?? 'Failed to assign exercise')
+      }
     } else {
       setError(result.error ?? 'Failed to create exercise')
     }
+    setCreatingExercise(false)
   }
 
   async function handleRemoveExercise(assignmentId: number) {
@@ -283,7 +290,7 @@ export default function PlanPage() {
                   </div>
                 ))}
 
-                <AddExerciseButton variant="compact" onSuccess={loadData} />
+                <AddExerciseButton onSuccess={loadData} />
               </div>
             ) : (
               <div className="w-full opacity-40 grayscale border-2 border-on-surface p-xl flex flex-col items-center text-center gap-3">
@@ -297,15 +304,18 @@ export default function PlanPage() {
         )}
         </div>
 
-        {/* Toggle button between select/new modes */}
-        {showModal && (
+        {/* Toggle button between select/new modes — always visible when a day is selected */}
+        {isDaySelected(selectedDay, addingDay, selectedDay) && (
           <div className="mt-4 flex flex-col items-center gap-2">
             <button
               type="button"
-              onClick={toggleModalMode}
+              onClick={() => {
+                toggleModalMode()
+                setShowModal(true)
+              }}
               className="w-full flex items-center justify-center gap-2 border-4 border-on-surface bg-surface-container py-3 font-headline-md font-headline-md uppercase font-bold text-on-surface transition-all active-press"
             >
-              {modalMode === 'select' ? 'NEW EXERCISE' : 'SELECT EXERCISE'}
+              {modalMode === 'select' ? 'ADD EXERCISE' : 'SELECT EXERCISE'}
             </button>
           </div>
         )}
@@ -403,10 +413,10 @@ export default function PlanPage() {
                   <button
                     type="button"
                     onClick={handleCreateExercise}
-                    disabled={!newExerciseName.trim()}
+                    disabled={!newExerciseName.trim() || creatingExercise}
                     className="w-full bg-primary-container text-on-primary-container border-4 border-on-surface py-md font-headline-md uppercase neo-shadow active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all disabled:opacity-50"
                   >
-                    ADD
+                    {creatingExercise ? '...' : 'ADD'}
                   </button>
 
                   <button

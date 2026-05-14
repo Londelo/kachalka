@@ -4,12 +4,11 @@ import { useState } from 'react'
 import { createExerciseAction } from '@/features/exercise/exercise-server-actions'
 
 interface AddExerciseButtonProps {
-  variant?: 'compact' | 'expanded'
   label?: string
   onSuccess?: () => void
 }
 
-export default function AddExerciseButton({ variant = 'expanded', label, onSuccess }: AddExerciseButtonProps) {
+export default function AddExerciseButton({ label, onSuccess }: AddExerciseButtonProps) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -44,13 +43,7 @@ export default function AddExerciseButton({ variant = 'expanded', label, onSucce
     setCreating(false)
   }
 
-  const compactClasses = label
-    ? 'flex cursor-pointer items-center border-4 border-on-surface bg-primary px-3 py-2 font-black text-on-primary shadow transition-all active-press' +
-      (open ? '' : ' neo-shadow')
-    : 'flex h-12 w-12 cursor-pointer items-center justify-center border-4 border-on-surface bg-primary text-2xl font-black text-on-primary transition-all active-press' +
-      (open ? '' : ' neo-shadow')
-
-  const expandedClasses =
+  const buttonClasses =
     'flex w-full items-center justify-center gap-4 border-4 border-on-surface bg-primary py-3 text-headline-md font-headline-md uppercase font-bold text-on-primary transition-all neo-shadow-sm active-press'
 
   return (
@@ -58,19 +51,15 @@ export default function AddExerciseButton({ variant = 'expanded', label, onSucce
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={variant === 'compact' ? compactClasses : expandedClasses}
+        className={buttonClasses}
         id="add-exercise-button"
       >
-        {variant === 'compact' ? (
-          label ?? '+'
-        ) : (
-          <div>
-            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
-              add_circle
-            </span>
-            {label ?? 'NEW EXERCISE'}
-          </div>
-        )}
+        <div>
+          <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
+            add_circle
+          </span>
+          {label ?? 'ADD EXERCISE'}
+        </div>
       </button>
 
       {open && (
