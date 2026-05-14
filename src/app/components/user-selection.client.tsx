@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import NewRecruitButton from '@/app/components/new-recruit-button'
+import AddExerciseButton from '@/app/components/add-exercise-button'
 
 interface UserSelectionClientProps {
   initialUsers: { id: { value: number }; name: string }[]
@@ -33,7 +33,7 @@ export default function UserSelectionClient({
             SELECT COMMANDER
           </h2>
         </div>
-        <NewRecruitButton variant="compact" />
+        <AddExerciseButton variant="compact" />
       </div>
 
       <div className="flex w-full flex-col gap-8" id="user-cards-grid">

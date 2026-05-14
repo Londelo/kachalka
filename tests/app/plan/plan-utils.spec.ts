@@ -8,7 +8,7 @@ import {
   getExerciseCountForDay,
   resolveDaySelection,
   isDaySelected,
-} from '@/app/profile/profile-utils'
+} from '@/app/plan/plan-utils'
 import type { RoutineAssignment } from '@/features/routine/routine-entity'
 
 const MondayExercise: RoutineAssignment = {

@@ -10,7 +10,7 @@ const TABS = [
   { id: 'WORKOUT', label: 'WORKOUT', icon: 'fitness_center', href: '/today' },
   { id: 'HISTORY', label: 'HISTORY', icon: 'calendar_today', href: '/history' },
   { id: 'PROGRESS', label: 'PROGRESS', icon: 'monitoring', href: '/progress' },
-  { id: 'PROFILE', label: 'PROFILE', icon: 'settings', href: '/profile' },
+  { id: 'PLAN', label: 'PLAN', icon: 'settings', href: '/plan' },
 ]
 
 export default function BottomNav({ activeTab }: BottomNavProps) {

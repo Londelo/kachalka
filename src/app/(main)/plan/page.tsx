@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   assignExerciseAction,
   removeExerciseAction,
   getUserRoutineAction,
 } from '@/features/routine/routine-server-actions'
-import { listExercisesAction } from '@/features/exercise/exercise-server-actions'
+import { listExercisesAction, createExerciseAction } from '@/features/exercise/exercise-server-actions'
 import type { RoutineAssignment, DayOfWeek } from '@/features/routine/routine-entity'
 import { numberToDayOfWeek } from '@/features/routine/routine-entity'
 import {
@@ -15,8 +15,8 @@ import {
   getDayLabel,
   isDaySelected,
   resolveDaySelection,
-} from '@/app/profile/profile-utils'
-import NewRecruitButton from '@/app/components/new-recruit-button'
+} from '@/app/plan/plan-utils'
+import AddExerciseButton from '@/app/components/add-exercise-button'
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -25,14 +25,18 @@ interface ExerciseOption {
   name: string
 }
 
-export default function ProfilePage() {
+type ModalMode = 'select' | 'new'
+
+export default function PlanPage() {
   const router = useRouter()
   const [selectedDay, setSelectedDay] = useState<number>(0)
   const [addingDay, setAddingDay] = useState<number | null>(null)
-  const [modalOpen, setModalOpen] = useState(false)
+  const [showModal, setShowModal] = useState(false)
+  const [modalMode, setModalMode] = useState<ModalMode>('select')
   const [routine, setRoutine] = useState<Record<string, RoutineAssignment[]> | null>(null)
   const [exercises, setExercises] = useState<ExerciseOption[]>([])
   const [selectedExerciseId, setSelectedExerciseId] = useState<number | null>(null)
+  const [newExerciseName, setNewExerciseName] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -79,6 +83,17 @@ export default function ProfilePage() {
     loadData()
   }, [loadData])
 
+  // Task 1: Filter exercises to exclude already-assigned ones for the selected day
+  const assignedExerciseIds = useMemo(() => {
+    if (!routine) return new Set<number>()
+    const assignments = getAssignmentsForDay(routine, selectedDay)
+    return new Set(assignments.map((a) => a.exerciseId))
+  }, [routine, selectedDay])
+
+  const availableExercises = useMemo(() => {
+    return exercises.filter((ex) => !assignedExerciseIds.has(ex.id))
+  }, [exercises, assignedExerciseIds])
+
   async function handleAddExercise() {
     if (selectedExerciseId === null) return
     if (addingDay === null) return
@@ -110,10 +125,31 @@ export default function ProfilePage() {
 
     if (result.success && result.assignment) {
       await loadData()
-      setModalOpen(false)
+      setShowModal(false)
       setSelectedExerciseId(null)
     } else {
       setError(result.error ?? 'Failed to add exercise')
+    }
+  }
+
+  // Task 3: New exercise form handler
+  async function handleCreateExercise() {
+    if (!newExerciseName.trim()) return
+    setError(null)
+
+    const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
+    const userId = cookieMatch ? parseInt(cookieMatch[1], 10) : 0
+    if (!userId) return
+
+    const result = await createExerciseAction(newExerciseName.trim(), userId)
+    if (result.success && result.exercise) {
+      setNewExerciseName('')
+      await loadData()
+      // Switch to select mode and open modal to assign the new exercise
+      setModalMode('select')
+      setShowModal(true)
+    } else {
+      setError(result.error ?? 'Failed to create exercise')
     }
   }
 
@@ -136,18 +172,29 @@ export default function ProfilePage() {
   }
 
   function handleModalClose() {
-    setModalOpen(false)
+    setShowModal(false)
     setSelectedExerciseId(null)
+    setNewExerciseName('')
   }
 
   function handleAddExistingClick() {
-    setModalOpen(true)
+    // Task 2: Default to 'select' mode; if no exercises available, default to 'new'
+    if (availableExercises.length > 0) {
+      setModalMode('select')
+    } else {
+      setModalMode('new')
+    }
+    setShowModal(true)
+  }
+
+  function toggleModalMode() {
+    setModalMode((prev) => (prev === 'select' ? 'new' : 'select'))
   }
 
   if (loading) {
     return (
       <>
-        <main id="profile-loading" className="mx-auto flex w-full flex-col items-center px-6 pt-[100px] pb-[140px]">
+        <main id="plan-loading" className="mx-auto flex w-full flex-col items-center px-6 pt-[100px] pb-[140px]">
           <div className="mb-8 w-full text-center">
             <h1 className="font-headline-xl text-headline-xl font-black uppercase text-on-surface">
               MY BATTLE PLAN
@@ -163,9 +210,9 @@ export default function ProfilePage() {
 
   return (
     <>
-      <main id="profile-page" className="mx-auto flex w-full flex-col items-center px-6 pt-[100px] pb-[140px]">
+      <main id="plan-page" className="mx-auto flex w-full flex-col items-center px-6 pt-[100px] pb-[140px]">
         {/* Hero Header */}
-        <section id="profile-header" className="mb-6 flex flex-wrap items-start justify-between pt-md">
+        <section id="plan-header" className="mb-6 flex flex-wrap items-start justify-between pt-md">
           <h1 className="font-headline-xl text-headline-xl font-black uppercase text-on-surface">
             MY BATTLE PLAN
           </h1>
@@ -173,15 +220,15 @@ export default function ProfilePage() {
 
         {/* Error */}
         {error && (
-          <div id="profile-error" className="mb-4 w-full border-2 border-error bg-error-container p-3">
+          <div id="plan-error" className="mb-4 w-full border-2 border-error bg-error-container p-3">
             <p className="font-label-bold text-label-bold text-error">{error}</p>
           </div>
         )}
 
         {/* Unified workspace: day selector + exercise display */}
-        <div id="profile-workspace" className="mx-auto w-full max-w-3xl">
+        <div id="plan-workspace" className="mx-auto w-full max-w-3xl">
           {/* Day Selector */}
-          <section id="profile-day-selector" className="mb-6 flex flex-wrap gap-2">
+          <section id="plan-day-selector" className="mb-6 flex flex-wrap gap-2">
             {DAYS.map((_, dayIndex) => {
               const selected = isDaySelected(selectedDay, addingDay, dayIndex)
               return (
@@ -203,7 +250,7 @@ export default function ProfilePage() {
 
           {/* Exercise Display — Selected Day Only */}
         {isDaySelected(selectedDay, addingDay, selectedDay) && (
-          <section id="profile-current-assets" className="mb-6 space-y-3">
+          <section id="plan-current-assets" className="mb-6 space-y-3">
             <div className="flex items-center gap-1">
               <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
                 emoji_events
@@ -212,7 +259,7 @@ export default function ProfilePage() {
             </div>
 
             {assignments.length > 0 ? (
-              <div id="profile-assignment-list" className="w-full space-y-3">
+              <div id="plan-assignment-list" className="w-full space-y-3">
                 {assignments.map((a, idx) => (
                   <div
                     key={a.id.value}
@@ -236,18 +283,7 @@ export default function ProfilePage() {
                   </div>
                 ))}
 
-                {/* New Recruit Button — last item in assignment list */}
-                <NewRecruitButton variant="compact" label="NEW EXERCISE" />
-
-                {/* Add Existing Exercise Button — last item in assignment list */}
-                <button
-                  type="button"
-                  onClick={handleAddExistingClick}
-                  className="w-full flex items-center justify-center gap-2 border-4 border-on-surface bg-primary py-3 font-headline-md font-headline-md uppercase font-bold text-on-primary transition-all neo-shadow-sm active-press"
-                >
-                  <span className="material-symbols-outlined">add_circle</span>
-                  ADD EXISTING EXERCISE
-                </button>
+                <AddExerciseButton variant="compact" onSuccess={loadData} />
               </div>
             ) : (
               <div className="w-full opacity-40 grayscale border-2 border-on-surface p-xl flex flex-col items-center text-center gap-3">
@@ -261,66 +297,130 @@ export default function ProfilePage() {
         )}
         </div>
 
-        {/* Inline Add Exercise Panel — removed (replaced by modal) */}
+        {/* Toggle button between select/new modes */}
+        {showModal && (
+          <div className="mt-4 flex flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleModalMode}
+              className="w-full flex items-center justify-center gap-2 border-4 border-on-surface bg-surface-container py-3 font-headline-md font-headline-md uppercase font-bold text-on-surface transition-all active-press"
+            >
+              {modalMode === 'select' ? 'NEW EXERCISE' : 'SELECT EXERCISE'}
+            </button>
+          </div>
+        )}
 
         {/* Add Existing Exercise Modal */}
-        {modalOpen && (
+        {showModal && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" onClick={handleModalClose}>
             <div
               className="w-full max-w-md border-4 border-on-surface bg-surface-container-high p-6 flex flex-col neo-shadow sm:max-w-sm"
               id="add-existing-exercise-modal"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="mb-4 font-headline-md text-headline-md font-black uppercase text-on-surface">
-                REINFORCE LINEUP
-              </h3>
+              {modalMode === 'select' ? (
+                <>
+                  {/* Task 4: Renamed heading */}
+                  <h3 className="mb-4 font-headline-md text-headline-md font-black uppercase text-on-surface">
+                    ASSIGN EXERCISE
+                  </h3>
 
-              {error && (
-                <p className="mb-3 rounded border-2 border-error bg-error-container p-2 text-sm text-error">
-                  {error}
-                </p>
+                  {error && (
+                    <p className="mb-3 rounded border-2 border-error bg-error-container p-2 text-sm text-error">
+                      {error}
+                    </p>
+                  )}
+
+                  <label className="mb-1 block font-label-bold text-label-bold uppercase">SELECT EXERCISE</label>
+                  <div className="relative mb-4">
+                    <select
+                      value={selectedExerciseId ?? ''}
+                      onChange={(e) => setSelectedExerciseId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                      className="w-full bg-background border-2 border-on-surface p-md font-body-lg appearance-none focus:border-primary focus:ring-0"
+                    >
+                      <option value="">CHOOSE DRILL...</option>
+                      {availableExercises.length === 0 && (
+                        <option value="" disabled>
+                          NO EXERCISES AVAILABLE
+                        </option>
+                      )}
+                      {availableExercises.map((ex) => (
+                        <option key={ex.id} value={ex.id}>
+                          {ex.name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <span className="material-symbols-outlined">expand_more</span>
+                    </div>
+                  </div>
+
+                  {availableExercises.length === 0 && (
+                    <p className="mb-3 text-center text-sm opacity-60">All exercises are already assigned to this day.</p>
+                  )}
+
+                  {/* Task 4: DEPLOY → ASSIGN */}
+                  <button
+                    type="button"
+                    onClick={handleModalAddExercise}
+                    disabled={selectedExerciseId === null}
+                    className="w-full bg-primary-container text-on-primary-container border-4 border-on-surface py-md font-headline-md uppercase neo-shadow active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all disabled:opacity-50"
+                  >
+                    ASSIGN
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleModalClose}
+                    className="mt-3 w-full border-2 border-on-surface bg-surface px-3 py-2 font-label-bold text-label-bold uppercase text-on-surface hover:bg-surface-container transition-colors"
+                  >
+                    CANCEL
+                  </button>
+                </>
+              ) : (
+                <>
+                  {/* Task 3: New exercise form */}
+                  <h3 className="mb-4 font-headline-md text-headline-md font-black uppercase text-on-surface">
+                    NEW EXERCISE
+                  </h3>
+
+                  {error && (
+                    <p className="mb-3 rounded border-2 border-error bg-error-container p-2 text-sm text-error">
+                      {error}
+                    </p>
+                  )}
+
+                  <label className="mb-1 block font-label-bold text-label-bold uppercase">EXERCISE NAME</label>
+                  <input
+                    type="text"
+                    value={newExerciseName}
+                    onChange={(e) => setNewExerciseName(e.target.value)}
+                    placeholder="Enter exercise name..."
+                    className="w-full bg-background border-2 border-on-surface p-md font-body-lg focus:border-primary focus:ring-0 mb-4"
+                    autoFocus
+                  />
+
+                  <button
+                    type="button"
+                    onClick={handleCreateExercise}
+                    disabled={!newExerciseName.trim()}
+                    className="w-full bg-primary-container text-on-primary-container border-4 border-on-surface py-md font-headline-md uppercase neo-shadow active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all disabled:opacity-50"
+                  >
+                    ADD
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleModalClose}
+                    className="mt-3 w-full border-2 border-on-surface bg-surface px-3 py-2 font-label-bold text-label-bold uppercase text-on-surface hover:bg-surface-container transition-colors"
+                  >
+                    CANCEL
+                  </button>
+                </>
               )}
-
-              <label className="mb-1 block font-label-bold text-label-bold uppercase">SELECT EXERCISE</label>
-              <div className="relative mb-4">
-                <select
-                  value={selectedExerciseId ?? ''}
-                  onChange={(e) => setSelectedExerciseId(e.target.value ? parseInt(e.target.value, 10) : null)}
-                  className="w-full bg-background border-2 border-on-surface p-md font-body-lg appearance-none focus:border-primary focus:ring-0"
-                >
-                  <option value="">CHOOSE DRILL...</option>
-                  {exercises.map((ex) => (
-                    <option key={ex.id} value={ex.id}>
-                      {ex.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <span className="material-symbols-outlined">expand_more</span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleModalAddExercise}
-                disabled={selectedExerciseId === null}
-                className="w-full bg-primary-container text-on-primary-container border-4 border-on-surface py-md font-headline-md uppercase neo-shadow active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all disabled:opacity-50"
-              >
-                DEPLOY
-              </button>
-
-              <button
-                type="button"
-                onClick={handleModalClose}
-                className="mt-3 w-full border-2 border-on-surface bg-surface px-3 py-2 font-label-bold text-label-bold uppercase text-on-surface hover:bg-surface-container transition-colors"
-              >
-                CANCEL
-              </button>
             </div>
           </div>
         )}
-
-        {/* Inline Add Exercise Panel — replaced by modal */}
       </main>
     </>
   )
