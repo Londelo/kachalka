@@ -1,11 +1,27 @@
 // Seed Bruno's routine: Mon/Wed/Fri, barbell curls + pull-ups + squats, 7 months of data
 const Database = require('better-sqlite3')
+const fs = require('fs')
 const path = require('path')
 
 const dbPath = path.join(__dirname, '..', 'data', 'kachalka.db')
 const db = new Database(dbPath)
 db.pragma('foreign_keys = ON')
 
+// Run migrations to create schema before seeding
+console.log('\n=== RUNNING MIGRATIONS ===')
+const migrationsDir = path.join(__dirname, '..', 'src', 'db', 'migrations')
+const sqlFiles = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort()
+for (const file of sqlFiles) {
+  const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8')
+  db.exec(sql)
+  console.log(`  Applied ${file}`)
+}
+console.log('  Schema ready.')
+
+// ---- Phase 0: CREATE BRUNO (user) ----
+console.log('\n=== CREATING BRUNO ===')
+const insertUser = db.prepare('INSERT INTO users (name, email, is_active) VALUES (?, ?, ?)')
+insertUser.run('Bruno', 'bruno@kachalka.com', 1)
 const userId = 1 // Bruno
 
 // ---- Phase 1: DELETE existing data for Bruno ----
