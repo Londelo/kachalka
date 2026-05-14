@@ -33,7 +33,7 @@ export default function UserSelectionClient({
             SELECT COMMANDER
           </h2>
         </div>
-        <AddExerciseButton variant="compact" />
+        <AddExerciseButton />
       </div>
 
       <div className="flex w-full flex-col gap-8" id="user-cards-grid">
