@@ -3,12 +3,14 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import * as schema from '@/db/schema'
 import type { ChartRepository } from '@/features/chart/chart-repository'
-import type { ChartDataPoint, IntensitySplit } from '@/features/chart/chart-entity'
+import type { ChartDataPoint, IntensitySplit, RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
+import { groupByGranularity } from '@/features/chart/chart-utils'
 import type { WorkoutSet } from '@/features/workout/types'
 import * as R from 'ramda'
 
-function mapRowToDataPoint(row: Record<string, unknown>): ChartDataPoint {
+export function mapRowToDataPoint(row: Record<string, unknown>): ChartDataPoint {
   const sets = row.sets as WorkoutSet[]
+  const exerciseName = row.exerciseName as string
   return {
     date: row.date as string,
     volume: R.sum(
@@ -18,21 +20,21 @@ function mapRowToDataPoint(row: Record<string, unknown>): ChartDataPoint {
       ),
     ),
     sets,
+    exercises: [{ name: exerciseName, sets }],
   }
 }
 
 function applyDateFilter(
   logs: ChartDataPoint[],
-  range: '1M' | '3M' | '6M' | 'ALL' | undefined,
+  range: RangeFilter | undefined,
 ): ChartDataPoint[] {
   if (range === 'ALL' || !range) {
     return logs
   }
 
   const days = R.cond([
-    [R.equals('1M'), R.always(30)],
-    [R.equals('3M'), R.always(90)],
     [R.equals('6M'), R.always(180)],
+    [R.equals('1Y'), R.always(365)],
     [R.T, R.always(0)],
   ])(range)
 
@@ -56,31 +58,56 @@ export class SqliteChartRepository implements ChartRepository {
 
   getVolumeByDate(
     userId: number,
-    exerciseId: number,
-    range?: '1M' | '3M' | '6M' | 'ALL',
+    exerciseId?: number | null,
+    range?: RangeFilter,
+    granularity?: TimeGranularity,
   ): ChartDataPoint[] {
+    const whereClauses = [eq(schema.workoutLogs.userId, userId)]
+    if (exerciseId != null) {
+      whereClauses.push(eq(schema.workoutLogs.exerciseId, exerciseId))
+    }
+
     const rows = this.queryDb
-      .select()
+      .select({
+        date: schema.workoutLogs.date,
+        sets: schema.workoutLogs.sets,
+        exerciseName: schema.exercises.name,
+      })
       .from(schema.workoutLogs)
-      .where(and(
-        eq(schema.workoutLogs.userId, userId),
-        eq(schema.workoutLogs.exerciseId, exerciseId),
-      ))
+      .innerJoin(schema.exercises, eq(schema.workoutLogs.exerciseId, schema.exercises.id))
+      .where(and(...whereClauses))
       .orderBy(schema.workoutLogs.date)
       .all()
 
-    const dataPoints = R.map(mapRowToDataPoint, rows)
-    return applyDateFilter(dataPoints, range)
+    let dataPoints = R.map(mapRowToDataPoint, rows)
+    dataPoints = applyDateFilter(dataPoints, range)
+
+    if (granularity) {
+      const grouped = groupByGranularity(dataPoints, granularity)
+      return R.map(
+        (bar) => ({
+          date: bar.date,
+          volume: bar.volume,
+          sets: bar.tooltipData?.sets ?? [],
+          exercises: bar.exercises,
+        }),
+        grouped,
+      )
+    }
+
+    return dataPoints
   }
 
-  getPeakVolume(userId: number, exerciseId: number): number {
+  getPeakVolume(userId: number, exerciseId?: number | null): number {
+    const whereClauses = [eq(schema.workoutLogs.userId, userId)]
+    if (exerciseId != null) {
+      whereClauses.push(eq(schema.workoutLogs.exerciseId, exerciseId))
+    }
+
     const rows = this.queryDb
       .select()
       .from(schema.workoutLogs)
-      .where(and(
-        eq(schema.workoutLogs.userId, userId),
-        eq(schema.workoutLogs.exerciseId, exerciseId),
-      ))
+      .where(and(...whereClauses))
       .all()
 
     if (R.isEmpty(rows)) {
@@ -103,8 +130,12 @@ export class SqliteChartRepository implements ChartRepository {
 
   getIntensitySplit(
     userId: number,
-    exerciseId: number,
+    exerciseId?: number | null,
   ): IntensitySplit[] {
+    if (exerciseId == null) {
+      return []
+    }
+
     const dataPoints = this.getVolumeByDate(userId, exerciseId, 'ALL')
 
     if (R.isEmpty(dataPoints)) {

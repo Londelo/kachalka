@@ -10,7 +10,7 @@ export default function NavWrapper() {
   if (pathname?.startsWith('/today')) activeTab = 'WORKOUT'
   else if (pathname?.startsWith('/history')) activeTab = 'HISTORY'
   else if (pathname?.startsWith('/progress')) activeTab = 'PROGRESS'
-  else if (pathname?.startsWith('/profile')) activeTab = 'PROFILE'
+  else if (pathname?.startsWith('/plan')) activeTab = 'PLAN'
 
   return <BottomNav activeTab={activeTab} />
 }

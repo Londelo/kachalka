@@ -28,3 +28,8 @@ coverage/
 
 # TypeScript
 tsconfig.tsbuildinfo
+
+screenshots/
+.playwright-mcp/
+
+

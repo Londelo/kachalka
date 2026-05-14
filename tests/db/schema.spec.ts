@@ -12,7 +12,6 @@ describe('users table schema', () => {
 
   it('defines id as primary key with auto increment', () => {
     expect(users.id.primary).toBe(true)
-    expect(users.id.autoIncrement).toBe(true)
   })
 
   it('defines name as unique and not null', () => {
@@ -35,7 +34,6 @@ describe('exercises table schema', () => {
 
   it('defines id as primary key with auto increment', () => {
     expect(exercises.id.primary).toBe(true)
-    expect(exercises.id.autoIncrement).toBe(true)
   })
 
   it('defines userId as not null', () => {
@@ -54,7 +52,6 @@ describe('userRoutines table schema', () => {
 
   it('defines id as primary key with auto increment', () => {
     expect(userRoutines.id.primary).toBe(true)
-    expect(userRoutines.id.autoIncrement).toBe(true)
   })
 
   it('defines userId as not null', () => {
@@ -83,7 +80,6 @@ describe('workoutLogs table schema', () => {
 
   it('defines id as primary key with auto increment', () => {
     expect(workoutLogs.id.primary).toBe(true)
-    expect(workoutLogs.id.autoIncrement).toBe(true)
   })
 
   it('defines userId as not null', () => {

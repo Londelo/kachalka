@@ -4,14 +4,14 @@ import type { ExerciseRepository } from '@/features/exercise/exercise-repository
 
 function makeRepo(overrides: Partial<ExerciseRepository> = {}): ExerciseRepository {
   return {
-    findById: vi.fn(),
-    findByName: vi.fn(),
-    findAll: vi.fn(),
-    create: vi.fn(),
-    updateName: vi.fn(),
-    delete: vi.fn(),
-    findByOwner: vi.fn(),
-    inAnyRoutine: vi.fn(),
+    findById: vi.fn() as any,
+    findByName: vi.fn() as any,
+    findAll: vi.fn() as any,
+    create: vi.fn() as any,
+    updateName: vi.fn() as any,
+    delete: vi.fn() as any,
+    findByOwner: vi.fn() as any,
+    inAnyRoutine: vi.fn() as any,
     ...overrides,
   }
 }

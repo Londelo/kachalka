@@ -2,45 +2,39 @@
 
 import { useState, useEffect } from 'react'
 import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from 'recharts'
+import {
   getExercisesWithLogsAction,
   getExerciseChartData,
-  getPeakVolumeAction,
-  getIntensitySplitAction,
+  getAllExerciseChartData,
 } from '@/features/chart/chart-server-actions'
+import type { RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
 
 type DataPoint = {
   date: string
   volume: number
   sets: { id: string; reps: number; weight: number }[]
-}
-
-type IntensitySplitItem = {
-  type: string
-  percentage: number
+  exercises: { name: string; sets: { id: string; reps: number; weight: number }[] }[]
 }
 
 export default function ProgressPage() {
   const [exercises, setExercises] = useState<{ id: number; name: string }[]>([])
   const [selectedExerciseId, setSelectedExerciseId] = useState<number | null>(null)
   const [selectedExerciseName, setSelectedExerciseName] = useState<string>('')
-  const [range, setRange] = useState<'1M' | '3M' | '6M' | 'ALL'>('ALL')
+  const [range, setRange] = useState<RangeFilter>('6M')
+  const [granularity, setGranularity] = useState<TimeGranularity>('session')
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([])
-  const [peakVolume, setPeakVolume] = useState<number>(0)
-  const [intensitySplit, setIntensitySplit] = useState<IntensitySplitItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [tooltip, setTooltip] = useState<{ index: number; x: number; y: number } | null>(null)
 
   useEffect(() => {
     async function loadData() {
-      if (!selectedExerciseId) {
-        setDataPoints([])
-        setPeakVolume(0)
-        setIntensitySplit([])
-        setLoading(false)
-        return
-      }
-
-      setLoading(true)
       const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
       const userId = cookieMatch ? parseInt(cookieMatch[1], 10) : 0
       if (!userId) {
@@ -48,19 +42,21 @@ export default function ProgressPage() {
         return
       }
 
-      const [chartData, peak, split] = await Promise.all([
-        getExerciseChartData(userId, selectedExerciseId, range),
-        getPeakVolumeAction(userId, selectedExerciseId),
-        getIntensitySplitAction(userId, selectedExerciseId),
-      ])
+      setLoading(true)
 
+      if (!selectedExerciseId) {
+        const chartData = await getAllExerciseChartData(userId, range, granularity)
+        setDataPoints(chartData ?? [])
+        setLoading(false)
+        return
+      }
+
+      const chartData = await getExerciseChartData(userId, selectedExerciseId, range, granularity)
       setDataPoints(chartData ?? [])
-      setPeakVolume(peak ?? 0)
-      setIntensitySplit(split ?? [])
       setLoading(false)
     }
     loadData()
-  }, [selectedExerciseId, range])
+  }, [selectedExerciseId, range, granularity])
 
   useEffect(() => {
     async function loadExercises() {
@@ -96,22 +92,29 @@ export default function ProgressPage() {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
+  function formatTooltipDate(dateStr: string): string {
+    const d = new Date(dateStr + 'T00:00:00')
+    const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const dayPart = d.toLocaleDateString('en-US', { weekday: 'short' })
+    return `${datePart}, ${dayPart.toUpperCase()}`
+  }
+
   function formatVolume(v: number): string {
     return v.toLocaleString('en-US')
   }
 
   return (
     <>
-      <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[100px] pb-[140px]">
+      <main id="progress-page" className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[100px] pb-[140px]">
         {/* Header */}
-        <section className="space-y-xs pt-md">
+        <section id="progress-header" className="space-y-xs pt-md">
           <h1 className="font-headline-xl text-headline-xl font-black italic uppercase text-on-surface">
             FORCE Progression
           </h1>
         </section>
 
         {/* Exercise Dropdown */}
-        <div className="mt-md w-full space-y-4">
+        <div id="progress-exercise-selector" className="mt-md w-full space-y-4">
           <label className="font-label-bold text-label-bold uppercase block text-on-surface">
             SELECT EXERCISE
           </label>
@@ -121,7 +124,7 @@ export default function ProgressPage() {
               onChange={handleExerciseChange}
               className="w-full appearance-none border-4 border-on-surface bg-background py-3 pl-4 pr-12 font-label-bold text-label-bold uppercase text-on-surface shadow-[4px_4px_0px_0px_rgba(27,29,14,1)] transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
             >
-              <option value="">SELECT EXERCISE</option>
+              <option value="">ALL EXERCISES</option>
               {exercises.map((ex) => (
                 <option key={ex.id} value={ex.id}>
                   {ex.name}
@@ -135,35 +138,51 @@ export default function ProgressPage() {
         </div>
 
         {/* Time Range Pills */}
-        {selectedExerciseId && (
-          <div className="mt-4 flex w-full gap-2">
-            {(['1M', '3M', '6M', 'ALL'] as const).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRange(r)}
-                className={`flex-1 border-4 border-on-surface py-2 font-label-bold text-label-bold uppercase transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-none ${
-                  range === r
-                    ? 'bg-primary text-on-primary shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]'
-                    : 'bg-background text-on-surface shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]'
-                }`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-        )}
+        <div id="progress-range-pills" className="mt-4 flex w-full gap-2">
+          {(['6M', '1Y', 'ALL'] as const).map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => setRange(r)}
+              className={`flex-1 border-4 border-on-surface py-2 font-label-bold text-label-bold uppercase transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-none ${
+                range === r
+                  ? 'bg-primary text-on-primary'
+                  : 'bg-background text-on-surface shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]'
+              }`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+
+        {/* Granularity Pills */}
+        <div id="progress-granularity-pills" className="mt-2 flex w-full gap-2">
+          {(['session', 'week', 'month'] as const).map((g) => (
+            <button
+              key={g}
+              type="button"
+              onClick={() => setGranularity(g)}
+              className={`flex-1 border-4 border-on-surface py-2 font-label-bold text-label-bold uppercase transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-none ${
+                granularity === g
+                  ? 'bg-primary text-on-primary'
+                  : 'bg-background text-on-surface shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]'
+              }`}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
 
         {/* Loading State */}
         {loading && (
-          <div className="mt-8 w-full text-center">
+          <div id="progress-loading" className="mt-8 w-full text-center">
             <p className="font-label-bold text-label-bold text-on-surface-variant">LOADING PROGRESSION DATA...</p>
           </div>
         )}
 
         {/* Empty State */}
-        {!loading && dataPoints.length === 0 && selectedExerciseId && (
-          <div className="mt-8 w-full border-4 border-on-surface bg-surface-container-low p-8 text-center shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
+        {!loading && dataPoints.length === 0 && (
+          <div id="progress-empty" className="mt-8 w-full border-4 border-on-surface bg-surface-container-low p-8 text-center shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
             <span className="material-symbols-outlined text-[48px] text-on-surface-variant">analytics</span>
             <p className="mt-2 font-headline-md text-headline-md uppercase text-on-surface-variant">
               NO DATA YET
@@ -174,170 +193,70 @@ export default function ProgressPage() {
           </div>
         )}
 
-        {/* Bar Chart */}
+        {/* Recharts Bar Chart */}
         {!loading && dataPoints.length > 0 && (
-          <section className="mt-6 w-full">
+          <section id="progress-bar-chart" className="mt-6 w-full">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
                 show_chart
               </span>
-              <h3 className="font-headline-md text-headline-md uppercase">VOLUME BY SESSION</h3>
+              <h3 className="font-headline-md text-headline-md uppercase">
+                VOLUME BY {granularity === 'session' ? 'SESSION' : granularity === 'week' ? 'WEEK' : 'MONTH'}
+              </h3>
             </div>
 
-            <div className="mt-4 flex items-end gap-1 overflow-x-auto pb-2">
-              {dataPoints.map((dp, idx) => {
-                const barHeight = Math.max((dp.volume / maxVolume) * 200, 4)
-                return (
-                  <div
-                    key={dp.date}
-                    className="group relative flex flex-col items-center"
-                    onMouseEnter={() => setTooltip({ index: idx, x: 0, y: 0 })}
-                    onMouseLeave={() => setTooltip(null)}
-                    onTouchStart={() => setTooltip({ index: idx, x: 0, y: 0 })}
-                    onTouchEnd={() => setTimeout(() => setTooltip(null), 3000)}
-                  >
-                    {/* Tooltip */}
-                    {tooltip?.index === idx && (
-                      <div className="absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 whitespace-nowrap border-4 border-on-surface bg-background p-3 font-label-bold text-label-bold text-on-surface shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]"
-                        style={{ minWidth: '140px' }}
-                      >
-                        <div className="mb-1 text-primary">{formatDate(dp.date)}</div>
-                        {dp.sets.map((s, i) => (
-                          <div key={i}>{s.reps} x {s.weight}</div>
-                        ))}
-                        <div className="mt-1 border-t-2 border-on-surface pt-1 font-black text-primary">
-                          TOTAL: {formatVolume(dp.volume)}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Bar */}
-                    <div
-                      className="w-6 border-4 border-on-surface bg-primary transition-all hover:brightness-110 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
-                      style={{ height: `${barHeight}px`, width: '24px' }}
-                    />
-
-                    {/* Date Label */}
-                    <span className="mt-1 font-label-mono text-label-mono text-on-surface-variant" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', transform: 'rotate(180deg)' }}>
-                      {formatDate(dp.date)}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* Stats Cards Row */}
-        {!loading && selectedExerciseId && (
-          <section className="mt-6 w-full space-y-4">
-            {/* Peak Volume Card */}
-            <div className="border-4 border-on-surface bg-background p-4 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  emoji_events
-                </span>
-                <h3 className="font-label-bold text-label-bold uppercase text-on-surface">ALL TIME PEAK</h3>
-              </div>
-              <p className="mt-2 font-headline-xl text-headline-xl font-black text-primary">
-                {formatVolume(peakVolume)}
-              </p>
-            </div>
-
-            {/* Intensity Split Card */}
-            {intensitySplit.length > 0 && (
-              <div className="border-4 border-on-surface bg-background p-4 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
-                    donut_large
-                  </span>
-                  <h3 className="font-label-bold text-label-bold uppercase text-on-surface">INTENSITY SPLIT</h3>
-                </div>
-                <div className="mt-3 space-y-2">
-                  {intensitySplit.map((item) => (
-                    <div key={item.type}>
-                      <div className="flex justify-between">
-                        <span className="font-label-bold text-label-bold uppercase text-on-surface">{item.type}</span>
-                        <span className="font-label-bold text-label-bold text-primary">{item.percentage}%</span>
-                      </div>
-                      <div className="mt-1 h-4 border-2 border-on-surface bg-surface-container-low">
-                        <div
-                          className="h-full border-r-2 border-on-surface bg-primary transition-all"
-                          style={{ width: `${item.percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Commander's Intel Card */}
-            {dataPoints.length === 0 ? (
-              <div className="border-4 border-on-surface bg-error-container p-4 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
-                <div className="flex items-start gap-3">
-                  <span className="material-symbols-outlined text-error" style={{ fontVariationSettings: "'FILL' 1" }}>
-                    warning
-                  </span>
-                  <div>
-                    <h3 className="font-label-bold text-label-bold uppercase text-error">COMMANDER&apos;S INTEL</h3>
-                    <p className="mt-1 font-label-bold text-label-bold text-on-surface">
-                      INCREASE VOLUME TO SEE PROGRESSION
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : dataPoints.length <= 2 ? (
-              <div className="border-4 border-on-surface bg-error-container p-4 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
-                <div className="flex items-start gap-3">
-                  <span className="material-symbols-outlined text-error" style={{ fontVariationSettings: "'FILL' 1" }}>
-                    warning
-                  </span>
-                  <div>
-                    <h3 className="font-label-bold text-label-bold uppercase text-error">COMMANDER&apos;S INTEL</h3>
-                    <p className="mt-1 font-label-bold text-label-bold text-on-surface">
-                      INSUFFICIENT DATA — LOG MORE SESSIONS TO TRACK PROGRESSION
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="border-4 border-on-surface bg-surface-container-low p-4 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
-                <div className="flex items-start gap-3">
-                  <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
-                    info
-                  </span>
-                  <div>
-                    <h3 className="font-label-bold text-label-bold uppercase text-on-surface">COMMANDER&apos;S INTEL</h3>
-                    <p className="mt-1 font-label-bold text-label-bold text-on-surface">
-                      {dataPoints.length} SESSIONS RECORDED — PROGRESSION TRACKING ACTIVE
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Secondary Progression Card */}
-            <div className="border-4 border-on-surface bg-surface-container p-4 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-on-surface-variant">trending_flat</span>
-                <h3 className="font-label-bold text-label-bold uppercase text-on-surface-variant">SECONDARY PROGRESSION</h3>
-              </div>
-              <p className="mt-2 font-label-bold text-label-bold text-on-surface-variant">
-                NO DATA FOR ESTIMATED 1RM
-              </p>
+            <div className="mt-4 h-[300px] w-full">
+              <ResponsiveContainer>
+                <BarChart data={dataPoints}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(27,29,14,0.2)" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 12, fontFamily: 'inherit' }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                    tickFormatter={formatDate}
+                  />
+                  <YAxis
+                    dataKey="volume"
+                    tick={{ fontSize: 12, fontFamily: 'inherit' }}
+                  />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload as DataPoint
+                        return (
+                          <div className="border-4 border-on-surface bg-background p-3 font-label-bold text-label-bold text-on-surface shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
+                            <div className="mb-1 text-primary">{formatTooltipDate(data.date)}</div>
+                            {data.exercises.map((ex, i) => {
+                              const totalSets = ex.sets.length
+                              const totalReps = ex.sets.reduce((sum, s) => sum + s.reps, 0)
+                              const weights = ex.sets.map((s) => s.weight)
+                              return (
+                                <div key={i}>
+                                  <div className="font-black">{ex.name}</div>
+                                  <div>{totalSets} set{totalSets !== 1 ? 's' : ''} · {totalReps} reps · {weights.join(', ')}</div>
+                                </div>
+                              )
+                            })}
+                            <div className="mt-1 border-t-2 border-on-surface pt-1 font-black text-primary">
+                              TOTAL: {formatVolume(data.volume)}
+                            </div>
+                          </div>
+                        )
+                      }
+                      return null
+                    }}
+                  />
+                  <Bar
+                    dataKey="volume"
+                    fill="#a20000"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </section>
-        )}
-
-        {/* No Exercise Selected State */}
-        {!selectedExerciseId && !loading && (
-          <div className="mt-12 w-full text-center">
-            <span className="material-symbols-outlined text-[64px] text-on-surface-variant">bar_chart</span>
-            <p className="mt-3 font-headline-md text-headline-md uppercase text-on-surface-variant">
-              SELECT AN EXERCISE TO VIEW PROGRESSION
-            </p>
-          </div>
         )}
       </main>
     </>

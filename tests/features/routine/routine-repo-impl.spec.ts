@@ -94,13 +94,13 @@ describe('createSqliteRoutineRepository', () => {
 
       const found = repo.findByUserAndDay(user.lastInsertRowid!, 0)
       expect(found).toBeDefined()
-      expect(found!.userId).toBe(user.lastInsertRowid!)
+      expect(found!.userId).toBe(Number(user.lastInsertRowid))
       expect(found!.dayOfWeek).toBe('Monday')
     })
 
     it('returns undefined when no assignment for user and day', () => {
       const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
-      const found = repo.findByUserAndDay(user.lastInsertRowid!, 0)
+      const found = repo.findByUserAndDay(Number(user.lastInsertRowid), 0)
       expect(found).toBeUndefined()
     })
   })
@@ -115,7 +115,7 @@ describe('createSqliteRoutineRepository', () => {
       db!.prepare('INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)').run(user.lastInsertRowid!, ex1.lastInsertRowid!, 0)
       db!.prepare('INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)').run(user.lastInsertRowid!, ex3.lastInsertRowid!, 3)
 
-      const results = repo.findAllByUser(user.lastInsertRowid!)
+      const results = repo.findAllByUser(Number(user.lastInsertRowid))
       expect(results).toHaveLength(3)
       // Verify all expected days are present (order not guaranteed without ORDER BY)
       const days = results.map(r => r.dayOfWeek)
@@ -126,7 +126,7 @@ describe('createSqliteRoutineRepository', () => {
 
     it('returns empty array when user has no assignments', () => {
       const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
-      const results = repo.findAllByUser(user.lastInsertRowid!)
+      const results = repo.findAllByUser(Number(user.lastInsertRowid))
       expect(results).toHaveLength(0)
     })
   })
@@ -141,7 +141,7 @@ describe('createSqliteRoutineRepository', () => {
       db!.prepare('INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)').run(user.lastInsertRowid!, ex2.lastInsertRowid!, 0)
       db!.prepare('INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)').run(user.lastInsertRowid!, ex3.lastInsertRowid!, 3)
 
-      const result = repo.findAllByUserGroupedByDay(user.lastInsertRowid!)
+      const result = repo.findAllByUserGroupedByDay(Number(user.lastInsertRowid))
       expect(result).toHaveProperty('Monday')
       expect(result).toHaveProperty('Thursday')
       expect(result['Monday']).toHaveLength(2)
@@ -153,14 +153,14 @@ describe('createSqliteRoutineRepository', () => {
       const ex = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
       db!.prepare('INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)').run(user.lastInsertRowid!, ex.lastInsertRowid!, 0)
 
-      const result = repo.findAllByUserGroupedByDay(user.lastInsertRowid!)
+      const result = repo.findAllByUserGroupedByDay(Number(user.lastInsertRowid))
       expect(result).toEqual({ Monday: expect.any(Array) })
       expect(result['Monday']).toHaveLength(1)
     })
 
     it('returns empty object when user has no assignments', () => {
       const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
-      const result = repo.findAllByUserGroupedByDay(user.lastInsertRowid!)
+      const result = repo.findAllByUserGroupedByDay(Number(user.lastInsertRowid))
       expect(result).toEqual({})
     })
   })
@@ -170,20 +170,24 @@ describe('createSqliteRoutineRepository', () => {
       const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
       const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
 
-      const assignment = { id: { value: 0 }, userId: user.lastInsertRowid!, exerciseId: exercise.lastInsertRowid!, dayOfWeek: 'Monday' }
+      const userId = Number(user.lastInsertRowid)
+      const exerciseId = Number(exercise.lastInsertRowid)
+      const assignment = { id: { value: 0 }, userId, exerciseId, dayOfWeek: 'Monday' as const }
       const result = repo.create(assignment)
 
       expect(result.id.value).toBeGreaterThan(0)
-      expect(result.userId).toBe(user.lastInsertRowid!)
-      expect(result.exerciseId).toBe(exercise.lastInsertRowid!)
+      expect(result.userId).toBe(userId)
+      expect(result.exerciseId).toBe(exerciseId)
       expect(result.dayOfWeek).toBe('Monday')
     })
 
     it('throws on duplicate assignment', () => {
       const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
       const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
+      const userId = Number(user.lastInsertRowid)
+      const exerciseId = Number(exercise.lastInsertRowid)
 
-      const assignment = { id: { value: 0 }, userId: user.lastInsertRowid!, exerciseId: exercise.lastInsertRowid!, dayOfWeek: 'Monday' }
+      const assignment = { id: { value: 0 }, userId, exerciseId, dayOfWeek: 'Monday' as const }
       repo.create(assignment)
 
       expect(() => repo.create(assignment)).toThrow()

@@ -6,43 +6,43 @@ import type { ExerciseRepository } from '@/features/exercise/exercise-repository
 
 function makeWorkoutRepo(overrides: Partial<WorkoutRepository> = {}): WorkoutRepository {
   return {
-    findById: vi.fn(),
-    create: vi.fn(),
-    findByDateAndExercise: vi.fn(),
-    findByDate: vi.fn(),
-    findAllByUser: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-    findByDayOfWeek: vi.fn(),
-    findLatestForExercise: vi.fn(),
+    findById: vi.fn() as any,
+    create: vi.fn() as any,
+    findByDateAndExercise: vi.fn() as any,
+    findByDate: vi.fn() as any,
+    findAllByUser: vi.fn() as any,
+    update: vi.fn() as any,
+    delete: vi.fn() as any,
+    findByDayOfWeek: vi.fn() as any,
+    findLatestForExercise: vi.fn() as any,
     ...overrides,
   }
 }
 
 function makeRoutineRepo(overrides: Partial<RoutineRepository> = {}): RoutineRepository {
   return {
-    findById: vi.fn(),
-    findByUserAndDay: vi.fn(),
-    findAllByUser: vi.fn(),
-    findAllByUserGroupedByDay: vi.fn(),
-    create: vi.fn(),
-    delete: vi.fn(),
-    exists: vi.fn(),
-    exerciseExists: vi.fn(),
+    findById: vi.fn() as any,
+    findByUserAndDay: vi.fn() as any,
+    findAllByUser: vi.fn() as any,
+    findAllByUserGroupedByDay: vi.fn() as any,
+    create: vi.fn() as any,
+    delete: vi.fn() as any,
+    exists: vi.fn() as any,
+    exerciseExists: vi.fn() as any,
     ...overrides,
   }
 }
 
 function makeExerciseRepo(overrides: Partial<ExerciseRepository> = {}): ExerciseRepository {
   return {
-    findById: vi.fn(),
-    findByName: vi.fn(),
-    findAll: vi.fn(),
-    create: vi.fn(),
-    updateName: vi.fn(),
-    delete: vi.fn(),
-    findByOwner: vi.fn(),
-    inAnyRoutine: vi.fn(),
+    findById: vi.fn() as any,
+    findByName: vi.fn() as any,
+    findAll: vi.fn() as any,
+    create: vi.fn() as any,
+    updateName: vi.fn() as any,
+    delete: vi.fn() as any,
+    findByOwner: vi.fn() as any,
+    inAnyRoutine: vi.fn() as any,
     ...overrides,
   }
 }
@@ -96,10 +96,11 @@ describe('getTodayExercisesUseCase', () => {
 
     exerciseRepo.findById.mockReturnValue({ id: { value: 5 }, name: 'Bench Press' })
     workoutRepo.findLatestForExercise.mockReturnValue({
+      id: 1,
       sets: [
-        { weight: 225, reps: 10 },
-        { weight: 235, reps: 8 },
-        { weight: 225, reps: 10 },
+        { id: 's1', weight: 225, reps: 10 },
+        { id: 's2', weight: 235, reps: 8 },
+        { id: 's3', weight: 225, reps: 10 },
       ],
     })
 
