@@ -18,8 +18,15 @@ type ViewMode = 'past' | 'current'
 
 const DEBOUNCE_MS = 500
 
+function generateId(): string {
+  return crypto.getRandomValues(new Uint32Array(4))[0].toString(16) +
+    crypto.getRandomValues(new Uint32Array(4))[0].toString(16) +
+    crypto.getRandomValues(new Uint32Array(4))[0].toString(16) +
+    crypto.getRandomValues(new Uint32Array(4))[0].toString(16)
+}
+
 function defaultSet(): WorkoutSet {
-  return { id: crypto.randomUUID(), reps: 1, weight: 0 }
+  return { id: generateId(), reps: 1, weight: 0 }
 }
 
 function getStoredUserId(): number | null {
