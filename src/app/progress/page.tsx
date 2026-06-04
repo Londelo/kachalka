@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useLoading } from '@/app/components/loading-context'
 import {
   ResponsiveContainer,
   BarChart,
@@ -33,12 +34,16 @@ export default function ProgressPage() {
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([])
   const [loading, setLoading] = useState(true)
 
+  const { start, end } = useLoading()
+
   useEffect(() => {
+    start('progress')
     async function loadData() {
       const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
       const userId = cookieMatch ? parseInt(cookieMatch[1], 10) : 0
       if (!userId) {
         setLoading(false)
+        end('progress')
         return
       }
 
@@ -48,12 +53,14 @@ export default function ProgressPage() {
         const chartData = await getAllExerciseChartData(userId, range, granularity)
         setDataPoints(chartData ?? [])
         setLoading(false)
+        end('progress')
         return
       }
 
       const chartData = await getExerciseChartData(userId, selectedExerciseId, range, granularity)
       setDataPoints(chartData ?? [])
       setLoading(false)
+      end('progress')
     }
     loadData()
   }, [selectedExerciseId, range, granularity])
@@ -172,13 +179,6 @@ export default function ProgressPage() {
             </button>
           ))}
         </div>
-
-        {/* Loading State */}
-        {loading && (
-          <div id="progress-loading" className="mt-8 w-full text-center">
-            <p className="font-label-bold text-label-bold text-on-surface-variant">LOADING PROGRESSION DATA...</p>
-          </div>
-        )}
 
         {/* Empty State */}
         {!loading && dataPoints.length === 0 && (

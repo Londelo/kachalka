@@ -21,7 +21,8 @@ import {
   getDayLabel,
   isDaySelected,
   resolveDaySelection,
-} from "@/app/plan/plan-utils";
+} from '@/app/plan/plan-utils'
+import { useLoading } from '@/app/components/loading-context'
 
 const DAYS: DayOfWeek[] = [
   "Monday",
@@ -75,9 +76,12 @@ export default function PlanPage() {
     }
   }, [router]);
 
-  const loadData = useCallback(async (): Promise<boolean> => {
-    setLoading(true);
-    const userId = getUserId();
+  const { start, end } = useLoading()
+  const loadData = useCallback(async () => {
+    start('plan')
+    setLoading(true)
+    const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
+    const userId = cookieMatch ? parseInt(cookieMatch[1], 10) : 0
     if (!userId) {
       setLoading(false);
       return false;
@@ -103,13 +107,16 @@ export default function PlanPage() {
       );
     }
 
-    setLoading(false);
-    return true;
-  }, []);
+    setLoading(false)
+    end('plan')
+  }, [start, end])
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    return () => {
+      end('plan');
+    };
+  }, [loadData, end]);
 
   // Task 1: Filter exercises to exclude already-assigned ones for the selected day
   const assignedExerciseIds = useMemo(() => {
@@ -235,27 +242,7 @@ export default function PlanPage() {
     setShowModal(true);
   }
 
-  if (loading) {
-    return (
-      <>
-        <main
-          id="plan-loading"
-          className="mx-auto flex w-full flex-col items-center px-6 pt-[100px] pb-[140px]"
-        >
-          <div className="mb-8 w-full text-center">
-            <h1 className="font-headline-xl text-headline-xl font-black uppercase text-on-surface">
-              MY BATTLE PLAN
-            </h1>
-            <p className="mt-2 font-label-mono text-label-mono text-on-surface">
-              LOADING BATTLE PLAN...
-            </p>
-          </div>
-        </main>
-      </>
-    );
-  }
-
-  const assignments = getAssignmentsForDay(routine, selectedDay);
+  const assignments = getAssignmentsForDay(routine, selectedDay)
 
   return (
     <>

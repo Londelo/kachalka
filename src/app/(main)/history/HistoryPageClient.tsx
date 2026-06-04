@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getHistoryAction, deleteHistoryEntryAction } from '@/features/workout/workout-server-actions'
+import { useLoading } from '@/app/components/loading-context'
 import { calculateVolume } from '@/features/workout/workout-entity'
 
 type HistoryEntry = {
@@ -29,9 +30,13 @@ export default function HistoryPageClient() {
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
+  const { start, end } = useLoading()
+
   useEffect(() => {
+    start('history')
     const userId = getStoredUserId()
     if (!userId) {
+      end('history')
       router.push('/')
       return
     }
@@ -40,6 +45,7 @@ export default function HistoryPageClient() {
         setHistory(res.history)
       }
       setLoading(false)
+      end('history')
     })
   }, [])
 
@@ -77,14 +83,6 @@ export default function HistoryPageClient() {
   function calcIntensity(sets: { reps: number; weight: number }[]): number {
     if (sets.length === 0) return 0
     return Math.max(...sets.map((s) => s.weight))
-  }
-
-  if (loading) {
-    return (
-      <main id="history-loading" className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[120px] pb-[140px]">
-        <p className="font-label-bold text-label-bold text-on-surface">Loading war logs...</p>
-      </main>
-    )
   }
 
   return (
