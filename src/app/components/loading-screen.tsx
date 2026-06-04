@@ -8,7 +8,7 @@ export default function LoadingScreen() {
   if (!loading) return null
 
   return (
-    <div className="fixed inset-x-0 top-[60px] z-[49] flex items-center justify-center bg-background">
+    <div className="fixed inset-0 z-[49] flex items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-4">
         <span
           className="material-symbols-outlined text-[64px]"
