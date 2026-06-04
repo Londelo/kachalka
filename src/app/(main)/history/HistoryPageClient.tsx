@@ -47,6 +47,9 @@ export default function HistoryPageClient() {
       setLoading(false)
       end('history')
     })
+    return () => {
+      end('history')
+    }
   }, [])
 
   function getStoredUserId(): number | null {

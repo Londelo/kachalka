@@ -63,6 +63,9 @@ export default function ProgressPage() {
       end('progress')
     }
     loadData()
+    return () => {
+      end('progress')
+    }
   }, [selectedExerciseId, range, granularity])
 
   useEffect(() => {

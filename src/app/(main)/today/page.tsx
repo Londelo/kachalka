@@ -226,6 +226,9 @@ export default function TodayPage() {
       setLoading(false)
       end('today')
     })
+    return () => {
+      end('today')
+    }
   }, [])
 
   // Cleanup: clear all debounce timers on unmount
