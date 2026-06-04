@@ -6,7 +6,7 @@ export default function Header() {
       <div className="flex items-center gap-4" id="header-branding">
         <span className="material-symbols-outlined text-primary">menu</span>
         <h1 className="font-headline-lg text-headline-lg font-black uppercase tracking-tighter text-primary">
-          IRON COMMAND
+          Kachalka
         </h1>
       </div>
       <Link href="/" className="transition-all active:scale-95" id="header-account-link">

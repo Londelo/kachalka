@@ -6,7 +6,7 @@ import Header from '@/app/components/header'
 import NavWrapper from '@/app/components/nav-wrapper.client'
 
 export const metadata = {
-  title: 'IRON COMMAND',
+  title: 'Kachalka',
   description: 'Track your weightlifting workouts',
 }
 
