@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { useLoading } from '@/app/components/loading-context'
 
 interface BottomNavProps {
   activeTab: string
@@ -15,8 +14,6 @@ const TABS = [
 ]
 
 export default function BottomNav({ activeTab }: BottomNavProps) {
-  const { start } = useLoading()
-
   return (
     <footer className="fixed bottom-0 left-0 z-50 w-full border-t-4 border-on-surface bg-background shadow-[0px_-4px_0px_0px_rgba(27,29,14,1)]" id="bottom-nav">
       <div className="w-full max-w-4xl px-6 py-3">
@@ -25,7 +22,6 @@ export default function BottomNav({ activeTab }: BottomNavProps) {
             <Link
               key={tab.id}
               href={tab.href}
-              onClick={() => start('nav')}
               className={`flex flex-col items-center justify-center px-4 py-2 transition-all active:scale-95 ${
                 activeTab === tab.id
                   ? 'border-x-4 border-on-surface bg-primary shadow-[2px_2px_0px_0px_rgba(27,29,14,1)] text-on-primary'
