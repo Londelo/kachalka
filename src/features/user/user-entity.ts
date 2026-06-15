@@ -13,25 +13,7 @@ export const UserId = Object.freeze({
   },
 })
 
-export function validateEmail(email: string): string {
-  if (typeof email !== 'string') {
-    throw new Error('Email must be a string')
-  }
-
-  const trimmed = email.trim()
-
-  if (trimmed.length === 0) {
-    throw new Error('Email cannot be empty')
-  }
-
-  if (trimmed.length > 254) {
-    throw new Error('Email too long')
-  }
-
-  return trimmed
-}
-
-export function createUser(name: string, email: string): { id: { value: number }; name: string; email: string } {
+export function createUser(name: string): { id: { value: number }; name: string } {
   const trimmedName = name.trim()
 
   if (trimmedName.length === 0) {
@@ -42,13 +24,10 @@ export function createUser(name: string, email: string): { id: { value: number }
     throw new Error('Name too long')
   }
 
-  const trimmedEmail = validateEmail(email)
-
   return {
     id: { value: 0 },
     name: trimmedName,
-    email: trimmedEmail,
   }
 }
 
-export type User = { id: { value: number }; name: string; email: string }
+export type User = { id: { value: number }; name: string }

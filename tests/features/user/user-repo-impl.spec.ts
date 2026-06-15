@@ -59,7 +59,7 @@ describe('createSqliteUserRepository', () => {
     runMigration(db)
     const repo = createSqliteUserRepository(db)
 
-    const user = repo.create({ id: { value: 0 }, name: 'Alice', email: 'alice@example.com' })
+    const user = repo.create({ id: { value: 0 }, name: 'Alice' })
 
     expect(user.name).toBe('Alice')
     expect(user.id.value).toBe(1)
@@ -74,7 +74,7 @@ describe('createSqliteUserRepository', () => {
     runMigration(db)
     const repo = createSqliteUserRepository(db)
 
-    const user = repo.create({ id: { value: 0 }, name: 'Bob', email: 'bob@example.com' })
+    const user = repo.create({ id: { value: 0 }, name: 'Bob' })
 
     const found = repo.findById(user.id.value)
     expect(found?.name).toBe('Bob')
@@ -103,9 +103,9 @@ describe('createSqliteUserRepository', () => {
     runMigration(db)
     const repo = createSqliteUserRepository(db)
 
-    repo.create({ id: { value: 0 }, name: 'Charlie', email: 'charlie@example.com' })
-    repo.create({ id: { value: 0 }, name: 'Alice', email: 'alice@example.com' })
-    repo.create({ id: { value: 0 }, name: 'Bob', email: 'bob@example.com' })
+    repo.create({ id: { value: 0 }, name: 'Charlie' })
+    repo.create({ id: { value: 0 }, name: 'Alice' })
+    repo.create({ id: { value: 0 }, name: 'Bob' })
 
     const all = repo.findAll()
 
@@ -129,7 +129,7 @@ describe('createSqliteUserRepository', () => {
     runMigration(db)
     const repo = createSqliteUserRepository(db)
 
-    const user = repo.create({ id: { value: 0 }, name: 'Dave', email: 'dave@example.com' })
+    const user = repo.create({ id: { value: 0 }, name: 'Dave' })
     repo.delete(user.id.value)
 
     const all = repo.findAll()

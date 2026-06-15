@@ -1,5 +1,9 @@
 # Add User Button — Create New User Modal
 
+## Status
+
+**Not started.** All 7 steps below are pending.
+
 ## Summary
 
 Add a red square button with a plus sign on the right side of the "SELECT COMMANDER" title container. Clicking it opens a modal with form inputs (name, email) to create a new user via the existing `createUserAction` server action.

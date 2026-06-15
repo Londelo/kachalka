@@ -11,7 +11,6 @@ function mapRowToUser(row: Record<string, unknown>): User {
   return {
     id: UserId.make(row.id as number),
     name: row.name as string,
-    email: row.email as string,
   }
 }
 
@@ -56,14 +55,13 @@ export function createSqliteUserRepository(db: ReturnType<typeof Database>): Use
     create(user: User): User {
       const inserted = queryDb
         .insert(schema.users)
-        .values({ name: user.name, email: user.email })
-        .returning({ id: schema.users.id, name: schema.users.name, email: schema.users.email })
+        .values({ name: user.name })
+        .returning({ id: schema.users.id, name: schema.users.name })
         .get()
 
       return {
         id: UserId.make(inserted.id),
         name: inserted.name,
-        email: inserted.email,
       }
     },
 

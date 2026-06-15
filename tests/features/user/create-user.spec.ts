@@ -8,30 +8,29 @@ describe('createUserUseCase', () => {
       findById: vi.fn().mockReturnValue(undefined),
       findByName: vi.fn().mockReturnValue(undefined),
       findAll: vi.fn().mockReturnValue([]),
-      create: vi.fn().mockReturnValue({ id: { value: 1 }, name: 'Alice', email: 'alice@example.com' }),
+      create: vi.fn().mockReturnValue({ id: { value: 1 }, name: 'Alice' }),
       delete: vi.fn(),
     } satisfies UserRepository
 
     const useCase = createUserUseCase(repo)
-    const result = useCase.execute('Alice', 'alice@example.com')
+    const result = useCase.execute('Alice')
 
     expect(result.name).toBe('Alice')
-    expect(result.email).toBe('alice@example.com')
     expect(result.id.value).toBe(1)
   })
 
   it('rejects duplicate names', () => {
     const repo = {
       findById: vi.fn().mockReturnValue(undefined),
-      findByName: vi.fn().mockReturnValue({ id: { value: 1 }, name: 'Alice', email: 'alice@example.com' }),
+      findByName: vi.fn().mockReturnValue({ id: { value: 1 }, name: 'Alice' }),
       findAll: vi.fn().mockReturnValue([]),
-      create: vi.fn().mockReturnValue({ id: { value: 1 }, name: 'Alice', email: 'alice@example.com' }),
+      create: vi.fn().mockReturnValue({ id: { value: 1 }, name: 'Alice' }),
       delete: vi.fn(),
     } satisfies UserRepository
 
     const useCase = createUserUseCase(repo)
 
-    expect(() => useCase.execute('Alice', 'alice@example.com')).toThrow('User already exists')
+    expect(() => useCase.execute('Alice')).toThrow('User already exists')
     expect(repo.create).not.toHaveBeenCalled()
   })
 
@@ -40,13 +39,13 @@ describe('createUserUseCase', () => {
       findById: vi.fn().mockReturnValue(undefined),
       findByName: vi.fn().mockReturnValue(undefined),
       findAll: vi.fn().mockReturnValue([]),
-      create: vi.fn().mockReturnValue({ id: { value: 1 }, name: 'Alice', email: 'alice@example.com' }),
+      create: vi.fn().mockReturnValue({ id: { value: 1 }, name: 'Alice' }),
       delete: vi.fn(),
     } satisfies UserRepository
 
     const useCase = createUserUseCase(repo)
 
-    expect(() => useCase.execute('', 'alice@example.com')).toThrow('Name cannot be empty')
+    expect(() => useCase.execute('')).toThrow('Name cannot be empty')
   })
 
   it('throws for whitespace-only name', () => {
@@ -54,13 +53,13 @@ describe('createUserUseCase', () => {
       findById: vi.fn().mockReturnValue(undefined),
       findByName: vi.fn().mockReturnValue(undefined),
       findAll: vi.fn().mockReturnValue([]),
-      create: vi.fn().mockReturnValue({ id: { value: 1 }, name: 'Alice', email: 'alice@example.com' }),
+      create: vi.fn().mockReturnValue({ id: { value: 1 }, name: 'Alice' }),
       delete: vi.fn(),
     } satisfies UserRepository
 
     const useCase = createUserUseCase(repo)
 
-    expect(() => useCase.execute('   ', 'alice@example.com')).toThrow('Name cannot be empty')
+    expect(() => useCase.execute('   ')).toThrow('Name cannot be empty')
   })
 
   it('throws for name over 100 characters', () => {
@@ -68,41 +67,13 @@ describe('createUserUseCase', () => {
       findById: vi.fn().mockReturnValue(undefined),
       findByName: vi.fn().mockReturnValue(undefined),
       findAll: vi.fn().mockReturnValue([]),
-      create: vi.fn().mockReturnValue({ id: { value: 1 }, name: 'Alice', email: 'alice@example.com' }),
+      create: vi.fn().mockReturnValue({ id: { value: 1 }, name: 'Alice' }),
       delete: vi.fn(),
     } satisfies UserRepository
 
     const useCase = createUserUseCase(repo)
 
-    expect(() => useCase.execute('a'.repeat(101), 'test@example.com')).toThrow('Name too long')
-  })
-
-  it('throws for empty email', () => {
-    const repo = {
-      findById: vi.fn().mockReturnValue(undefined),
-      findByName: vi.fn().mockReturnValue(undefined),
-      findAll: vi.fn().mockReturnValue([]),
-      create: vi.fn().mockReturnValue({ id: { value: 1 }, name: 'Alice', email: 'alice@example.com' }),
-      delete: vi.fn(),
-    } satisfies UserRepository
-
-    const useCase = createUserUseCase(repo)
-
-    expect(() => useCase.execute('Alice', '')).toThrow('Email cannot be empty')
-  })
-
-  it('throws for whitespace-only email', () => {
-    const repo = {
-      findById: vi.fn().mockReturnValue(undefined),
-      findByName: vi.fn().mockReturnValue(undefined),
-      findAll: vi.fn().mockReturnValue([]),
-      create: vi.fn().mockReturnValue({ id: { value: 1 }, name: 'Alice', email: 'alice@example.com' }),
-      delete: vi.fn(),
-    } satisfies UserRepository
-
-    const useCase = createUserUseCase(repo)
-
-    expect(() => useCase.execute('Alice', '   ')).toThrow('Email cannot be empty')
+    expect(() => useCase.execute('a'.repeat(101))).toThrow('Name too long')
   })
 
   it('trims whitespace from name', () => {
@@ -110,29 +81,14 @@ describe('createUserUseCase', () => {
       findById: vi.fn().mockReturnValue(undefined),
       findByName: vi.fn().mockReturnValue(undefined),
       findAll: vi.fn().mockReturnValue([]),
-      create: vi.fn().mockReturnValue({ id: { value: 1 }, name: 'Carol', email: 'carol@example.com' }),
+      create: vi.fn().mockReturnValue({ id: { value: 1 }, name: 'Carol' }),
       delete: vi.fn(),
     } satisfies UserRepository
 
     const useCase = createUserUseCase(repo)
-    const result = useCase.execute('  Carol  ', 'carol@example.com')
+    const result = useCase.execute('  Carol  ')
 
     expect(result.name).toBe('Carol')
-  })
-
-  it('trims whitespace from email', () => {
-    const repo = {
-      findById: vi.fn().mockReturnValue(undefined),
-      findByName: vi.fn().mockReturnValue(undefined),
-      findAll: vi.fn().mockReturnValue([]),
-      create: vi.fn().mockReturnValue({ id: { value: 1 }, name: 'Dana', email: 'dana@example.com' }),
-      delete: vi.fn(),
-    } satisfies UserRepository
-
-    const useCase = createUserUseCase(repo)
-    const result = useCase.execute('Dana', '  dana@example.com  ')
-
-    expect(result.email).toBe('dana@example.com')
   })
 
   it('propagates repo.create errors', () => {
@@ -146,6 +102,6 @@ describe('createUserUseCase', () => {
 
     const useCase = createUserUseCase(repo)
 
-    expect(() => useCase.execute('Bob', 'bob@example.com')).toThrow('Database connection lost')
+    expect(() => useCase.execute('Bob')).toThrow('Database connection lost')
   })
 })

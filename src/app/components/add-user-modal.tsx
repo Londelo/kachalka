@@ -10,23 +10,20 @@ interface AddUserModalProps {
 export default function AddUserModal({ onCreated }: AddUserModalProps) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
 
   async function handleCreate() {
     if (!name.trim()) return
-    if (!email.trim()) return
 
     setCreating(true)
     setError(null)
 
-    const result = await createUserAction(name, email)
+    const result = await createUserAction(name)
 
     if (result.success) {
       setOpen(false)
       setName('')
-      setEmail('')
       onCreated?.()
     } else {
       setError(result.error ?? 'Failed to create user')
@@ -89,17 +86,9 @@ export default function AddUserModal({ onCreated }: AddUserModalProps) {
                 className="flex-1 border-4 border-on-surface bg-surface px-3 py-2 font-label-mono text-label-mono"
                 id="add-user-name-input"
               />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email address"
-                className="flex-1 border-4 border-on-surface bg-surface px-3 py-2 font-label-mono text-label-mono"
-                id="add-user-email-input"
-              />
               <button
                 type="submit"
-                disabled={creating || !name.trim() || !email.trim()}
+                disabled={creating || !name.trim()}
                 className="border-4 border-on-surface bg-primary px-4 py-2 font-label-bold text-label-bold uppercase text-on-primary transition-all active-press disabled:opacity-50"
                 id="add-user-submit"
               >
