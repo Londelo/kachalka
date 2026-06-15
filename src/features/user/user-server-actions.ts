@@ -8,16 +8,21 @@ import type { User } from '@/features/user/user-entity'
 
 export async function createUserAction(
   name: string,
+  email: string,
 ): Promise<{ success: boolean; user?: User; error?: string }> {
   try {
     if (typeof name !== 'string' || name.trim().length === 0) {
       return { success: false, error: 'Name is required' }
     }
 
+    if (typeof email !== 'string' || email.trim().length === 0) {
+      return { success: false, error: 'Email is required' }
+    }
+
     const db = getDatabase()
     const repo = createSqliteUserRepository(db)
     const useCase = createUserUseCase(repo)
-    const user = useCase.execute(name)
+    const user = useCase.execute(name, email)
 
     return { success: true, user }
   } catch (err) {

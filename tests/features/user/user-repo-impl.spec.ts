@@ -59,7 +59,7 @@ describe('createSqliteUserRepository', () => {
     runMigration(db)
     const repo = createSqliteUserRepository(db)
 
-    const user = repo.create({ id: { value: 0 }, name: 'Alice' })
+    const user = repo.create({ id: { value: 0 }, name: 'Alice', email: 'alice@example.com' })
 
     expect(user.name).toBe('Alice')
     expect(user.id.value).toBe(1)
@@ -74,7 +74,7 @@ describe('createSqliteUserRepository', () => {
     runMigration(db)
     const repo = createSqliteUserRepository(db)
 
-    const user = repo.create({ id: { value: 0 }, name: 'Bob' })
+    const user = repo.create({ id: { value: 0 }, name: 'Bob', email: 'bob@example.com' })
 
     const found = repo.findById(user.id.value)
     expect(found?.name).toBe('Bob')
@@ -103,9 +103,9 @@ describe('createSqliteUserRepository', () => {
     runMigration(db)
     const repo = createSqliteUserRepository(db)
 
-    repo.create({ id: { value: 0 }, name: 'Charlie' })
-    repo.create({ id: { value: 0 }, name: 'Alice' })
-    repo.create({ id: { value: 0 }, name: 'Bob' })
+    repo.create({ id: { value: 0 }, name: 'Charlie', email: 'charlie@example.com' })
+    repo.create({ id: { value: 0 }, name: 'Alice', email: 'alice@example.com' })
+    repo.create({ id: { value: 0 }, name: 'Bob', email: 'bob@example.com' })
 
     const all = repo.findAll()
 
@@ -129,7 +129,7 @@ describe('createSqliteUserRepository', () => {
     runMigration(db)
     const repo = createSqliteUserRepository(db)
 
-    const user = repo.create({ id: { value: 0 }, name: 'Dave' })
+    const user = repo.create({ id: { value: 0 }, name: 'Dave', email: 'dave@example.com' })
     repo.delete(user.id.value)
 
     const all = repo.findAll()
@@ -144,8 +144,8 @@ describe('createSqliteUserRepository', () => {
     runMigration(db)
     const repo = createSqliteUserRepository(db)
 
-    repo.create({ id: { value: 0 }, name: 'Eve' })
+    repo.create({ id: { value: 0 }, name: 'Eve', email: 'eve@example.com' })
 
-    expect(() => repo.create({ id: { value: 0 }, name: 'Eve' })).toThrow()
+    expect(() => repo.create({ id: { value: 0 }, name: 'Eve', email: 'eve@example.com' })).toThrow()
   })
 })

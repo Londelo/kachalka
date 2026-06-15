@@ -21,6 +21,7 @@ const mockGetUsers = {
 const mockUser = {
   id: { value: 1 },
   name: 'Alice',
+  email: 'alice@example.com',
 }
 
 vi.mock('@/config/db', () => ({
@@ -50,15 +51,24 @@ afterEach(() => {
 })
 
 describe('createUserAction', () => {
-  it('returns success with user on valid name', async () => {
+  it('returns success with user on valid name and email', async () => {
     mockCreateUser.execute.mockReturnValue(mockUser)
 
     const { createUserAction } = await import('@/features/user/user-server-actions')
-    const result = await createUserAction('Alice')
+    const result = await createUserAction('Alice', 'alice@example.com')
 
     expect(result.success).toBe(true)
     expect(result.user).toEqual(mockUser)
     expect(result.error).toBeUndefined()
+  })
+
+  it('passes name and email to use case', async () => {
+    mockCreateUser.execute.mockReturnValue(mockUser)
+
+    const { createUserAction } = await import('@/features/user/user-server-actions')
+    await createUserAction('Alice', 'alice@example.com')
+
+    expect(mockCreateUser.execute).toHaveBeenCalledWith('Alice', 'alice@example.com')
   })
 
   it('returns failure when user already exists', async () => {
@@ -67,7 +77,7 @@ describe('createUserAction', () => {
     })
 
     const { createUserAction } = await import('@/features/user/user-server-actions')
-    const result = await createUserAction('Alice')
+    const result = await createUserAction('Alice', 'alice@example.com')
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('User already exists')
@@ -76,10 +86,26 @@ describe('createUserAction', () => {
 
   it('returns failure for empty name', async () => {
     const { createUserAction } = await import('@/features/user/user-server-actions')
-    const result = await createUserAction('')
+    const result = await createUserAction('', 'alice@example.com')
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Name is required')
+  })
+
+  it('returns failure for empty email', async () => {
+    const { createUserAction } = await import('@/features/user/user-server-actions')
+    const result = await createUserAction('Alice', '')
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Email is required')
+  })
+
+  it('returns failure for whitespace-only email', async () => {
+    const { createUserAction } = await import('@/features/user/user-server-actions')
+    const result = await createUserAction('Alice', '   ')
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Email is required')
   })
 
   it('returns internal error message on database failure', async () => {
@@ -88,18 +114,26 @@ describe('createUserAction', () => {
     })
 
     const { createUserAction } = await import('@/features/user/user-server-actions')
-    const result = await createUserAction('Alice')
+    const result = await createUserAction('Alice', 'alice@example.com')
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Connection refused: ECONNREFUSED')
   })
 
-  it('returns failure for non-string input', async () => {
+  it('returns failure for non-string name input', async () => {
     const { createUserAction } = await import('@/features/user/user-server-actions')
-    const result = await createUserAction(null as unknown as string)
+    const result = await createUserAction(null as unknown as string, 'alice@example.com')
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Name is required')
+  })
+
+  it('returns failure for non-string email input', async () => {
+    const { createUserAction } = await import('@/features/user/user-server-actions')
+    const result = await createUserAction('Alice', 123 as unknown as string)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Email is required')
   })
 })
 
@@ -124,8 +158,8 @@ describe('getUsersAction', () => {
 
   it('returns multiple users', async () => {
     const users = [
-      { id: { value: 1 }, name: 'Alice' },
-      { id: { value: 2 }, name: 'Bob' },
+      { id: { value: 1 }, name: 'Alice', email: 'alice@example.com' },
+      { id: { value: 2 }, name: 'Bob', email: 'bob@example.com' },
     ]
     mockGetUsers.execute.mockReturnValue(users)
 
