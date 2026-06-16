@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   assignExerciseAction,
@@ -193,10 +193,6 @@ export default function PlanPage() {
     setShowModal(true)
   }
 
-  function toggleModalMode() {
-    setModalMode((prev) => (prev === 'select' ? 'new' : 'select'))
-  }
-
   if (loading) {
     return (
       <>
@@ -244,7 +240,7 @@ export default function PlanPage() {
                   onClick={() => handleDayClick(dayIndex)}
                   className={`flex-1 min-w-0 border-2 border-on-surface py-3 font-label-bold text-label-bold uppercase transition-colors ${
                     selected
-                      ? 'bg-primary text-on-primary shadow-[2px_2px_0px_0px_rgba(27,29,14,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px]'
+                      ? 'bg-primary text-on-primary shadow-[2px_2px_0px_0px_rgba(27,29,14,1)] active:shadow-none active:translate-x-[4px] active:translate-y-[4px]'
                       : 'bg-surface-container-low text-on-surface hover:bg-surface-variant'
                   }`}
                 >
@@ -299,23 +295,20 @@ export default function PlanPage() {
             )}
           </section>
         )}
-        </div>
 
-        {/* Toggle button between select/new modes — always visible when a day is selected */}
+        {/* Add Exercise button — opens modal in select mode */}
         {isDaySelected(selectedDay, addingDay, selectedDay) && (
-          <div className="mt-4 flex flex-col items-center gap-2">
+          <div className="mt-4 flex justify-center">
             <button
               type="button"
-              onClick={() => {
-                toggleModalMode()
-                setShowModal(true)
-              }}
-              className="w-full flex items-center justify-center gap-2 border-4 border-on-surface bg-surface-container py-3 font-headline-md font-headline-md uppercase font-bold text-on-surface transition-all active-press"
+              onClick={handleAddExistingClick}
+              className="w-full max-w-sm border-4 border-on-surface bg-background py-3 font-headline-md uppercase font-bold text-on-surface transition-all active-press"
             >
-              {modalMode === 'select' ? 'ADD EXERCISE' : 'SELECT EXERCISE'}
+              ADD EXERCISE
             </button>
           </div>
         )}
+        </div>
 
         {/* Add Existing Exercise Modal */}
         {showModal && (
@@ -332,11 +325,22 @@ export default function PlanPage() {
               onClick={(e) => e.stopPropagation()}
             >
               {modalMode === 'select' ? (
-                <>
-                  {/* Task 4: Renamed heading */}
-                  <h3 className="mb-4 font-headline-md text-headline-md font-black uppercase text-on-surface">
-                    ASSIGN EXERCISE
-                  </h3>
+                <React.Fragment key="select">
+                  {/* Task 4: Renamed heading with toggle button */}
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="font-headline-md text-headline-md font-black uppercase text-on-surface">
+                      ASSIGN EXERCISE
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setModalMode('new')}
+                      className="flex size-10 shrink-0 items-center justify-center border-2 border-on-surface bg-background font-headline-md uppercase font-bold text-on-surface neo-shadow active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all"
+                      aria-label="Create new exercise"
+                      title="Create new exercise"
+                    >
+                      <span className="material-symbols-outlined">add</span>
+                    </button>
+                  </div>
 
                   {error && (
                     <p className="mb-3 rounded border-2 border-error bg-error-container p-2 text-sm text-error" role="alert">
@@ -377,7 +381,7 @@ export default function PlanPage() {
                     type="button"
                     onClick={handleModalAddExercise}
                     disabled={selectedExerciseId === null}
-                    className="w-full bg-primary-container text-on-primary-container border-4 border-on-surface py-md font-headline-md uppercase neo-shadow active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all disabled:opacity-50"
+                    className="w-full bg-primary-container text-on-primary-container border-4 border-on-surface py-md font-headline-md uppercase neo-shadow active:shadow-none active:translate-x-[4px] active:translate-y-[4px] disabled:opacity-50"
                   >
                     ASSIGN
                   </button>
@@ -389,13 +393,24 @@ export default function PlanPage() {
                   >
                     CANCEL
                   </button>
-                </>
+                </React.Fragment>
               ) : (
-                <>
-                  {/* Task 3: New exercise form */}
-                  <h3 className="mb-4 font-headline-md text-headline-md font-black uppercase text-on-surface">
-                    NEW EXERCISE
-                  </h3>
+                <React.Fragment key="new">
+                  {/* Task 3: New exercise form with toggle button */}
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="font-headline-md text-headline-md font-black uppercase text-on-surface">
+                      NEW EXERCISE
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setModalMode('select')}
+                      className="flex size-10 shrink-0 items-center justify-center border-2 border-on-surface bg-background font-headline-md uppercase font-bold text-on-surface neo-shadow active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all"
+                      aria-label="Select existing exercise"
+                      title="Select existing exercise"
+                    >
+                      <span className="material-symbols-outlined">arrow_back</span>
+                    </button>
+                  </div>
 
                   {error && (
                     <p className="mb-3 rounded border-2 border-error bg-error-container p-2 text-sm text-error" role="alert">
@@ -417,7 +432,7 @@ export default function PlanPage() {
                     type="button"
                     onClick={handleCreateExercise}
                     disabled={!newExerciseName.trim() || creatingExercise}
-                    className="w-full bg-primary-container text-on-primary-container border-4 border-on-surface py-md font-headline-md uppercase neo-shadow active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all disabled:opacity-50"
+                    className="w-full bg-primary-container text-on-primary-container border-4 border-on-surface py-md font-headline-md uppercase neo-shadow active:shadow-none active:translate-x-[4px] active:translate-y-[4px] disabled:opacity-50"
                   >
                     {creatingExercise ? '...' : 'ADD'}
                   </button>
@@ -429,7 +444,7 @@ export default function PlanPage() {
                   >
                     CANCEL
                   </button>
-                </>
+                </React.Fragment>
               )}
             </div>
           </div>
