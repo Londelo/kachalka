@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { createUserAction } from '@/features/user/user-server-actions'
 
 interface AddUserModalProps {
-  onCreated?: () => Promise<void>
+  onCreated?: (user: { id: { value: number }; name: string }) => Promise<void>
 }
 
 export default function AddUserModal({ onCreated }: AddUserModalProps) {
@@ -21,10 +21,10 @@ export default function AddUserModal({ onCreated }: AddUserModalProps) {
 
     const result = await createUserAction(name)
 
-    if (result.success) {
+    if (result.success && result.user) {
       setOpen(false)
       setName('')
-      await onCreated?.()
+      await onCreated?.({ id: result.user.id, name: result.user.name })
     } else {
       setError(result.error ?? 'Failed to create user')
     }

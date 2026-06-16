@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AddUserModal from '@/app/components/add-user-modal'
-import { getUsersAction } from '@/features/user/user-server-actions'
 
 interface UserSelectionClientProps {
   initialUsers: { id: { value: number }; name: string }[]
@@ -21,9 +20,8 @@ export default function UserSelectionClient({
     setCookie('kachalka.userId', String(initialUsers[0].id.value))
   }, [initialUsers])
 
-  async function handleCreated(): Promise<void> {
-    const freshUsers = await getUsersAction()
-    setUsers(freshUsers)
+  async function handleCreated(user: { id: { value: number }; name: string }): Promise<void> {
+    setUsers(prev => [...prev, user])
   }
 
   function handleSelect(userId: number): void {

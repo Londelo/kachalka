@@ -17,7 +17,7 @@ export async function createUserAction(
     const db = getDatabase()
     const repo = createSqliteUserRepository(db)
     const useCase = createUserUseCase(repo)
-    const user = useCase.execute(name)
+    const user = useCase.execute(name.trim())
 
     return { success: true, user }
   } catch (err) {
