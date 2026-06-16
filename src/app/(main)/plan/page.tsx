@@ -104,13 +104,12 @@ export default function PlanPage() {
   async function handleModalAddExercise() {
     if (isSubmitting.current) return
     if (selectedExerciseId === null) return
-    if (addingDay === null) return
 
     const userId = getUserId()
     if (!userId) return
 
     isSubmitting.current = true
-    const result = await assignExerciseAction(userId, selectedExerciseId, numberToDayOfWeek(addingDay))
+    const result = await assignExerciseAction(userId, selectedExerciseId, numberToDayOfWeek(selectedDay))
     isSubmitting.current = false
 
     if (result.success && result.assignment) {

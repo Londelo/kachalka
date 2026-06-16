@@ -8,6 +8,7 @@ const mockRepo = {
   create: vi.fn(),
   findById: vi.fn(),
   findByUserAndDay: vi.fn(),
+  findByUserExerciseAndDay: vi.fn(),
   findAllByUser: vi.fn(),
   findAllByUserGroupedByDay: vi.fn(),
   delete: vi.fn(),
@@ -94,14 +95,14 @@ describe('assignExerciseAction', () => {
 
   it('returns failure when duplicate assignment exists', async () => {
     mockAssignExercise.execute.mockImplementation(() => {
-      throw new Error('An exercise is already assigned to this day')
+      throw new Error('This exercise is already assigned to this day')
     })
 
     const { assignExerciseAction } = await import('@/features/routine/routine-server-actions')
     const result = await assignExerciseAction(1, 5, 'Monday')
 
     expect(result.success).toBe(false)
-    expect(result.error).toBe('An exercise is already assigned to this day')
+    expect(result.error).toBe('This exercise is already assigned to this day')
     expect(result.assignment).toBeUndefined()
   })
 

@@ -9,6 +9,7 @@ function makeRepo(overrides: Partial<RoutineRepository> = {}): RoutineRepository
     create: vi.fn(),
     findById: vi.fn(),
     findByUserAndDay: vi.fn(),
+    findByUserExerciseAndDay: vi.fn(),
     findAllByUser: vi.fn(),
     findAllByUserGroupedByDay: vi.fn(),
     delete: vi.fn(),

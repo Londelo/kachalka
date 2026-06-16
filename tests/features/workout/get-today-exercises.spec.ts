@@ -23,6 +23,7 @@ function makeRoutineRepo(overrides: Partial<RoutineRepository> = {}): RoutineRep
   return {
     findById: vi.fn() as any,
     findByUserAndDay: vi.fn() as any,
+    findByUserExerciseAndDay: vi.fn() as any,
     findAllByUser: vi.fn() as any,
     findAllByUserGroupedByDay: vi.fn() as any,
     create: vi.fn() as any,

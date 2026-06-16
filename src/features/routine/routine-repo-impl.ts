@@ -45,6 +45,24 @@ export function createSqliteRoutineRepository(db: ReturnType<typeof Database>): 
       return mapRowToRoutineAssignment(row)
     },
 
+    findByUserExerciseAndDay(userId: number, exerciseId: number, dayOfWeek: number): RoutineAssignment | undefined {
+      const row = queryDb
+        .select()
+        .from(schema.userRoutines)
+        .where(
+          and(
+            eq(schema.userRoutines.userId, userId),
+            eq(schema.userRoutines.exerciseId, exerciseId),
+            eq(schema.userRoutines.dayOfWeek, dayOfWeek),
+          ),
+        )
+        .limit(1)
+        .get()
+
+      if (!row) return undefined
+      return mapRowToRoutineAssignment(row)
+    },
+
     findAllByUser(userId: number): RoutineAssignment[] {
       const rows = queryDb
         .select()

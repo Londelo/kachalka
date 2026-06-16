@@ -10,10 +10,10 @@ export function assignExerciseUseCase(repo: RoutineRepository) {
       }
 
       const dayNumber = dayOfWeekToNumber(dayOfWeek)
-      const existing = repo.findByUserAndDay(userId, dayNumber)
+      const existing = repo.findByUserExerciseAndDay(userId, exerciseId, dayNumber)
 
       if (existing) {
-        throw new Error('An exercise is already assigned to this day')
+        throw new Error('This exercise is already assigned to this day')
       }
 
       const unsaved = createRoutineAssignment(userId, exerciseId, dayOfWeek)
