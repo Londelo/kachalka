@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { createUserAction } from '@/features/user/user-server-actions'
 
 interface AddUserModalProps {
-  onCreated?: () => void
+  onCreated?: () => Promise<void>
 }
 
 export default function AddUserModal({ onCreated }: AddUserModalProps) {
@@ -24,7 +24,7 @@ export default function AddUserModal({ onCreated }: AddUserModalProps) {
     if (result.success) {
       setOpen(false)
       setName('')
-      onCreated?.()
+      await onCreated?.()
     } else {
       setError(result.error ?? 'Failed to create user')
     }
@@ -50,6 +50,9 @@ export default function AddUserModal({ onCreated }: AddUserModalProps) {
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
           id="add-user-modal-overlay"
           onClick={() => setOpen(false)}
+          role="dialog"
+          aria-label="Create new commander"
+          aria-modal="true"
         >
           <div
             className="w-full max-w-sm border-4 border-on-surface bg-surface-container-high p-6 neo-shadow"
@@ -64,6 +67,7 @@ export default function AddUserModal({ onCreated }: AddUserModalProps) {
               <div
                 id="add-user-error"
                 className="mb-3 rounded border-2 border-error bg-error-container p-2 text-sm text-error"
+                role="alert"
               >
                 {error}
               </div>
@@ -82,6 +86,7 @@ export default function AddUserModal({ onCreated }: AddUserModalProps) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Commander name"
+                maxLength={100}
                 autoFocus
                 className="flex-1 border-4 border-on-surface bg-surface px-3 py-2 font-label-mono text-label-mono"
                 id="add-user-name-input"

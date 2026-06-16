@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "6cf12817-bb31-48a1-92bc-929d40da9ad6",
-  "prevId": "ca35a51a-8569-411c-9c94-f497d37adc88",
+  "id": "7612cecb-b6fc-4939-a3b5-cb4dd81a2786",
+  "prevId": "6cf12817-bb31-48a1-92bc-929d40da9ad6",
   "tables": {
     "exercises": {
       "name": "exercises",
@@ -34,7 +34,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'\"2026-05-06T15:39:38.583Z\"'"
+          "default": "'\"2026-06-15T21:01:33.719Z\"'"
         },
         "updated_at": {
           "name": "updated_at",
@@ -42,7 +42,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'\"2026-05-06T15:39:38.583Z\"'"
+          "default": "'\"2026-06-15T21:01:33.719Z\"'"
         }
       },
       "indexes": {},
@@ -102,7 +102,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'\"2026-05-06T15:39:38.584Z\"'"
+          "default": "'\"2026-06-15T21:01:33.719Z\"'"
         }
       },
       "indexes": {
@@ -171,7 +171,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'\"2026-05-06T15:39:38.583Z\"'"
+          "default": "'\"2026-06-15T21:01:33.719Z\"'"
         },
         "is_active": {
           "name": "is_active",
@@ -240,7 +240,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'\"2026-05-06T15:39:38.584Z\"'"
+          "default": "'\"2026-06-15T21:01:33.719Z\"'"
         },
         "updated_at": {
           "name": "updated_at",
@@ -248,7 +248,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'\"2026-05-06T15:39:38.584Z\"'"
+          "default": "'\"2026-06-15T21:01:33.719Z\"'"
         }
       },
       "indexes": {},

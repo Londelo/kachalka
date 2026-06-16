@@ -27,7 +27,7 @@ export function seedDatabase(): void {
   db.exec("DELETE FROM sqlite_sequence WHERE name IN ('users', 'exercises', 'workout_logs', 'user_routines')")
 
   const insertUser = db.prepare(
-    'INSERT INTO users (name, email) VALUES (?, ?)',
+    'INSERT INTO users (name) VALUES (?)',
   )
   const insertExercise = db.prepare(
     'INSERT INTO exercises (name, user_id) VALUES (?, ?)',
@@ -40,7 +40,7 @@ export function seedDatabase(): void {
   )
 
   const seedBruno = db.transaction(() => {
-    const user = insertUser.run('Bruno', '')
+    const user = insertUser.run('Bruno')
     const userId = user.lastInsertRowid as number
 
     const exercise = insertExercise.run('Pull Up', userId)

@@ -3,8 +3,8 @@ CREATE TABLE `__new_exercises` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`name` text NOT NULL,
 	`user_id` integer NOT NULL,
-	`created_at` integer DEFAULT '"2026-05-06T15:39:38.583Z"' NOT NULL,
-	`updated_at` integer DEFAULT '"2026-05-06T15:39:38.583Z"' NOT NULL,
+	`created_at` integer DEFAULT '"2026-06-15T21:01:33.719Z"' NOT NULL,
+	`updated_at` integer DEFAULT '"2026-06-15T21:01:33.719Z"' NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
@@ -17,7 +17,7 @@ CREATE TABLE `__new_user_routines` (
 	`user_id` integer NOT NULL,
 	`exercise_id` integer NOT NULL,
 	`day_of_week` integer NOT NULL,
-	`created_at` integer DEFAULT '"2026-05-06T15:39:38.584Z"' NOT NULL,
+	`created_at` integer DEFAULT '"2026-06-15T21:01:33.719Z"' NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`exercise_id`) REFERENCES `exercises`(`id`) ON UPDATE no action ON DELETE no action
 );
@@ -29,7 +29,7 @@ CREATE UNIQUE INDEX `user_routine_unique` ON `user_routines` (`user_id`,`exercis
 CREATE TABLE `__new_users` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`name` text NOT NULL,
-	`created_at` integer DEFAULT '"2026-05-06T15:39:38.583Z"' NOT NULL,
+	`created_at` integer DEFAULT '"2026-06-15T21:01:33.719Z"' NOT NULL,
 	`is_active` integer DEFAULT true NOT NULL
 );
 --> statement-breakpoint
@@ -43,8 +43,8 @@ CREATE TABLE `__new_workout_logs` (
 	`exercise_id` integer NOT NULL,
 	`date` text NOT NULL,
 	`sets` text NOT NULL,
-	`created_at` integer DEFAULT '"2026-05-06T15:39:38.584Z"' NOT NULL,
-	`updated_at` integer DEFAULT '"2026-05-06T15:39:38.584Z"' NOT NULL,
+	`created_at` integer DEFAULT '"2026-06-15T21:01:33.719Z"' NOT NULL,
+	`updated_at` integer DEFAULT '"2026-06-15T21:01:33.719Z"' NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`exercise_id`) REFERENCES `exercises`(`id`) ON UPDATE no action ON DELETE no action
 );

@@ -17,7 +17,6 @@ function runMigration(db: Database): void {
     CREATE TABLE users (
       id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
       name TEXT NOT NULL UNIQUE,
-      email TEXT NOT NULL DEFAULT '',
       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
       is_active INTEGER NOT NULL DEFAULT 1
     )
@@ -144,8 +143,8 @@ describe('createSqliteUserRepository', () => {
     runMigration(db)
     const repo = createSqliteUserRepository(db)
 
-    repo.create({ id: { value: 0 }, name: 'Eve', email: 'eve@example.com' })
+    repo.create({ id: { value: 0 }, name: 'Eve' })
 
-    expect(() => repo.create({ id: { value: 0 }, name: 'Eve', email: 'eve@example.com' })).toThrow()
+    expect(() => repo.create({ id: { value: 0 }, name: 'Eve' })).toThrow()
   })
 })

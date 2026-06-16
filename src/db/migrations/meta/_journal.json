@@ -15,6 +15,13 @@
       "when": 1778081978595,
       "tag": "0001_init",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1781557293727,
+      "tag": "0002_left_mariko_yashida",
+      "breakpoints": true
     }
   ]
 }

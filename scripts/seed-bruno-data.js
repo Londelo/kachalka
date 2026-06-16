@@ -27,8 +27,8 @@ console.log('  Schema ready.')
 
 // ---- Phase 0: CREATE BRUNO (user) ----
 console.log('\n=== CREATING BRUNO ===')
-const insertUser = db.prepare('INSERT INTO users (name, email, is_active) VALUES (?, ?, ?)')
-insertUser.run('Bruno', 'bruno@kachalka.com', 1)
+const insertUser = db.prepare('INSERT INTO users (name, is_active) VALUES (?, ?)')
+insertUser.run('Bruno', 1)
 const userId = 1 // Bruno
 
 // ---- Phase 1: DELETE existing data for Bruno ----

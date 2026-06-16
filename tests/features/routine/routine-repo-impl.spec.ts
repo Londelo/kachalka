@@ -18,8 +18,7 @@ function resetDb(): void {
     CREATE TABLE users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE,
-      email TEXT NOT NULL DEFAULT '',
-      created_at INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL DEFAULT 0,
       is_active INTEGER NOT NULL DEFAULT 1
     )
   `)
@@ -56,7 +55,7 @@ describe('createSqliteRoutineRepository', () => {
 
   describe('exerciseExists', () => {
     it('returns true when exercise exists', () => {
-      const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
       db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
 
       expect(repo.exerciseExists(1)).toBe(true)
@@ -69,7 +68,7 @@ describe('createSqliteRoutineRepository', () => {
 
   describe('findById', () => {
     it('finds an assignment by id', () => {
-      const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
       const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
       const routine = db!.prepare('INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)').run(user.lastInsertRowid!, exercise.lastInsertRowid!, 0)
 
@@ -88,7 +87,7 @@ describe('createSqliteRoutineRepository', () => {
 
   describe('findByUserAndDay', () => {
     it('returns an assignment for a user on a specific day', () => {
-      const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
       const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
       db!.prepare('INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)').run(user.lastInsertRowid!, exercise.lastInsertRowid!, 0)
 
@@ -99,7 +98,7 @@ describe('createSqliteRoutineRepository', () => {
     })
 
     it('returns undefined when no assignment for user and day', () => {
-      const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
       const found = repo.findByUserAndDay(Number(user.lastInsertRowid), 0)
       expect(found).toBeUndefined()
     })
@@ -107,7 +106,7 @@ describe('createSqliteRoutineRepository', () => {
 
   describe('findAllByUser', () => {
     it('returns all assignments for a user', () => {
-      const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
       const ex1 = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
       const ex2 = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
       const ex3 = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Deadlift', user.lastInsertRowid!)
@@ -125,7 +124,7 @@ describe('createSqliteRoutineRepository', () => {
     })
 
     it('returns empty array when user has no assignments', () => {
-      const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
       const results = repo.findAllByUser(Number(user.lastInsertRowid))
       expect(results).toHaveLength(0)
     })
@@ -133,7 +132,7 @@ describe('createSqliteRoutineRepository', () => {
 
   describe('findAllByUserGroupedByDay', () => {
     it('groups assignments by day of week', () => {
-      const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
       const ex1 = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
       const ex2 = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
       const ex3 = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Deadlift', user.lastInsertRowid!)
@@ -149,7 +148,7 @@ describe('createSqliteRoutineRepository', () => {
     })
 
     it('handles single day with single exercise', () => {
-      const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
       const ex = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
       db!.prepare('INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)').run(user.lastInsertRowid!, ex.lastInsertRowid!, 0)
 
@@ -159,7 +158,7 @@ describe('createSqliteRoutineRepository', () => {
     })
 
     it('returns empty object when user has no assignments', () => {
-      const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
       const result = repo.findAllByUserGroupedByDay(Number(user.lastInsertRowid))
       expect(result).toEqual({})
     })
@@ -167,7 +166,7 @@ describe('createSqliteRoutineRepository', () => {
 
   describe('create', () => {
     it('inserts an assignment and returns persisted object with id', () => {
-      const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
       const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
 
       const userId = Number(user.lastInsertRowid)
@@ -182,7 +181,7 @@ describe('createSqliteRoutineRepository', () => {
     })
 
     it('throws on duplicate assignment', () => {
-      const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
       const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
       const userId = Number(user.lastInsertRowid)
       const exerciseId = Number(exercise.lastInsertRowid)
@@ -196,7 +195,7 @@ describe('createSqliteRoutineRepository', () => {
 
   describe('delete', () => {
     it('removes an assignment', () => {
-      const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
       const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
       const routine = db!.prepare('INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)').run(user.lastInsertRowid!, exercise.lastInsertRowid!, 0)
       const id = Number(routine.lastInsertRowid!)
@@ -213,7 +212,7 @@ describe('createSqliteRoutineRepository', () => {
 
   describe('exists', () => {
     it('returns true when assignment exists', () => {
-      const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
       const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
       const routine = db!.prepare('INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)').run(user.lastInsertRowid!, exercise.lastInsertRowid!, 0)
       const id = Number(routine.lastInsertRowid!)
@@ -222,7 +221,7 @@ describe('createSqliteRoutineRepository', () => {
     })
 
     it('returns false when assignment does not exist', () => {
-      const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
       const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
 
       expect(repo.exists(999)).toBe(false)
