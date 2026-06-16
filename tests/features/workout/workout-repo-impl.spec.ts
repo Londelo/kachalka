@@ -16,8 +16,7 @@ function resetDb(): void {
     CREATE TABLE users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE,
-      email TEXT NOT NULL DEFAULT '',
-      created_at INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL DEFAULT 0,
       is_active INTEGER NOT NULL DEFAULT 1
     )
   `)
@@ -64,7 +63,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('creates a log and returns it with an id', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
 
     const userId = Number(user.lastInsertRowid)
@@ -84,7 +83,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('returns a log when findById finds it', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
     const userId = Number(user.lastInsertRowid)
     const exerciseId = Number(exercise.lastInsertRowid)
@@ -108,7 +107,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('finds a log by userId, date, and exerciseId', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
     const userId = Number(user.lastInsertRowid)
     const exerciseId = Number(exercise.lastInsertRowid)
@@ -121,7 +120,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('returns undefined when findByDateAndExercise does not match', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
     const userId = Number(user.lastInsertRowid)
     const exerciseId = Number(exercise.lastInsertRowid)
@@ -133,7 +132,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('finds all logs for a user on a specific date', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
     const ex1 = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
     const ex2 = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
     const userId = Number(user.lastInsertRowid)
@@ -149,7 +148,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('finds all logs for a user across dates', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
     const userId = Number(user.lastInsertRowid)
     const exerciseId = Number(exercise.lastInsertRowid)
@@ -164,7 +163,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('updates sets on an existing log', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
     const userId = Number(user.lastInsertRowid)
     const exerciseId = Number(exercise.lastInsertRowid)
@@ -187,7 +186,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('deletes a log', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
     const userId = Number(user.lastInsertRowid)
     const exerciseId = Number(exercise.lastInsertRowid)
@@ -201,7 +200,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('findByDayOfWeek returns logs for a user', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
 
     db!.prepare('INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)').run(user.lastInsertRowid!, exercise.lastInsertRowid!, 0)
@@ -214,7 +213,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('findLatestForExercise returns the most recent log for a userId and exerciseId', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
 
     db!.prepare('INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)').run(user.lastInsertRowid!, exercise.lastInsertRowid!, 0)
@@ -229,7 +228,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('findLatestForExercise returns undefined when no logs exist for the exercise', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
 
     const latest = repo.findLatestForExercise(user.lastInsertRowid!, exercise.lastInsertRowid!)
@@ -237,7 +236,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('findLatestForExercise returns the latest even when multiple logs exist for different dates', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
 
     db!.prepare('INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)').run(user.lastInsertRowid!, exercise.lastInsertRowid!, 0)
@@ -253,8 +252,8 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('findLatestForExercise returns the log for the correct user when multiple users have the exercise', () => {
-    const user1 = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
-    const user2 = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Bob', 'bob@example.com')
+    const user1 = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
+    const user2 = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Bob')
     const exercise1 = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user1.lastInsertRowid!)
     const exercise2 = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user2.lastInsertRowid!)
 
@@ -275,7 +274,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('findHistoryByDate returns logs grouped by date, newest date first', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
 
     repo.create({ userId: user.lastInsertRowid!, exerciseId: exercise.lastInsertRowid!, date: '2025-01-01', sets: [{ reps: 5, weight: 100 }] })
@@ -291,7 +290,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('findHistoryByDate returns groups with exercise names', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
     const squat = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
     const bench = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
 
@@ -308,7 +307,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('findHistoryByDate returns empty array when user has no logs', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
 
     const history = repo.findHistoryByDate(user.lastInsertRowid!)
 
@@ -316,7 +315,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('findHistoryByDate calculates volume correctly per log', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
 
     repo.create({
@@ -336,7 +335,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('findHistoryByDate groups multiple exercises on the same date together', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
     const squat = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
     const deadlift = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Deadlift', user.lastInsertRowid!)
 
@@ -351,7 +350,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('findHistoryByDate returns correct log ids', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
 
     const log1 = repo.create({ userId: user.lastInsertRowid!, exerciseId: exercise.lastInsertRowid!, date: '2025-01-01', sets: [{ reps: 5, weight: 100 }] })
@@ -366,7 +365,7 @@ describe('createSqliteWorkoutRepository', () => {
   })
 
   it('findHistoryByDate returns JSON-serializable data (no Drizzle value objects)', () => {
-    const user = db!.prepare('INSERT INTO users (name, email) VALUES (?, ?)').run('Alice', 'alice@example.com')
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
     const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
 
     repo.create({ userId: user.lastInsertRowid!, exerciseId: exercise.lastInsertRowid!, date: '2025-01-01', sets: [{ reps: 5, weight: 100 }] })

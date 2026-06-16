@@ -47,26 +47,26 @@ describe('UserId', () => {
 })
 
 describe('createUser', () => {
-  it('returns a user with trimmed name and placeholder id', () => {
+  it('returns a user with trimmed name', () => {
     const result = createUser('  Alice  ')
     expect(result).toEqual({ id: { value: 0 }, name: 'Alice' })
   })
 
-  it('trims leading whitespace', () => {
+  it('trims leading whitespace from name', () => {
     const result = createUser('  Bob')
     expect(result.name).toBe('Bob')
   })
 
-  it('trims trailing whitespace', () => {
+  it('trims trailing whitespace from name', () => {
     const result = createUser('Bob  ')
     expect(result.name).toBe('Bob')
   })
 
-  it('throws for empty string', () => {
+  it('throws for empty name', () => {
     expect(() => createUser('')).toThrow('Name cannot be empty')
   })
 
-  it('throws for whitespace-only string', () => {
+  it('throws for whitespace-only name', () => {
     expect(() => createUser('   ')).toThrow('Name cannot be empty')
   })
 

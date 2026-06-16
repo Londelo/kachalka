@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import AddUserModal from '@/app/components/add-user-modal'
 
 interface UserSelectionClientProps {
   initialUsers: { id: { value: number }; name: string }[]
@@ -19,6 +20,10 @@ export default function UserSelectionClient({
     setCookie('kachalka.userId', String(initialUsers[0].id.value))
   }, [initialUsers])
 
+  async function handleCreated(user: { id: { value: number }; name: string }): Promise<void> {
+    setUsers(prev => [...prev, user])
+  }
+
   function handleSelect(userId: number): void {
     setCookie('kachalka.userId', String(userId))
     router.push('/today')
@@ -32,6 +37,7 @@ export default function UserSelectionClient({
             SELECT COMMANDER
           </h2>
         </div>
+        <AddUserModal onCreated={handleCreated} />
       </div>
 
       <div className="flex w-full flex-col gap-8" id="user-cards-grid">

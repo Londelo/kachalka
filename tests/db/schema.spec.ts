@@ -5,7 +5,6 @@ describe('users table schema', () => {
   it('has all required columns', () => {
     expect(users.id).toBeDefined()
     expect(users.name).toBeDefined()
-    expect(users.email).toBeDefined()
     expect(users.createdAt).toBeDefined()
     expect(users.isActive).toBeDefined()
   })
@@ -16,10 +15,6 @@ describe('users table schema', () => {
 
   it('defines name as unique and not null', () => {
     expect(users.name.notNull).toBe(true)
-  })
-
-  it('defines email with default value', () => {
-    expect(users.email.notNull).toBe(true)
   })
 })
 

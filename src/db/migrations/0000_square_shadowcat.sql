@@ -21,7 +21,6 @@ CREATE UNIQUE INDEX `user_routine_unique` ON `user_routines` (`user_id`,`exercis
 CREATE TABLE `users` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`name` text NOT NULL,
-	`email` text NOT NULL,
 	`created_at` integer DEFAULT '"2026-05-06T15:39:12.421Z"' NOT NULL,
 	`is_active` integer DEFAULT true NOT NULL
 );

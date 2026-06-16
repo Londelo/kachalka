@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockDb = {}
 
@@ -45,10 +45,6 @@ beforeEach(() => {
   mockGetUsers.execute.mockReset()
 })
 
-afterEach(() => {
-  vi.clearAllMocks()
-})
-
 describe('createUserAction', () => {
   it('returns success with user on valid name', async () => {
     mockCreateUser.execute.mockReturnValue(mockUser)
@@ -59,6 +55,15 @@ describe('createUserAction', () => {
     expect(result.success).toBe(true)
     expect(result.user).toEqual(mockUser)
     expect(result.error).toBeUndefined()
+  })
+
+  it('passes name to use case', async () => {
+    mockCreateUser.execute.mockReturnValue(mockUser)
+
+    const { createUserAction } = await import('@/features/user/user-server-actions')
+    await createUserAction('Alice')
+
+    expect(mockCreateUser.execute).toHaveBeenCalledWith('Alice')
   })
 
   it('returns failure when user already exists', async () => {
@@ -82,19 +87,27 @@ describe('createUserAction', () => {
     expect(result.error).toBe('Name is required')
   })
 
-  it('returns internal error message on database failure', async () => {
+  it('returns failure for whitespace-only name', async () => {
+    const { createUserAction } = await import('@/features/user/user-server-actions')
+    const result = await createUserAction('   ')
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Name is required')
+  })
+
+  it('returns internal error message on use case failure', async () => {
     mockCreateUser.execute.mockImplementation(() => {
-      throw new Error('Connection refused: ECONNREFUSED')
+      throw new Error('Database connection lost')
     })
 
     const { createUserAction } = await import('@/features/user/user-server-actions')
     const result = await createUserAction('Alice')
 
     expect(result.success).toBe(false)
-    expect(result.error).toBe('Connection refused: ECONNREFUSED')
+    expect(result.error).toBe('Database connection lost')
   })
 
-  it('returns failure for non-string input', async () => {
+  it('returns failure for non-string name input', async () => {
     const { createUserAction } = await import('@/features/user/user-server-actions')
     const result = await createUserAction(null as unknown as string)
 

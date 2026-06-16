@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   assignExerciseAction,
@@ -16,9 +16,14 @@ import {
   isDaySelected,
   resolveDaySelection,
 } from '@/app/plan/plan-utils'
-import AddExerciseButton from '@/app/components/add-exercise-button'
 
 const DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+/** Extract the current user ID from the session cookie. */
+function getUserId(): number {
+  const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
+  return cookieMatch ? parseInt(cookieMatch[1], 10) : 0
+}
 
 interface ExerciseOption {
   id: number
@@ -40,6 +45,7 @@ export default function PlanPage() {
   const [creatingExercise, setCreatingExercise] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const isSubmitting = useRef(false)
 
   useEffect(() => {
     const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
@@ -48,13 +54,12 @@ export default function PlanPage() {
     }
   }, [router])
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (): Promise<boolean> => {
     setLoading(true)
-    const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
-    const userId = cookieMatch ? parseInt(cookieMatch[1], 10) : 0
+    const userId = getUserId()
     if (!userId) {
       setLoading(false)
-      return
+      return false
     }
 
     const [routineResult, exercisesResult] = await Promise.all([
@@ -78,6 +83,7 @@ export default function PlanPage() {
     }
 
     setLoading(false)
+    return true
   }, [])
 
   useEffect(() => {
@@ -95,39 +101,26 @@ export default function PlanPage() {
     return exercises.filter((ex) => !assignedExerciseIds.has(ex.id))
   }, [exercises, assignedExerciseIds])
 
-  async function handleAddExercise() {
-    if (selectedExerciseId === null) return
-    if (addingDay === null) return
-
-    const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
-    const userId = cookieMatch ? parseInt(cookieMatch[1], 10) : 0
-    if (!userId) return
-
-    const result = await assignExerciseAction(userId, selectedExerciseId, numberToDayOfWeek(addingDay))
-
-    if (result.success && result.assignment) {
-      await loadData()
-      setAddingDay(null)
-      setSelectedExerciseId(null)
-    } else {
-      setError(result.error ?? 'Failed to add exercise')
-    }
-  }
-
   async function handleModalAddExercise() {
+    if (isSubmitting.current) return
     if (selectedExerciseId === null) return
     if (addingDay === null) return
 
-    const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
-    const userId = cookieMatch ? parseInt(cookieMatch[1], 10) : 0
+    const userId = getUserId()
     if (!userId) return
 
+    isSubmitting.current = true
     const result = await assignExerciseAction(userId, selectedExerciseId, numberToDayOfWeek(addingDay))
+    isSubmitting.current = false
 
     if (result.success && result.assignment) {
-      await loadData()
-      setShowModal(false)
-      setSelectedExerciseId(null)
+      const refreshed = await loadData()
+      if (!refreshed) {
+        setError('Exercise assigned but failed to refresh data. Please try again.')
+      } else {
+        setShowModal(false)
+        setSelectedExerciseId(null)
+      }
     } else {
       setError(result.error ?? 'Failed to add exercise')
     }
@@ -136,21 +129,26 @@ export default function PlanPage() {
   // Task 3: New exercise form handler
   async function handleCreateExercise() {
     if (!newExerciseName.trim()) return
+    if (isSubmitting.current) return
     setError(null)
 
-    const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
-    const userId = cookieMatch ? parseInt(cookieMatch[1], 10) : 0
+    const userId = getUserId()
     if (!userId) return
 
+    isSubmitting.current = true
     setCreatingExercise(true)
     const result = await createExerciseAction(newExerciseName.trim(), userId)
     if (result.success && result.exercise && addingDay !== null) {
       // Auto-assign to selected day
       const assignResult = await assignExerciseAction(userId, result.exercise.id.value, numberToDayOfWeek(addingDay))
       if (assignResult.success) {
-        setNewExerciseName('')
-        setShowModal(false)
-        await loadData()
+        const refreshed = await loadData()
+        if (!refreshed) {
+          setError('Exercise created but failed to refresh data. Please try again.')
+        } else {
+          setNewExerciseName('')
+          setShowModal(false)
+        }
       } else {
         setError(assignResult.error ?? 'Failed to assign exercise')
       }
@@ -158,11 +156,11 @@ export default function PlanPage() {
       setError(result.error ?? 'Failed to create exercise')
     }
     setCreatingExercise(false)
+    isSubmitting.current = false
   }
 
   async function handleRemoveExercise(assignmentId: number) {
-    const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
-    const userId = cookieMatch ? parseInt(cookieMatch[1], 10) : 0
+    const userId = getUserId()
     if (!userId) return
     const result = await removeExerciseAction(userId, assignmentId)
     if (result.success) {
@@ -182,6 +180,7 @@ export default function PlanPage() {
     setShowModal(false)
     setSelectedExerciseId(null)
     setNewExerciseName('')
+    setError(null)
   }
 
   function handleAddExistingClick() {
@@ -289,8 +288,6 @@ export default function PlanPage() {
                     </button>
                   </div>
                 ))}
-
-                <AddExerciseButton onSuccess={loadData} />
               </div>
             ) : (
               <div className="w-full opacity-40 grayscale border-2 border-on-surface p-xl flex flex-col items-center text-center gap-3">
@@ -322,7 +319,13 @@ export default function PlanPage() {
 
         {/* Add Existing Exercise Modal */}
         {showModal && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" onClick={handleModalClose}>
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
+            onClick={handleModalClose}
+            role="dialog"
+            aria-label={modalMode === 'select' ? 'Assign exercise' : 'Create new exercise'}
+            aria-modal="true"
+          >
             <div
               className="w-full max-w-md border-4 border-on-surface bg-surface-container-high p-6 flex flex-col neo-shadow sm:max-w-sm"
               id="add-existing-exercise-modal"
@@ -336,7 +339,7 @@ export default function PlanPage() {
                   </h3>
 
                   {error && (
-                    <p className="mb-3 rounded border-2 border-error bg-error-container p-2 text-sm text-error">
+                    <p className="mb-3 rounded border-2 border-error bg-error-container p-2 text-sm text-error" role="alert">
                       {error}
                     </p>
                   )}
@@ -395,7 +398,7 @@ export default function PlanPage() {
                   </h3>
 
                   {error && (
-                    <p className="mb-3 rounded border-2 border-error bg-error-container p-2 text-sm text-error">
+                    <p className="mb-3 rounded border-2 border-error bg-error-container p-2 text-sm text-error" role="alert">
                       {error}
                     </p>
                   )}
