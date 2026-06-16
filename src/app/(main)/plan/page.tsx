@@ -137,9 +137,9 @@ export default function PlanPage() {
     isSubmitting.current = true
     setCreatingExercise(true)
     const result = await createExerciseAction(newExerciseName.trim(), userId)
-    if (result.success && result.exercise && addingDay !== null) {
+    if (result.success && result.exercise) {
       // Auto-assign to selected day
-      const assignResult = await assignExerciseAction(userId, result.exercise.id.value, numberToDayOfWeek(addingDay))
+      const assignResult = await assignExerciseAction(userId, result.exercise.id.value, numberToDayOfWeek(selectedDay))
       if (assignResult.success) {
         const refreshed = await loadData()
         if (!refreshed) {
