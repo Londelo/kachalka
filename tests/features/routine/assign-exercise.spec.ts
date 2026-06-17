@@ -9,6 +9,7 @@ function makeRepo(overrides: Partial<RoutineRepository> = {}): RoutineRepository
     create: vi.fn(),
     findById: vi.fn(),
     findByUserAndDay: vi.fn(),
+    findByUserExerciseAndDay: vi.fn(),
     findAllByUser: vi.fn(),
     findAllByUserGroupedByDay: vi.fn(),
     delete: vi.fn(),
@@ -24,7 +25,7 @@ describe('assignExerciseUseCase', () => {
   it('creates an assignment when exercise exists and no duplicate on that day', () => {
     const repo = makeRepo()
     repo.exerciseExists.mockReturnValue(true)
-    repo.findByUserAndDay.mockReturnValue(undefined)
+    repo.findByUserExerciseAndDay.mockReturnValue(undefined)
     const persisted = { id: { value: 42 }, userId: 1, exerciseId: 5, dayOfWeek: 'Monday' }
     repo.create.mockReturnValue(persisted)
 
@@ -33,7 +34,7 @@ describe('assignExerciseUseCase', () => {
 
     expect(result).toEqual(persisted)
     expect(repo.exerciseExists).toHaveBeenCalledWith(5)
-    expect(repo.findByUserAndDay).toHaveBeenCalledWith(1, 0)
+    expect(repo.findByUserExerciseAndDay).toHaveBeenCalledWith(1, 5, 0)
     expect(repo.create).toHaveBeenCalled()
   })
 
@@ -44,25 +45,25 @@ describe('assignExerciseUseCase', () => {
     const useCase = assignExerciseUseCase(repo)
 
     expect(() => useCase.execute(1, 5, 'Monday')).toThrow('Exercise not found')
-    expect(repo.findByUserAndDay).not.toHaveBeenCalled()
+    expect(repo.findByUserExerciseAndDay).not.toHaveBeenCalled()
     expect(repo.create).not.toHaveBeenCalled()
   })
 
-  it('rejects when an exercise is already assigned to that day', () => {
+  it('rejects when the same exercise is already assigned to that day', () => {
     const repo = makeRepo()
     repo.exerciseExists.mockReturnValue(true)
-    repo.findByUserAndDay.mockReturnValue({ id: { value: 1 }, userId: 1, exerciseId: 3, dayOfWeek: 'Monday' })
+    repo.findByUserExerciseAndDay.mockReturnValue({ id: { value: 1 }, userId: 1, exerciseId: 5, dayOfWeek: 'Monday' })
 
     const useCase = assignExerciseUseCase(repo)
 
-    expect(() => useCase.execute(1, 5, 'Monday')).toThrow('An exercise is already assigned to this day')
+    expect(() => useCase.execute(1, 5, 'Monday')).toThrow('This exercise is already assigned to this day')
     expect(repo.create).not.toHaveBeenCalled()
   })
 
   it('rejects negative userId (passes through to repo)', () => {
     const repo = makeRepo()
     repo.exerciseExists.mockReturnValue(true)
-    repo.findByUserAndDay.mockReturnValue(undefined)
+    repo.findByUserExerciseAndDay.mockReturnValue(undefined)
     repo.create.mockImplementation(() => {
       throw new Error('Validation failed')
     })
@@ -75,7 +76,7 @@ describe('assignExerciseUseCase', () => {
   it('propagates repo.create errors', () => {
     const repo = makeRepo()
     repo.exerciseExists.mockReturnValue(true)
-    repo.findByUserAndDay.mockReturnValue(undefined)
+    repo.findByUserExerciseAndDay.mockReturnValue(undefined)
     repo.create.mockImplementation(() => {
       throw new Error('Database connection lost')
     })
@@ -88,7 +89,7 @@ describe('assignExerciseUseCase', () => {
   it('creates an assignment for Wednesday', () => {
     const repo = makeRepo()
     repo.exerciseExists.mockReturnValue(true)
-    repo.findByUserAndDay.mockReturnValue(undefined)
+    repo.findByUserExerciseAndDay.mockReturnValue(undefined)
     const persisted = { id: { value: 10 }, userId: 2, exerciseId: 3, dayOfWeek: 'Wednesday' }
     repo.create.mockReturnValue(persisted)
 
@@ -96,24 +97,24 @@ describe('assignExerciseUseCase', () => {
     const result = useCase.execute(2, 3, 'Wednesday')
 
     expect(result).toEqual(persisted)
-    expect(repo.findByUserAndDay).toHaveBeenCalledWith(2, 2)
+    expect(repo.findByUserExerciseAndDay).toHaveBeenCalledWith(2, 3, 2)
   })
 
-  it('calls exerciseExists before findByUserAndDay check', () => {
+  it('calls exerciseExists before findByUserExerciseAndDay check', () => {
     const repo = makeRepo()
     const callOrder: string[] = []
     repo.exerciseExists.mockImplementation(() => {
       callOrder.push('exerciseExists')
       return true
     })
-    repo.findByUserAndDay.mockImplementation(() => {
-      callOrder.push('findByUserAndDay')
+    repo.findByUserExerciseAndDay.mockImplementation(() => {
+      callOrder.push('findByUserExerciseAndDay')
       return undefined
     })
 
     const useCase = assignExerciseUseCase(repo)
     useCase.execute(1, 5, 'Monday')
 
-    expect(callOrder).toEqual(['exerciseExists', 'findByUserAndDay'])
+    expect(callOrder).toEqual(['exerciseExists', 'findByUserExerciseAndDay'])
   })
 })

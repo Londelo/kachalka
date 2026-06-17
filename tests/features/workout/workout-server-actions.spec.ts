@@ -17,6 +17,7 @@ const mockWorkoutRepo = {
 const mockRoutineRepo = {
   findById: vi.fn(),
   findByUserAndDay: vi.fn(),
+  findByUserExerciseAndDay: vi.fn(),
   findAllByUser: vi.fn(),
   findAllByUserGroupedByDay: vi.fn(),
   create: vi.fn(),
