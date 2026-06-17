@@ -4,6 +4,8 @@ import { runMigrations } from '@/db/migrate'
 import { seedDatabase, seedProgressData } from '@/db/seed'
 import Header from '@/app/components/header'
 import NavWrapper from '@/app/components/nav-wrapper.client'
+import LoadingProviderClient from '@/app/components/loading-provider.client'
+import LoadingScreen from '@/app/components/loading-screen'
 
 export const metadata = {
   title: 'Kachalka',
@@ -28,8 +30,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="bg-background text-on-surface font-body-md">
         <Header />
-        <main id="app-main">{children}</main>
-        <NavWrapper />
+        <LoadingProviderClient>
+          <main id="app-main">{children}</main>
+          <NavWrapper />
+          <LoadingScreen />
+        </LoadingProviderClient>
       </body>
     </html>
   )

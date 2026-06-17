@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { logWorkoutAction, getTodayExercisesAction } from '@/features/workout/workout-server-actions'
+import { useLoading } from '@/app/components/loading-context'
 import type { WorkoutSet } from '@/features/workout/types'
 import { jsDayToAppIndex } from '@/shared/utils/date'
 
@@ -206,10 +207,14 @@ export default function TodayPage() {
   // Keep ref in sync with state so debounced callbacks always read fresh data
   exerciseSetsRef.current = exerciseSets
 
+  const { start, end } = useLoading()
+
   // Load exercises on mount
   useEffect(() => {
+    start('today')
     const userId = getStoredUserId()
     if (!userId) {
+      end('today')
       router.push('/')
       return
     }
@@ -219,7 +224,11 @@ export default function TodayPage() {
         setExercises(res.exercises)
       }
       setLoading(false)
+      end('today')
     })
+    return () => {
+      end('today')
+    }
   }, [])
 
   // Cleanup: clear all debounce timers on unmount
