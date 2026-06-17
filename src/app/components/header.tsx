@@ -27,7 +27,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
         </button>
       )}
       {/* Title — always centered */}
-      <h1 className="font-headline-lg text-headline-lg font-black uppercase tracking-tighter text-primary">
+      <h1 className="w-full font-headline-lg text-headline-lg font-black uppercase tracking-tighter text-center text-primary">
         Kachalka
       </h1>
       {/* Account button */}
