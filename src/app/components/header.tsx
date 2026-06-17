@@ -11,7 +11,7 @@ export default function Header({ isDrawerOpen, onMenuToggle }: HeaderProps) {
   return (
     <button
       onClick={onMenuToggle}
-      className="fixed left-0 top-0 z-50 flex w-full items-center justify-between border-b-4 border-on-surface bg-background px-6 py-3 shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]"
+      className="fixed left-0 top-0 z-50 flex h-14 w-full items-center justify-between border-b-4 border-on-surface bg-background px-6"
       id="app-header"
     >
       <div className="flex items-center gap-4" id="header-branding">
