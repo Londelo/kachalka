@@ -2,8 +2,7 @@ import type { ReactNode } from 'react'
 import './globals.css'
 import { runMigrations } from '@/db/migrate'
 import { seedDatabase, seedProgressData } from '@/db/seed'
-import Header from '@/app/components/header'
-import NavWrapper from '@/app/components/nav-wrapper.client'
+import AppShell from '@/app/components/app-shell.client'
 import LoadingProviderClient from '@/app/components/loading-provider.client'
 import LoadingScreen from '@/app/components/loading-screen'
 
@@ -16,6 +15,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   runMigrations()
   seedDatabase()
   seedProgressData()
+
   return (
     <html lang="en">
       <head>
@@ -29,12 +29,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
       </head>
       <body className="bg-background text-on-surface font-body-md">
-        <Header />
-        <LoadingProviderClient>
-          <main id="app-main">{children}</main>
-          <NavWrapper />
-          <LoadingScreen />
-        </LoadingProviderClient>
+        <AppShell>
+          <LoadingProviderClient>
+            <main id="app-main">{children}</main>
+            <LoadingScreen />
+          </LoadingProviderClient>
+        </AppShell>
       </body>
     </html>
   )

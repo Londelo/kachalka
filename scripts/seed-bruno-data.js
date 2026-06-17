@@ -5,9 +5,22 @@ const path = require('path')
 
 const dbPath = path.join(__dirname, '..', 'data', 'kachalka.db')
 
-// Delete the entire DB to start fresh
-if (fs.existsSync(dbPath)) {
+// Delete the entire DB to start fresh (including WAL/SHM files)
+const walPath = dbPath + '-wal'
+const shmPath = dbPath + '-shm'
+const dbExists = fs.existsSync(dbPath)
+const walExists = fs.existsSync(walPath)
+const shmExists = fs.existsSync(shmPath)
+if (dbExists) {
   fs.unlinkSync(dbPath)
+}
+if (walExists) {
+  fs.unlinkSync(walPath)
+}
+if (shmExists) {
+  fs.unlinkSync(shmPath)
+}
+if (dbExists || walExists || shmExists) {
   console.log('=== DELETED EXISTING DB ===')
 }
 
