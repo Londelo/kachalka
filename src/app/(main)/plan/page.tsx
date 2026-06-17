@@ -1,12 +1,6 @@
 "use client";
 
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-} from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   assignExerciseAction,
@@ -397,7 +391,7 @@ export default function PlanPage() {
               onClick={(e) => e.stopPropagation()}
             >
               {modalMode === "select" ? (
-                <React.Fragment key="select">
+                <>
                   {/* Task 4: Renamed heading with toggle button */}
                   <div className="mb-4 flex items-center justify-between">
                     <h3 className="font-headline-md text-headline-md font-black uppercase text-on-surface">
@@ -466,7 +460,7 @@ export default function PlanPage() {
                     type="button"
                     onClick={handleModalAddExercise}
                     disabled={selectedExerciseId === null}
-                    className="w-full bg-primary-container text-on-primary-container border-4 border-on-surface py-md font-headline-md uppercase neo-shadow active:shadow-none active:translate-x-[4px] active:translate-y-[4px] disabled:opacity-50"
+                    className="w-full bg-primary-container text-on-primary-container border-4 border-on-surface py-md font-headline-md uppercase neo-shadow active:shadow-none active:translate-x-[4px] active:translate-y-[4px] disabled:opacity-50 transition-all"
                   >
                     ASSIGN
                   </button>
@@ -478,9 +472,9 @@ export default function PlanPage() {
                   >
                     CANCEL
                   </button>
-                </React.Fragment>
+                </>
               ) : (
-                <React.Fragment key="new">
+                <>
                   {/* Task 3: New exercise form with toggle button */}
                   <div className="mb-4 flex items-center justify-between">
                     <h3 className="font-headline-md text-headline-md font-black uppercase text-on-surface">
@@ -536,7 +530,7 @@ export default function PlanPage() {
                   >
                     CANCEL
                   </button>
-                </React.Fragment>
+                </>
               )}
             </div>
           </div>
