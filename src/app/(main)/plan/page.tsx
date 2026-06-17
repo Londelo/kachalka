@@ -346,7 +346,7 @@ export default function PlanPage() {
                       <button
                         type="button"
                         onClick={() => handleRemoveExercise(a.id.value)}
-                        className="shrink-0 bg-primary text-on-primary border-2 border-on-surface p-1 flex items-center justify-center active:shadow-none active:translate-x-[1px] active:translate-y-[1px]"
+                        className="shrink-0 bg-primary text-on-primary border-2 border-on-surface p-1 flex items-center justify-center neo-shadow active:shadow-none active:translate-x-[1px] active:translate-y-[1px]"
                       >
                         <span className="material-symbols-outlined">close</span>
                       </button>
