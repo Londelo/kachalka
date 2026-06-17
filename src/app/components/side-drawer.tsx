@@ -28,14 +28,14 @@ export default function SideDrawer({ isOpen, onClose }: SideDrawerProps) {
     <>
       {/* Backdrop overlay — starts below header so header stays bright */}
       <div
-        className={`fixed inset-0 top-14 z-[60] bg-black/50 transition-opacity duration-200 ${
+        className={`fixed inset-0 top-[var(--header-height)] z-[60] bg-black/50 transition-opacity duration-200 ${
           isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         onClick={onClose}
       />
       {/* Drawer panel */}
       <aside
-        className={`fixed left-0 top-14 z-[60] flex h-[calc(100vh-3.5rem)] w-[80vw] flex-col border-r-4 border-on-surface bg-background transition-transform duration-200 ease-in-out lg:w-[20vw] ${
+        className={`fixed left-0 top-[var(--header-height)] z-[60] flex h-[calc(100vh-var(--header-height))] w-[80vw] flex-col border-r-4 border-on-surface bg-background transition-transform duration-200 ease-in-out lg:w-[20vw] ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
