@@ -20,7 +20,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
       {!isSelectUser && (
         <button
           onClick={onMenuToggle}
-          className="flex items-center gap-2 active:scale-95"
+          className="absolute left-6 top-1/2 -translate-y-1/2 flex items-center gap-2 active:scale-95"
           id="header-nav-btn"
         >
           <span className="material-symbols-outlined text-primary">menu</span>
@@ -33,7 +33,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
       {/* Account button — always pinned to the right */}
       <Link
         href="/"
-        className="absolute right-6 transition-all active:scale-95"
+        className="absolute right-6 top-1/2 -translate-y-1/2 transition-all active:scale-95"
         id="header-account-link"
       >
         <span className="material-symbols-outlined text-primary">account_circle</span>
