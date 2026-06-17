@@ -137,6 +137,8 @@ export default function PlanPage() {
     );
     isSubmitting.current = false;
 
+    // selectedDay is always set when a day is clicked; addingDay can be null
+    // after the initial click, so selectedDay is the correct assignment target
     if (result.success && result.assignment) {
       const refreshed = await loadData();
       if (!refreshed) {
@@ -146,6 +148,7 @@ export default function PlanPage() {
       } else {
         setShowModal(false);
         setSelectedExerciseId(null);
+        setError(null);
       }
     } else {
       setError(result.error ?? "Failed to add exercise");
@@ -220,6 +223,9 @@ export default function PlanPage() {
   }
 
   function handleAddExistingClick() {
+    setSelectedExerciseId(null);
+    setNewExerciseName('');
+    setError(null);
     // Task 2: Default to 'select' mode; if no exercises available, default to 'new'
     if (availableExercises.length > 0) {
       setModalMode("select");

@@ -46,8 +46,8 @@ test('create new exercise flow on plan page', async ({ page }) => {
   const addBtn = page.locator('button', { hasText: /^ADD$/ })
   await addBtn.click()
 
-  // Step 7: Wait and observe results
-  await page.waitForTimeout(2000)
+  // Step 7: Wait for the assignment card to appear instead of a blind sleep
+  await expect(page.locator('#assignment-card-')).toBeVisible({ timeout: 5000 })
 
   // Check for errors
   const errorElement = page.locator('#plan-error')
@@ -78,7 +78,7 @@ test('create new exercise flow on plan page', async ({ page }) => {
   console.log(`Error displayed: ${hasError}`)
 
   // Take a screenshot for debugging
-  await page.screenshot({ path: 'tests/playwright/create-exercise-failure.png' })
+  await page.screenshot({ path: '/Users/Brodie.Balser/Documents/WizWork/kachalka/tests/playwright/create-exercise-failure.png' })
 
   expect(hasError).toBe(false)
 })
