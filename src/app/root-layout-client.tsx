@@ -12,7 +12,7 @@ export default function RootLayoutClient({ children }: { children: React.ReactNo
 
   return (
     <>
-      <Header isDrawerOpen={isDrawerOpen} onMenuToggle={onMenuToggle} />
+      <Header onMenuToggle={onMenuToggle} />
       <LoadingProviderClient>
         <main id="app-main">{children}</main>
         <SideDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />

@@ -26,26 +26,19 @@ export default function SideDrawer({ isOpen, onClose }: SideDrawerProps) {
 
   return (
     <>
-      {/* Backdrop overlay */}
+      {/* Backdrop overlay — starts below header so header stays bright */}
       <div
-        className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-200 ${
+        className={`fixed inset-0 top-[var(--header-height)] z-[60] bg-black/50 transition-opacity duration-200 ${
           isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         onClick={onClose}
       />
       {/* Drawer panel */}
       <aside
-        className={`fixed left-0 top-[56px] z-[60] flex h-[calc(100vh-56px)] w-[80vw] flex-col border-r-4 border-on-surface bg-background transition-transform duration-200 ease-in-out ${
+        className={`fixed left-0 top-[var(--header-height)] z-[60] flex h-[calc(100vh-var(--header-height))] w-[80vw] flex-col border-r-4 border-on-surface bg-background transition-transform duration-200 ease-in-out lg:w-[20vw] ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Branding section */}
-        <div className="flex items-center gap-4 border-b-4 border-on-surface px-6 py-3">
-          <span className="material-symbols-outlined text-primary">menu</span>
-          <h1 className="font-headline-lg text-headline-lg font-black uppercase tracking-tighter text-primary">
-            Kachalka
-          </h1>
-        </div>
         {/* Navigation links */}
         <nav className="flex flex-col">
           {TABS.map((tab) => (
@@ -55,7 +48,7 @@ export default function SideDrawer({ isOpen, onClose }: SideDrawerProps) {
               onClick={onClose}
               className={`flex items-center gap-4 px-6 py-3 transition-all active:scale-95 ${
                 activeTab === tab.id
-                  ? 'border-r-4 border-on-surface bg-primary shadow-[2px_2px_0px_0px_rgba(27,29,14,1)] text-on-primary'
+                  ? 'bg-primary text-on-primary'
                   : 'hover:bg-surface-container-highest text-on-surface'
               }`}
             >

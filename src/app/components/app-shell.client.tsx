@@ -11,7 +11,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <Header isDrawerOpen={isDrawerOpen} onMenuToggle={onMenuToggle} />
+      <Header onMenuToggle={onMenuToggle} />
       {children}
       <SideDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
     </>
