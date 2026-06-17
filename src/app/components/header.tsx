@@ -16,9 +16,7 @@ export default function Header({ isDrawerOpen, onMenuToggle }: HeaderProps) {
     <button
       disabled={isSelectUser}
       onClick={onMenuToggle}
-      className={`fixed left-0 top-0 z-50 flex h-14 w-full items-center justify-between border-b-4 border-on-surface bg-background px-6 ${
-        isSelectUser ? 'cursor-not-allowed opacity-50' : ''
-      }`}
+      className="fixed left-0 top-0 z-50 flex h-14 w-full items-center justify-between border-b-4 border-on-surface bg-background px-6"
       id="app-header"
     >
       <div className="flex items-center gap-4" id="header-branding">
