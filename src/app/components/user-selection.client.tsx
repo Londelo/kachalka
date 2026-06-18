@@ -31,7 +31,7 @@ export default function UserSelectionClient({
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[120px] pb-[140px]" id="user-selection-main">
+    <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[24px] pb-[24px]" id="user-selection-main">
       <div className="mb-12 flex w-full items-center justify-between border-b-4 border-on-surface pb-4" id="user-selection-title">
         <div className="flex flex-1 flex-col items-center">
           <h2 className="font-headline-xl text-headline-xl uppercase text-on-surface">

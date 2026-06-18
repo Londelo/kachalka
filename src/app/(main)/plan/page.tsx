@@ -248,7 +248,7 @@ export default function PlanPage() {
     <>
       <main
         id="plan-page"
-        className="mx-auto flex w-full flex-col items-center px-6 pt-[100px] pb-[140px]"
+        className="mx-auto flex w-full flex-col items-center px-6 pt-[24px] pb-[24px]"
       >
         {/* Hero Header */}
         <section

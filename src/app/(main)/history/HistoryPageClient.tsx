@@ -89,7 +89,7 @@ export default function HistoryPageClient() {
   }
 
   return (
-    <main id="history-page" className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[120px] pb-[140px]">
+    <main id="history-page" className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[24px] pb-[24px]">
       {/* Hero Header */}
       <section id="history-header" className="mb-10 w-full text-center">
         <h1 className="font-headline-xl text-headline-xl font-black uppercase text-on-surface">

@@ -357,7 +357,7 @@ export default function TodayPage() {
 
   if (loading) {
     return (
-      <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[120px] pb-[140px]">
+      <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[24px] pb-[24px]">
         <p className="text-on-surface">Loading...</p>
       </main>
     )
@@ -365,7 +365,7 @@ export default function TodayPage() {
 
   return (
     <>
-      <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[120px] pb-[140px]">
+      <main className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[24px] pb-[24px]">
         <div className="mb-8 w-full text-center">
           <h1 className="font-headline-xl text-headline-xl uppercase text-on-surface">
             TODAY&apos;S BATTLE

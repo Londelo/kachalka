@@ -115,7 +115,7 @@ export default function ProgressPage() {
 
   return (
     <>
-      <main id="progress-page" className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[100px] pb-[140px]">
+      <main id="progress-page" className="mx-auto flex w-full max-w-4xl flex-col items-center px-6 pt-[24px] pb-[24px]">
         {/* Header */}
         <section id="progress-header" className="space-y-xs pt-md">
           <h1 className="font-headline-xl text-headline-xl font-black italic uppercase text-on-surface">
