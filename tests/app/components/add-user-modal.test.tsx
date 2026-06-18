@@ -10,10 +10,12 @@ function getMock() {
   return require('@/features/user/user-server-actions')
 }
 
-function renderModal() {
+function renderModal({ open = true, onClose = vi.fn() } = {}) {
   const onCreated = vi.fn()
-  const { container } = render(<AddUserModal onCreated={onCreated} />)
-  return { onCreated, container }
+  const { container } = render(
+    <AddUserModal open={open} onClose={onClose} onCreated={onCreated} />,
+  )
+  return { onCreated, onClose, container }
 }
 
 describe('AddUserModal', () => {
@@ -21,88 +23,75 @@ describe('AddUserModal', () => {
     vi.clearAllMocks()
   })
 
-  it('renders the add button', () => {
-    renderModal()
-    expect(screen.getByRole('button', { name: /add/i })).toBeInTheDocument()
-  })
-
-  it('does not render modal overlay initially', () => {
-    renderModal()
+  it('does not render overlay when closed', () => {
+    renderModal({ open: false })
     expect(screen.queryByText('NEW COMMANDER')).not.toBeInTheDocument()
   })
 
-  it('opens modal when add button is clicked', () => {
-    renderModal()
-    fireEvent.click(screen.getByRole('button', { name: /add/i }))
+  it('renders overlay when open', () => {
+    renderModal({ open: true })
     expect(screen.getByText('NEW COMMANDER')).toBeInTheDocument()
   })
 
   it('renders name input', () => {
-    renderModal()
-    fireEvent.click(screen.getByRole('button', { name: /add/i }))
+    renderModal({ open: true })
     expect(screen.getByPlaceholderText('Commander name')).toBeInTheDocument()
   })
 
   it('renders cancel button', () => {
-    renderModal()
-    fireEvent.click(screen.getByRole('button', { name: /add/i }))
+    renderModal({ open: true })
     expect(screen.getByRole('button', { name: 'CANCEL' })).toBeInTheDocument()
   })
 
   it('renders submit button with correct text', () => {
-    renderModal()
-    fireEvent.click(screen.getByRole('button', { name: /add/i }))
+    renderModal({ open: true })
     expect(screen.getByRole('button', { name: 'ADD COMMANDER' })).toBeInTheDocument()
   })
 
   it('submit button is disabled when name is empty', () => {
-    renderModal()
-    fireEvent.click(screen.getByRole('button', { name: /add/i }))
+    renderModal({ open: true })
     const submitBtn = screen.getByRole('button', { name: 'ADD COMMANDER' })
     expect(submitBtn).toBeDisabled()
   })
 
   it('submit button is enabled when name is filled', () => {
-    renderModal()
-    fireEvent.click(screen.getByRole('button', { name: /add/i }))
+    renderModal({ open: true })
     const nameInput = screen.getByPlaceholderText('Commander name')
     fireEvent.change(nameInput, { target: { value: 'Alice' } })
     const submitBtn = screen.getByRole('button', { name: 'ADD COMMANDER' })
     expect(submitBtn).not.toBeDisabled()
   })
 
-  it('closes modal when cancel button is clicked', () => {
-    const { onCreated } = renderModal()
-    fireEvent.click(screen.getByRole('button', { name: /add/i }))
+  it('calls onClose when cancel button is clicked', () => {
+    const onClose = vi.fn()
+    renderModal({ open: true, onClose })
     fireEvent.click(screen.getByRole('button', { name: 'CANCEL' }))
-    expect(screen.queryByText('NEW COMMANDER')).not.toBeInTheDocument()
-    expect(onCreated).not.toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('closes modal when overlay is clicked', () => {
-    renderModal()
-    fireEvent.click(screen.getByRole('button', { name: /add/i }))
+  it('calls onClose when overlay is clicked', () => {
+    const onClose = vi.fn()
+    renderModal({ open: true, onClose })
     const overlay = document.getElementById('add-user-modal-overlay')
     expect(overlay).toBeInTheDocument()
     fireEvent.click(overlay!)
-    expect(screen.queryByText('NEW COMMANDER')).not.toBeInTheDocument()
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('does not close modal when card is clicked', () => {
-    renderModal()
-    fireEvent.click(screen.getByRole('button', { name: /add/i }))
+    const onClose = vi.fn()
+    renderModal({ open: true, onClose })
     const card = document.getElementById('add-user-modal')
     expect(card).toBeInTheDocument()
     fireEvent.click(card!)
-    expect(screen.getByText('NEW COMMANDER')).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
   })
 
   it('calls createUserAction on form submit', async () => {
     const { createUserAction } = await import('@/features/user/user-server-actions')
     vi.mocked(createUserAction).mockResolvedValue({ success: true, user: { id: { value: 1 }, name: 'Alice' } })
 
-    renderModal()
-    fireEvent.click(screen.getByRole('button', { name: /add/i }))
+    renderModal({ open: true })
 
     const nameInput = screen.getByPlaceholderText('Commander name')
     fireEvent.change(nameInput, { target: { value: 'Alice' } })
@@ -114,12 +103,12 @@ describe('AddUserModal', () => {
     })
   })
 
-  it('clears form and closes modal on success', async () => {
+  it('closes modal on success', async () => {
+    const onClose = vi.fn()
     const { createUserAction } = await import('@/features/user/user-server-actions')
     vi.mocked(createUserAction).mockResolvedValue({ success: true, user: { id: { value: 1 }, name: 'Alice' } })
 
-    renderModal()
-    fireEvent.click(screen.getByRole('button', { name: /add/i }))
+    renderModal({ open: true, onClose })
 
     const nameInput = screen.getByPlaceholderText('Commander name')
     fireEvent.change(nameInput, { target: { value: 'Alice' } })
@@ -127,7 +116,7 @@ describe('AddUserModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ADD COMMANDER' }))
 
     await waitFor(() => {
-      expect(screen.queryByText('NEW COMMANDER')).not.toBeInTheDocument()
+      expect(onClose).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -135,8 +124,7 @@ describe('AddUserModal', () => {
     const { createUserAction } = await import('@/features/user/user-server-actions')
     vi.mocked(createUserAction).mockResolvedValue({ success: false, error: 'User already exists' })
 
-    renderModal()
-    fireEvent.click(screen.getByRole('button', { name: /add/i }))
+    renderModal({ open: true })
 
     const nameInput = screen.getByPlaceholderText('Commander name')
     fireEvent.change(nameInput, { target: { value: 'Alice' } })
@@ -149,11 +137,11 @@ describe('AddUserModal', () => {
   })
 
   it('does not close modal on error', async () => {
+    const onClose = vi.fn()
     const { createUserAction } = await import('@/features/user/user-server-actions')
     vi.mocked(createUserAction).mockResolvedValue({ success: false, error: 'User already exists' })
 
-    renderModal()
-    fireEvent.click(screen.getByRole('button', { name: /add/i }))
+    renderModal({ open: true, onClose })
 
     const nameInput = screen.getByPlaceholderText('Commander name')
     fireEvent.change(nameInput, { target: { value: 'Alice' } })
@@ -161,16 +149,16 @@ describe('AddUserModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ADD COMMANDER' }))
 
     await waitFor(() => {
-      expect(screen.getByText('NEW COMMANDER')).toBeInTheDocument()
+      expect(onClose).not.toHaveBeenCalled()
     })
   })
 
   it('calls onCreated callback on success', async () => {
-    const { onCreated } = renderModal()
+    const onCreated = vi.fn()
     const { createUserAction } = await import('@/features/user/user-server-actions')
     vi.mocked(createUserAction).mockResolvedValue({ success: true, user: { id: { value: 1 }, name: 'Alice' } })
 
-    fireEvent.click(screen.getByRole('button', { name: /add/i }))
+    renderModal({ open: true, onCreated })
 
     const nameInput = screen.getByPlaceholderText('Commander name')
     fireEvent.change(nameInput, { target: { value: 'Alice' } })
@@ -188,8 +176,7 @@ describe('AddUserModal', () => {
       () => new Promise((resolve) => setTimeout(() => resolve({ success: true, user: { id: { value: 1 }, name: 'Alice' } }), 50)),
     )
 
-    renderModal()
-    fireEvent.click(screen.getByRole('button', { name: /add/i }))
+    renderModal({ open: true })
 
     const nameInput = screen.getByPlaceholderText('Commander name')
     fireEvent.change(nameInput, { target: { value: 'Alice' } })
@@ -202,9 +189,7 @@ describe('AddUserModal', () => {
   })
 
   it('does not submit when name is empty', () => {
-    renderModal()
-    fireEvent.click(screen.getByRole('button', { name: /add/i }))
-
+    renderModal({ open: true })
     const submitBtn = screen.getByRole('button', { name: 'ADD COMMANDER' })
     expect(submitBtn).toBeDisabled()
   })
