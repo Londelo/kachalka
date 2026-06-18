@@ -13,6 +13,7 @@ export default function UserSelectionClient({
 }: UserSelectionClientProps) {
   const router = useRouter()
   const [users, setUsers] = useState(initialUsers)
+  const [showAddModal, setShowAddModal] = useState(false)
 
   useEffect(() => {
     const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
@@ -37,7 +38,6 @@ export default function UserSelectionClient({
             SELECT COMMANDER
           </h2>
         </div>
-        <AddUserModal onCreated={handleCreated} />
       </div>
 
       <div className="flex w-full flex-col gap-8" id="user-cards-grid">
@@ -48,7 +48,16 @@ export default function UserSelectionClient({
             onSelect={() => handleSelect(user.id.value)}
           />
         ))}
+        <button
+          type="button"
+          onClick={() => setShowAddModal(true)}
+          className="group flex w-full cursor-pointer items-center justify-center border-4 border-on-surface bg-red-500 py-8 text-3xl font-black uppercase text-background transition-all neo-shadow active-press hover:bg-red-600"
+        >
+          Add User
+        </button>
       </div>
+
+      <AddUserModal open={showAddModal} onClose={() => setShowAddModal(false)} onCreated={handleCreated} />
     </main>
   )
 }
