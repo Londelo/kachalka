@@ -19,30 +19,28 @@ A Next.js weightlifting workout tracker called **Kachalka** (code name: **IRON C
 ```
 kachalka/
 ├── src/
-│   ├── app/                          # Next.js App Router
+│   ├── app/                          # Next.js App Router (flat routes, no route groups)
 │   │   ├── layout.tsx                # Root layout — runs migrations + seeds, wraps AppShell
 │   │   ├── page.tsx                  # User selection page (login) — SSR, calls getUsersAction
 │   │   ├── globals.css               # Tailwind directives + neo-brutalism CSS vars
-│   │   ├── (main)/                   # Authenticated route group
-│   │   │   ├── layout.tsx            # Wraps children in <main id="main-layout">
-│   │   │   ├── today/page.tsx        # Today's workout — log sets with auto-save + debounce
-│   │   │   ├── plan/page.tsx         # My Battle Plan — assign exercises to days, inline creation
-│   │   │   ├── history/              # War Logs
-│   │   │   │   ├── page.tsx          # SSR shell (dynamic = 'force-dynamic')
-│   │   │   │   └── HistoryPageClient.tsx  # Client-side history viewer + detail modal + delete
-│   │   │   └── plan/page.tsx         # My Battle Plan — full client page
-│   │   ├── components/
-│   │   │   ├── add-user-modal.tsx    # Modal for creating new users
-│   │   │   ├── app-shell.client.tsx  # Shell: Header + SideDrawer + children
-│   │   │   ├── header.tsx            # Top nav bar (title + account link + menu button)
-│   │   │   ├── loading-context.tsx   # Loading state context (Set-based, multi-key)
-│   │   │   ├── loading-provider.client.tsx  # Provider wrapper
-│   │   │   ├── loading-screen.tsx    # Hourglass loading overlay
-│   │   │   ├── side-drawer.tsx       # Slide-out navigation drawer (4 tabs)
-│   │   │   └── user-selection.client.tsx  # User cards + cookie management
+│   │   ├── history/                  # War Logs
+│   │   │   ├── page.tsx              # SSR shell (dynamic = 'force-dynamic')
+│   │   │   └── HistoryPageClient.tsx # Client-side history viewer + detail modal + delete
+│   │   ├── plan/
+│   │   │   ├── page.tsx              # My Battle Plan — full client page
+│   │   │   └── utils.ts              # Plan page helpers (day selection, assignment lookup)
 │   │   ├── progress/page.tsx         # Force Progression — Recharts bar chart with filters
-│   │   ├── root-layout-client.tsx    # Client-side root layout (Header + SideDrawer + LoadingProvider)
-│   │   └── plan/plan-utils.ts        # Plan page helpers (day selection, assignment lookup)
+│   │   └── today/page.tsx            # Today's workout — log sets with auto-save + debounce
+│   │
+│   ├── components/                   # Shared UI components (moved out of app/)
+│   │   ├── add-user-modal.tsx        # Modal for creating new users
+│   │   ├── app-shell.client.tsx      # Shell: Header + SideDrawer + children
+│   │   ├── header.tsx                # Top nav bar (title + account link + menu button)
+│   │   ├── loading-context.tsx       # Loading state context (Set-based, multi-key)
+│   │   ├── loading-provider.client.tsx  # Provider wrapper
+│   │   ├── loading-screen.tsx        # Hourglass loading overlay
+│   │   ├── side-drawer.tsx           # Slide-out navigation drawer (4 tabs)
+│   │   └── user-selection.client.tsx  # User cards + cookie management
 │   │
 │   ├── config/
 │   │   ├── db.ts                     # SQLite singleton + Drizzle instance (WAL + FK pragma)
@@ -106,26 +104,36 @@ kachalka/
 │   │       ├── chart-utils.ts        # groupByGranularity, toISOWeekKey, toMonthKey
 │   │       └── chart-server-actions.ts # getExerciseChartData, getAllExerciseChartData, getExercisesWithLogsAction, getPeakVolumeAction, getIntensitySplitAction
 │   │
-│   ├── shared/
-│   │   ├── errors/app-error.ts       # AppError class (message, status, cause, toJSON)
-│   │   ├── types/day-of-week.ts      # DayOfWeek type (re-exported from features/routine)
-│   │   └── utils/
-│   │       ├── date.ts               # formatDate, getTodayISO, dayOfWeekToIndex, jsDayToAppIndex
-│   │       └── volume.ts             # calculateVolume (duplicate of workout-entity version)
-│   │
-│   └── app/plan/plan-utils.ts        # Plan page helpers (getAssignmentsForDay, resolveDaySelection, isDaySelected, etc.)
+│   └── shared/
+│       ├── errors/app-error.ts       # AppError class (message, status, cause, toJSON)
+│       └── utils/
+│           └── date.ts               # formatDate, getTodayISO, dayOfWeekToIndex, jsDayToAppIndex
 │
-├── tests/                            # Vitest tests mirroring src/ structure
-│   ├── features/                     # Feature tests (entity, repo, use case, server action)
-│   ├── shared/                       # Shared utility tests
-│   ├── config/                       # DB + env tests
-│   ├── db/                           # Schema + migration tests
-│   └── app/components/               # Component tests
-│
-├── e2e/                              # Playwright E2E tests
-│   ├── create-exercise.spec.ts       # Full create-exercise flow on plan page
-│   ├── helpers.ts                    # loginAsBruno, logout helpers
-│   └── screenshots/                  # Debug screenshots
+├── tests/
+│   ├── e2e/                          # Playwright E2E tests
+│   │   ├── create-exercise.spec.ts   # Full create-exercise flow on plan page
+│   │   └── helpers.ts                # loginAsBruno, logout helpers
+│   └── unit/                         # Vitest unit + integration tests (mirrors src/ structure)
+│       ├── app/
+│       │   ├── components/           # Component tests
+│       │   │   └── add-user-modal.test.tsx
+│       │   └── plan/                 # Plan page helper tests
+│       │       └── plan-utils.spec.ts
+│       ├── config/                   # DB + env tests
+│       │   ├── db.spec.ts
+│       │   └── env.spec.ts
+│       ├── db/                       # Schema + migration tests
+│       │   ├── migrate.spec.ts
+│       │   └── schema.spec.ts
+│       ├── features/                 # Feature tests (entity, repo, use case, server action)
+│       │   ├── chart/                # chart-entity, chart-repo-impl, chart-utils, range-filter, time-granularity
+│       │   ├── exercise/             # entity, repo, use cases, server actions
+│       │   ├── routine/              # entity, repo, use cases, server actions
+│       │   ├── user/                 # entity, repo, use cases, server actions
+│       │   └── workout/              # entity, repo, use cases, server actions
+│       └── shared/
+│           ├── errors/               # app-error tests
+│           └── utils/                # date tests
 │
 ├── data/                             # SQLite database files
 │   └── kachalka.sqlite               # Main database (created by migrations)
@@ -135,7 +143,6 @@ kachalka/
 │   └── codegen.sh                    # Playwright codegen helper
 │
 ├── plans/                            # Implementation plans
-├── screenshots/                      # Reference screenshots
 ├── package.json
 ├── tsconfig.json                     # Strict TS, @/* path alias, esnext/bundler module resolution
 ├── tailwind.config.js                # Military palette, custom fonts, neo-brutalism spacing
@@ -204,17 +211,17 @@ use-cases/*.ts    (business logic — factory functions returning { execute() })
 
 ### Unit/Integration Tests (Vitest)
 
-**Config:** `vitest.config.ts` — jsdom environment, `@testing-library/jest-dom/vitest` setup, `@/*` alias, tests in `tests/**/*.spec.ts` and `src/**/*.test.ts`.
+**Config:** `vitest.config.ts` — jsdom environment, `@testing-library/jest-dom/vitest` setup, `@/*` alias, tests in `tests/unit/**/*.spec.ts` and `tests/unit/**/*.test.ts`.
 
 **Coverage by layer:**
 
 | Layer | Test files | What's tested |
 |-------|-----------|---------------|
-| **Entity** | `user-entity.test.ts`, `exercise-entity.spec.ts`, `workout-entity.spec.ts`, `routine-entity.spec.ts`, `chart-entity.test.ts` | Value object factories, validation rules, edge cases (negative, empty, boundary) |
-| **Repository Impl** | `user-repo-impl.spec.ts`, `exercise-repo-impl.spec.ts`, `routine-repo-impl.spec.ts`, `workout-repo-impl.spec.ts`, `chart-repo-impl.test.ts` | In-memory SQLite, real SQL, CRUD operations, data integrity |
+| **Entity** | `user-entity.spec.ts`, `exercise-entity.spec.ts`, `workout-entity.spec.ts`, `routine-entity.spec.ts`, `chart-entity.spec.ts` | Value object factories, validation rules, edge cases (negative, empty, boundary) |
+| **Repository Impl** | `user-repo-impl.spec.ts`, `exercise-repo-impl.spec.ts`, `routine-repo-impl.spec.ts`, `workout-repo-impl.spec.ts`, `chart-repo-impl.spec.ts` | In-memory SQLite, real SQL, CRUD operations, data integrity |
 | **Use Case** | `log-workout.spec.ts`, `create-exercise.spec.ts`, `assign-exercise.spec.ts`, `rename-exercise.spec.ts`, `delete-exercise.spec.ts`, `remove-exercise.spec.ts`, `get-users.spec.ts`, `get-user-routine.spec.ts`, `get-today-exercises.spec.ts`, `update-workout.spec.ts`, `delete-workout.spec.ts` | Business logic, mocked repositories, error propagation |
 | **Server Actions** | `user-server-actions.spec.ts`, `exercise-server-actions.spec.ts`, `routine-server-actions.spec.ts`, `workout-server-actions.spec.ts` | Mocked DB/repos via `vi.mock()`, success/failure paths, error handling, dynamic `import()` |
-| **Utilities** | `date.spec.ts`, `volume.spec.ts`, `chart-utils.spec.ts`, `range-filter.spec.ts`, `time-granularity.spec.ts` | Pure function correctness |
+| **Utilities** | `date.spec.ts`, `chart-utils.spec.ts`, `range-filter.spec.ts`, `time-granularity.spec.ts` | Pure function correctness |
 | **Config** | `db.spec.ts`, `env.spec.ts`, `schema.spec.ts`, `migrate.spec.ts` | DB setup, env validation, schema structure, migration behavior |
 | **Components** | `add-user-modal.test.tsx` | React component rendering, user interaction |
 
@@ -230,9 +237,11 @@ use-cases/*.ts    (business logic — factory functions returning { execute() })
 
 **Config:** `playwright.config.ts` — Chromium only, port 3111, auto-seed + dev server on test start (`npm run seed && npx next dev -p 3111`), screenshots on failure, traces on first retry.
 
-**Test file:** `e2e/create-exercise.spec.ts` — Full user flow: login as Bruno → navigate to plan → select day → create exercise → verify assignment card appears.
+**Test dir:** `tests/e2e/`
 
-**Helpers:** `e2e/helpers.ts` — `loginAsBruno(page)` sets cookie, `logout(page)` clears cookies.
+**Test file:** `tests/e2e/create-exercise.spec.ts` — Full user flow: login as Bruno → navigate to plan → select day → create exercise → verify assignment card appears.
+
+**Helpers:** `tests/e2e/helpers.ts` — `loginAsBruno(page)` sets cookie, `logout(page)` clears cookies.
 
 ## Build & Run
 
@@ -314,15 +323,6 @@ The root layout (`src/app/layout.tsx`) calls `runMigrations()` + `seedDatabase()
 
 ## Known Quirks
 
-- **Config page** directory exists but is empty (page was removed)
-- **`data/kachalka.db-shm`** and **`data/kachalka.db-wal`** are SQLite journal files (keep alongside `.sqlite`)
-- **No Docker** — runs directly via `npm run dev`
-- **`root-layout-client.tsx`** and **`app-shell.client.tsx`** are nearly identical — both wrap children with Header + SideDrawer + LoadingProvider
-- **`seed-bruno-data.js`** deletes the entire DB on each run (including WAL/SHM files) — not idempotent, meant for dev/E2E setup
-- **`0000_square_shadowcat.sql`** is an older migration that appears to be a no-op or placeholder (the `0001_init.sql` contains the full schema)
-- **`move-user-btn.md`** exists in `src/app/(main)/plan/` — likely a leftover design note
-- **`volume.ts`** in shared/utils duplicates `calculateVolume` from `workout-entity.ts` — slight code duplication
-- **`DayOfWeek` type** exists in both `shared/types/day-of-week.ts` and `features/routine/routine-entity.ts` — same content, imported from different places
 - **Users have no email** — the schema previously had an `email` column that was removed in migration 0001
 - **Exercise rename does NOT cascade** to routine assignments (the old CLAUDE.md said it did, but the code shows rename only updates the exercises table)
 - **`scripts/seed-bruno-data.js`** generates dates dynamically (last 7 months from a fixed date), not seeded statically
