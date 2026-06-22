@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { loginAsBruno } from './helpers'
 
 test('create new exercise flow on plan page', async ({ page }) => {
   // Collect console errors and warnings
@@ -9,18 +10,11 @@ test('create new exercise flow on plan page', async ({ page }) => {
     }
   })
 
-  // Step 0: Set the user cookie directly (Bruno has id=1 from seed)
-  await page.goto('http://localhost:3000/')
-  await page.context().addCookies([
-    {
-      name: 'kachalka.userId',
-      value: '1',
-      url: 'http://localhost:3000',
-    },
-  ])
+  // Authenticate as Bruno (id=1 from seed)
+  await loginAsBruno(page)
 
-  // Step 1: Navigate to plan page
-  await page.goto('http://localhost:3000/plan')
+  // Navigate to plan page
+  await page.goto('/plan')
   await page.waitForSelector('#plan-page', { timeout: 10000 })
 
   // Step 2: Click TUE to get into "select mode" for a day (adds ADD EXERCISE button)
@@ -47,7 +41,7 @@ test('create new exercise flow on plan page', async ({ page }) => {
   await addBtn.click()
 
   // Step 7: Wait for the assignment card to appear instead of a blind sleep
-  await expect(page.locator('#assignment-card-')).toBeVisible({ timeout: 5000 })
+  await expect(page.locator('[id^="assignment-card-"]').first()).toBeVisible({ timeout: 5000 })
 
   // Check for errors
   const errorElement = page.locator('#plan-error')
@@ -70,7 +64,7 @@ test('create new exercise flow on plan page', async ({ page }) => {
   }
 
   // Verify the exercise was created
-  const exerciseCard = page.locator('#assignment-card-').first()
+  const exerciseCard = page.locator('[id^="assignment-card-"]').first()
   const exerciseVisible = await exerciseCard.isVisible({ timeout: 3000 }).catch(() => false)
 
   console.log(`Exercise card visible: ${exerciseVisible}`)
@@ -78,7 +72,7 @@ test('create new exercise flow on plan page', async ({ page }) => {
   console.log(`Error displayed: ${hasError}`)
 
   // Take a screenshot for debugging
-  await page.screenshot({ path: '/Users/Brodie.Balser/Documents/WizWork/kachalka/tests/playwright/create-exercise-failure.png' })
+  await page.screenshot({ path: 'e2e/screenshots/create-exercise-failure.png' })
 
   expect(hasError).toBe(false)
 })
