@@ -55,10 +55,10 @@ describe('getVolumeByDate — granularity mapping', () => {
 
     vi.mocked(groupByGranularity).mockReturnValue(mockGroupedBars)
 
-    const { SqliteChartRepository } = await import('@/features/chart/chart-repo-impl')
+    const { createSqliteChartRepository } = await import('@/features/chart/chart-repo-impl')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockDb = {} as any
-    const repo = new SqliteChartRepository(mockDb)
+    const repo = createSqliteChartRepository(mockDb)
 
     const result = repo.getVolumeByDate(1, null, undefined, 'session')
 

@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getHistoryAction, deleteHistoryEntryAction } from '@/features/workout/workout-server-actions'
 import { useLoading } from '@/components/loading-context'
-import { calculateVolume } from '@/features/workout/workout-entity'
 
 type HistoryEntry = {
   date: string

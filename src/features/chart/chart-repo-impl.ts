@@ -6,19 +6,13 @@ import type { ChartRepository } from '@/features/chart/chart-repository'
 import type { ChartDataPoint, IntensitySplit, RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
 import { groupByGranularity } from '@/features/chart/chart-utils'
 import type { WorkoutSet } from '@/features/workout/types'
-import * as R from 'ramda'
 
 export function mapRowToDataPoint(row: Record<string, unknown>): ChartDataPoint {
   const sets = row.sets as WorkoutSet[]
   const exerciseName = row.exerciseName as string
   return {
     date: row.date as string,
-    volume: R.sum(
-      R.map(
-        (s: WorkoutSet) => s.reps * s.weight,
-        sets,
-      ),
-    ),
+    volume: sets.reduce((t, s) => t + s.reps * s.weight, 0),
     sets,
     exercises: [{ name: exerciseName, sets }],
   }
@@ -32,11 +26,7 @@ function applyDateFilter(
     return logs
   }
 
-  const days = R.cond([
-    [R.equals('6M'), R.always(180)],
-    [R.equals('1Y'), R.always(365)],
-    [R.T, R.always(0)],
-  ])(range)
+  const days = range === '6M' ? 180 : range === '1Y' ? 365 : 0
 
   if (days === 0) {
     return logs
@@ -46,17 +36,13 @@ function applyDateFilter(
   cutoff.setDate(cutoff.getDate() - days)
   const cutoffStr = cutoff.toISOString().split('T')[0]
 
-  return R.filter((dp: ChartDataPoint) => dp.date >= cutoffStr, logs)
+  return logs.filter((dp: ChartDataPoint) => dp.date >= cutoffStr)
 }
 
-export class SqliteChartRepository implements ChartRepository {
-  private readonly queryDb: ReturnType<typeof drizzle>
+export function createSqliteChartRepository(db: ReturnType<typeof Database>): ChartRepository {
+  const queryDb = drizzle(db, { schema })
 
-  constructor(db: ReturnType<typeof Database>) {
-    this.queryDb = drizzle(db, { schema })
-  }
-
-  getVolumeByDate(
+  function getVolumeByDate(
     userId: number,
     exerciseId?: number | null,
     range?: RangeFilter,
@@ -67,7 +53,7 @@ export class SqliteChartRepository implements ChartRepository {
       whereClauses.push(eq(schema.workoutLogs.exerciseId, exerciseId))
     }
 
-    const rows = this.queryDb
+    const rows = queryDb
       .select({
         date: schema.workoutLogs.date,
         sets: schema.workoutLogs.sets,
@@ -79,56 +65,49 @@ export class SqliteChartRepository implements ChartRepository {
       .orderBy(schema.workoutLogs.date)
       .all()
 
-    let dataPoints = R.map(mapRowToDataPoint, rows)
+    let dataPoints = rows.map(mapRowToDataPoint)
     dataPoints = applyDateFilter(dataPoints, range)
 
     if (granularity) {
       const grouped = groupByGranularity(dataPoints, granularity)
-      return R.map(
+      return grouped.map(
         (bar) => ({
           date: bar.date,
           volume: bar.volume,
           sets: bar.tooltipData?.sets ?? [],
           exercises: bar.exercises,
         }),
-        grouped,
       )
     }
 
     return dataPoints
   }
 
-  getPeakVolume(userId: number, exerciseId?: number | null): number {
+  function getPeakVolume(userId: number, exerciseId?: number | null): number {
     const whereClauses = [eq(schema.workoutLogs.userId, userId)]
     if (exerciseId != null) {
       whereClauses.push(eq(schema.workoutLogs.exerciseId, exerciseId))
     }
 
-    const rows = this.queryDb
+    const rows = queryDb
       .select()
       .from(schema.workoutLogs)
       .where(and(...whereClauses))
       .all()
 
-    if (R.isEmpty(rows)) {
+    if (rows.length === 0) {
       return 0
     }
 
-    const volumes = R.map(
+    const volumes = rows.map(
       (row: Record<string, unknown>) =>
-        R.sum(
-          R.map(
-            (s: WorkoutSet) => s.reps * s.weight,
-            row.sets as WorkoutSet[],
-          ),
-        ),
-      rows,
+        (row.sets as WorkoutSet[]).reduce((t, s) => t + s.reps * s.weight, 0),
     )
 
     return volumes.length > 0 ? Math.max(...volumes) : 0
   }
 
-  getIntensitySplit(
+  function getIntensitySplit(
     userId: number,
     exerciseId?: number | null,
   ): IntensitySplit[] {
@@ -136,14 +115,14 @@ export class SqliteChartRepository implements ChartRepository {
       return []
     }
 
-    const dataPoints = this.getVolumeByDate(userId, exerciseId, 'ALL')
+    const dataPoints = getVolumeByDate(userId, exerciseId, 'ALL')
 
-    if (R.isEmpty(dataPoints)) {
+    if (dataPoints.length === 0) {
       return []
     }
 
-    const peakVolume = this.getPeakVolume(userId, exerciseId)
-    const totalVolume = R.sum(R.map((dp: ChartDataPoint) => dp.volume, dataPoints))
+    const peakVolume = getPeakVolume(userId, exerciseId)
+    const totalVolume = dataPoints.reduce((t, dp) => t + dp.volume, 0)
 
     if (totalVolume === 0) {
       return []
@@ -161,8 +140,8 @@ export class SqliteChartRepository implements ChartRepository {
     ]
   }
 
-  getExercisesWithLogs(userId: number): { id: number; name: string }[] {
-    const rows = this.queryDb
+  function getExercisesWithLogs(userId: number): { id: number; name: string }[] {
+    const rows = queryDb
       .select({
         id: schema.exercises.id,
         name: schema.exercises.name,
@@ -171,7 +150,7 @@ export class SqliteChartRepository implements ChartRepository {
       .where(
         inArray(
           schema.exercises.id,
-          this.queryDb
+          queryDb
             .select({ id: schema.workoutLogs.exerciseId })
             .from(schema.workoutLogs)
             .where(eq(schema.workoutLogs.userId, userId))
@@ -181,12 +160,18 @@ export class SqliteChartRepository implements ChartRepository {
       .orderBy(schema.exercises.name)
       .all()
 
-    return R.map(
+    return rows.map(
       (row: Record<string, unknown>) => ({
         id: Number(row.id),
         name: row.name as string,
       }),
-      rows,
     )
+  }
+
+  return {
+    getVolumeByDate,
+    getPeakVolume,
+    getIntensitySplit,
+    getExercisesWithLogs,
   }
 }

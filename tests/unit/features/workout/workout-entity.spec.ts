@@ -60,7 +60,7 @@ describe('calculateVolume', () => {
 describe('WorkoutLog type structure', () => {
   it('has the expected shape', () => {
     const log: WorkoutLog = {
-      id: { value: 1 },
+      id: 1,
       userId: 1,
       exerciseId: 2,
       date: '2025-01-01',
@@ -69,7 +69,7 @@ describe('WorkoutLog type structure', () => {
       updatedAt: '2025-01-01T00:00:00.000Z',
     }
 
-    expect(log.id).toEqual({ value: 1 })
+    expect(log.id).toBe(1)
     expect(log.userId).toBe(1)
     expect(log.exerciseId).toBe(2)
     expect(log.date).toBe('2025-01-01')

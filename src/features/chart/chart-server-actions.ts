@@ -1,8 +1,7 @@
 'use server'
 
 import { getDatabase } from '@/config/db'
-import { SqliteChartRepository } from '@/features/chart/chart-repo-impl'
-import { ChartService } from '@/features/chart/chart-service'
+import { createSqliteChartRepository } from '@/features/chart/chart-repo-impl'
 import type { ChartDataPoint, IntensitySplit, RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
 
 export async function getExerciseChartData(
@@ -11,9 +10,8 @@ export async function getExerciseChartData(
   range?: RangeFilter,
   granularity?: TimeGranularity,
 ): Promise<ChartDataPoint[]> {
-  const repo = new SqliteChartRepository(getDatabase())
-  const service = new ChartService(repo)
-  return service.getExerciseProgress(userId, exerciseId, range, granularity)
+  const repo = createSqliteChartRepository(getDatabase())
+  return repo.getVolumeByDate(userId, exerciseId, range, granularity)
 }
 
 export async function getAllExerciseChartData(
@@ -21,33 +19,29 @@ export async function getAllExerciseChartData(
   range?: RangeFilter,
   granularity?: TimeGranularity,
 ): Promise<ChartDataPoint[]> {
-  const repo = new SqliteChartRepository(getDatabase())
-  const service = new ChartService(repo)
-  return service.getAllExercisesProgress(userId, range, granularity)
+  const repo = createSqliteChartRepository(getDatabase())
+  return repo.getVolumeByDate(userId, null, range, granularity)
 }
 
 export async function getExercisesWithLogsAction(
   userId: number,
 ): Promise<{ id: number; name: string }[]> {
-  const repo = new SqliteChartRepository(getDatabase())
-  const service = new ChartService(repo)
-  return service.getExercisesWithLogs(userId)
+  const repo = createSqliteChartRepository(getDatabase())
+  return repo.getExercisesWithLogs(userId)
 }
 
 export async function getPeakVolumeAction(
   userId: number,
   exerciseId?: number | null,
 ): Promise<number> {
-  const repo = new SqliteChartRepository(getDatabase())
-  const service = new ChartService(repo)
-  return service.getPeakVolume(userId, exerciseId)
+  const repo = createSqliteChartRepository(getDatabase())
+  return repo.getPeakVolume(userId, exerciseId)
 }
 
 export async function getIntensitySplitAction(
   userId: number,
   exerciseId?: number | null,
 ): Promise<IntensitySplit[]> {
-  const repo = new SqliteChartRepository(getDatabase())
-  const service = new ChartService(repo)
-  return service.getIntensitySplit(userId, exerciseId)
+  const repo = createSqliteChartRepository(getDatabase())
+  return repo.getIntensitySplit(userId, exerciseId)
 }

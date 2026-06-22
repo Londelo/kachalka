@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatDate, getTodayISO, dayOfWeekToIndex } from '@/shared/utils/date'
+import { formatDate, getTodayISO } from '@/shared/utils/date'
 
 describe('formatDate', () => {
   it('formats a Date object to YYYY-MM-DD string', () => {
@@ -41,58 +41,5 @@ describe('getTodayISO', () => {
     const result = getTodayISO()
 
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-  })
-})
-
-describe('dayOfWeekToIndex', () => {
-  it('returns 0 for Monday', () => {
-    expect(dayOfWeekToIndex('Monday')).toBe(0)
-  })
-
-  it('returns 1 for Tuesday', () => {
-    expect(dayOfWeekToIndex('Tuesday')).toBe(1)
-  })
-
-  it('returns 2 for Wednesday', () => {
-    expect(dayOfWeekToIndex('Wednesday')).toBe(2)
-  })
-
-  it('returns 3 for Thursday', () => {
-    expect(dayOfWeekToIndex('Thursday')).toBe(3)
-  })
-
-  it('returns 4 for Friday', () => {
-    expect(dayOfWeekToIndex('Friday')).toBe(4)
-  })
-
-  it('returns 5 for Saturday', () => {
-    expect(dayOfWeekToIndex('Saturday')).toBe(5)
-  })
-
-  it('returns 6 for Sunday', () => {
-    expect(dayOfWeekToIndex('Sunday')).toBe(6)
-  })
-
-  describe('error handling', () => {
-    it('throws for invalid day names', () => {
-      expect(() => dayOfWeekToIndex('Funday')).toThrow()
-    })
-
-    it('throws for lowercase day names', () => {
-      expect(() => dayOfWeekToIndex('monday')).toThrow()
-    })
-
-    it('throws for abbreviated day names', () => {
-      expect(() => dayOfWeekToIndex('Mon')).toThrow()
-    })
-
-    it('throws for numeric input', () => {
-      // @ts-expect-error - testing runtime behavior with wrong type
-      expect(() => dayOfWeekToIndex(0)).toThrow()
-    })
-
-    it('throws for empty string', () => {
-      expect(() => dayOfWeekToIndex('')).toThrow()
-    })
   })
 })

@@ -11,11 +11,8 @@ import {
   listExercisesAction,
   createExerciseAction,
 } from "@/features/exercise/exercise-server-actions";
-import type {
-  RoutineAssignment,
-  DayOfWeek,
-} from "@/features/routine/routine-entity";
-import { numberToDayOfWeek } from "@/features/routine/routine-entity";
+import type { RoutineAssignment } from "@/features/routine/routine-entity";
+import { numberToDayOfWeek, DAY_NAMES } from "@/features/routine/routine-entity";
 import {
   getAssignmentsForDay,
   getDayLabel,
@@ -24,15 +21,7 @@ import {
 } from './utils'
 import { useLoading } from '@/components/loading-context'
 
-const DAYS: DayOfWeek[] = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-];
+const DAYS = DAY_NAMES;
 
 /** Extract the current user ID from the session cookie. */
 function getUserId(): number {

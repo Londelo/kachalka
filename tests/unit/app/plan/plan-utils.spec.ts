@@ -1,11 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   getAssignmentsForDay,
-  getDayName,
   getDayLabel,
-  hasAssignments,
-  getExerciseCountPerDay,
-  getExerciseCountForDay,
   resolveDaySelection,
   isDaySelected,
 } from '@/app/plan/utils'
@@ -80,24 +76,6 @@ describe('getAssignmentsForDay', () => {
   })
 })
 
-describe('getDayName', () => {
-  it('returns correct name for each valid day index', () => {
-    expect(getDayName(0)).toBe('Monday')
-    expect(getDayName(1)).toBe('Tuesday')
-    expect(getDayName(2)).toBe('Wednesday')
-    expect(getDayName(3)).toBe('Thursday')
-    expect(getDayName(4)).toBe('Friday')
-    expect(getDayName(5)).toBe('Saturday')
-    expect(getDayName(6)).toBe('Sunday')
-  })
-
-  it('returns undefined for out-of-bounds indices', () => {
-    expect(getDayName(-1)).toBeUndefined()
-    expect(getDayName(7)).toBeUndefined()
-    expect(getDayName(100)).toBeUndefined()
-  })
-})
-
 describe('getDayLabel', () => {
   it('returns correct label for each valid day index', () => {
     expect(getDayLabel(0)).toBe('MON')
@@ -112,89 +90,6 @@ describe('getDayLabel', () => {
   it('returns undefined for out-of-bounds indices', () => {
     expect(getDayLabel(-1)).toBeUndefined()
     expect(getDayLabel(7)).toBeUndefined()
-  })
-})
-
-describe('hasAssignments', () => {
-  it('returns true when day has assignments', () => {
-    expect(hasAssignments(routineWithMonday, 0)).toBe(true)
-  })
-
-  it('returns false when day has no assignments', () => {
-    expect(hasAssignments(routineWithMonday, 1)).toBe(false)
-  })
-
-  it('returns false when routine is null', () => {
-    expect(hasAssignments(null, 0)).toBe(false)
-  })
-
-  it('returns false for empty assignment arrays', () => {
-    const emptyRoutine = { Monday: [] }
-    expect(hasAssignments(emptyRoutine, 0)).toBe(false)
-  })
-
-  it('returns false for out-of-bounds day index', () => {
-    expect(hasAssignments(routineWithMonday, 10)).toBe(false)
-  })
-})
-
-describe('getExerciseCountPerDay', () => {
-  it('returns counts for each day', () => {
-    const routine = {
-      Monday: [MondayExercise],
-      Tuesday: [TuesdayExercise, { ...TuesdayExercise, id: { value: 3 } }],
-      Wednesday: [],
-      Thursday: [],
-      Friday: [],
-      Saturday: [],
-      Sunday: [],
-    }
-    expect(getExerciseCountPerDay(routine)).toEqual([1, 2, 0, 0, 0, 0, 0])
-  })
-
-  it('returns all zeros when routine is null', () => {
-    expect(getExerciseCountPerDay(null)).toEqual([0, 0, 0, 0, 0, 0, 0])
-  })
-
-  it('returns zero for undefined day keys', () => {
-    const sparseRoutine = { Monday: [MondayExercise] }
-    expect(getExerciseCountPerDay(sparseRoutine)).toEqual([1, 0, 0, 0, 0, 0, 0])
-  })
-
-  it('returns correct counts for all days populated', () => {
-    const fullRoutine = {
-      Monday: [MondayExercise],
-      Tuesday: [TuesdayExercise],
-      Wednesday: [MondayExercise],
-      Thursday: [TuesdayExercise],
-      Friday: [MondayExercise],
-      Saturday: [TuesdayExercise],
-      Sunday: [MondayExercise],
-    }
-    expect(getExerciseCountPerDay(fullRoutine)).toEqual([1, 1, 1, 1, 1, 1, 1])
-  })
-})
-
-describe('getExerciseCountForDay', () => {
-  it('returns correct count for a day with assignments', () => {
-    const routine = {
-      Monday: [MondayExercise, { ...MondayExercise, id: { value: 5 } }],
-      Tuesday: [TuesdayExercise],
-    }
-    expect(getExerciseCountForDay(routine, 0)).toBe(2)
-    expect(getExerciseCountForDay(routine, 1)).toBe(1)
-  })
-
-  it('returns zero for a day with no assignments', () => {
-    expect(getExerciseCountForDay(routineWithMonday, 1)).toBe(0)
-  })
-
-  it('returns zero when routine is null', () => {
-    expect(getExerciseCountForDay(null, 0)).toBe(0)
-  })
-
-  it('returns undefined for out-of-bounds day index', () => {
-    expect(getExerciseCountForDay(routineWithMonday, 10)).toBeUndefined()
   })
 })
 

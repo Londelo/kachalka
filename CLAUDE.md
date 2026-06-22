@@ -10,7 +10,7 @@ A Next.js weightlifting workout tracker called **Kachalka** (code name: **IRON C
 - **Database:** better-sqlite3 (single-file SQLite) + Drizzle ORM
 - **Styling:** Tailwind CSS with neo-brutalism (hard shadows, sharp corners, military palette)
 - **Charts:** Recharts (bar charts for volume progression)
-- **Functional helpers:** Ramda — heavy use throughout (`R.map`, `R.filter`, `R.reduce`, `R.groupBy`, `R.flatten`, `R.concat`, `R.sum`, `R.toPairs`, `R.prop`, `R.cond`, `R.equals`, `R.isEmpty`)
+- **Functional helpers:** Ramda — used in a few places (`R.groupBy`, `R.concat`) but mostly replaced with native JS (`Array.map`, `Array.filter`, `Array.reduce`)
 - **Testing:** Vitest (unit + integration) + Playwright (E2E)
 - **Fonts:** Epilogue (headings), Space Grotesk (labels), Inter (body), Material Symbols Outlined (icons)
 
@@ -32,7 +32,7 @@ kachalka/
 │   │   ├── progress/page.tsx         # Force Progression — Recharts bar chart with filters
 │   │   └── today/page.tsx            # Today's workout — log sets with auto-save + debounce
 │   │
-│   ├── components/                   # Shared UI components (moved out of app/)
+│   ├── components/                   # Shared UI components (flat, not in app/)
 │   │   ├── add-user-modal.tsx        # Modal for creating new users
 │   │   ├── app-shell.client.tsx      # Shell: Header + SideDrawer + children
 │   │   ├── header.tsx                # Top nav bar (title + account link + menu button)
@@ -59,7 +59,7 @@ kachalka/
 │   │   ├── user/                     # User management (create, list, delete)
 │   │   │   ├── user-entity.ts        # UserId value object + createUser (name validation)
 │   │   │   ├── user-repository.ts    # Interface (findById, findByName, findAll, create, delete)
-│   │   │   ├── user-repo-impl.ts     # SQLite implementation (Drizzle + Ramda mapping)
+│   │   │   ├── user-repo-impl.ts     # SQLite implementation (Drizzle + native mapping)
 │   │   │   ├── create-user.ts        # Use case: validate + check duplicate + create
 │   │   │   ├── get-users.ts          # Use case: return all users
 │   │   │   └── user-server-actions.ts # createUserAction, getUsersAction, deleteUserAction
@@ -67,7 +67,7 @@ kachalka/
 │   │   ├── exercise/                 # Shared global exercise pool
 │   │   │   ├── exercise-entity.ts    # ExerciseId value object + createExercise (name + owner validation)
 │   │   │   ├── exercise-repository.ts # Interface (findById, findByName, findAll, create, updateName, delete, findByOwner, inAnyRoutine)
-│   │   │   ├── exercise-repo-impl.ts  # SQLite implementation
+│   │   │   ├── exercise-repo-impl.ts  # SQLite implementation (factory function)
 │   │   │   ├── create-exercise.ts    # Use case: validate + create
 │   │   │   ├── list-exercises.ts     # Use case: return all exercises
 │   │   │   ├── rename-exercise.ts    # Use case: ownership check + validate + update
@@ -75,19 +75,19 @@ kachalka/
 │   │   │   └── exercise-server-actions.ts # createExerciseAction, renameExerciseAction, deleteExerciseAction, listExercisesAction
 │   │   │
 │   │   ├── routine/                  # Per-user exercise-to-day assignments
-│   │   │   ├── routine-entity.ts     # DayOfWeek type, RoutineId value object, createRoutineAssignment
-│   │   │   ├── routine-repository.ts # Interface (findById, findByUserAndDay, findAllByUserGroupedByDay, create, delete, exists, exerciseExists)
-│   │   │   ├── routine-repo-impl.ts  # SQLite implementation (groupByDay aggregation)
+│   │   │   ├── routine-entity.ts     # DayOfWeek type, RoutineId value object, createRoutineAssignment, DAY_NAMES, DAY_LABELS
+│   │   │   ├── routine-repository.ts # Interface (findById, findByUserAndDay, findAllByUserGroupedByDay, create, delete, exerciseExists)
+│   │   │   ├── routine-repo-impl.ts  # SQLite implementation (factory function)
 │   │   │   ├── assign-exercise.ts    # Use case: exercise exists? not-already-assigned? + create
 │   │   │   ├── remove-exercise.ts    # Use case: ownership check + delete
 │   │   │   ├── get-user-routine.ts   # Use case: return routine grouped by day
 │   │   │   └── routine-server-actions.ts # assignExerciseAction, removeExerciseAction, getUserRoutineAction
 │   │   │
 │   │   ├── workout/                  # Log workouts, history, volume calc
-│   │   │   ├── types.ts              # WorkoutSet {id, reps, weight}, WorkoutLog
-│   │   │   ├── workout-entity.ts     # validateSet, calculateVolume, createEmptyLog
+│   │   │   ├── types.ts              # WorkoutSet {id, reps, weight}, WorkoutLog (id: number)
+│   │   │   ├── workout-entity.ts     # validateSet, calculateVolume, createEmptyLog (re-exports WorkoutLog from types)
 │   │   │   ├── workout-repository.ts # Interface (findById, findByDateAndExercise, findByDate, findAllByUser, create, update, delete, findByDayOfWeek, findLatestForExercise, findHistoryByDate)
-│   │   │   ├── workout-repo-impl.ts  # SQLite implementation (Drizzle joins, JSON parsing, Drizzle unwrap)
+│   │   │   ├── workout-repo-impl.ts  # SQLite implementation (factory function)
 │   │   │   ├── log-workout.ts        # Use case: upsert (create or update by date+exercise)
 │   │   │   ├── update-workout.ts     # Use case: ownership check + update
 │   │   │   ├── delete-workout.ts     # Use case: ownership check + delete
@@ -99,15 +99,14 @@ kachalka/
 │   │   └── chart/                    # Progress chart data aggregation
 │   │       ├── chart-entity.ts       # ChartDataPoint, ChartBarData, RangeFilter, TimeGranularity, IntensitySplit
 │   │       ├── chart-repository.ts   # Interface (getVolumeByDate, getPeakVolume, getIntensitySplit, getExercisesWithLogs)
-│   │       ├── chart-repo-impl.ts    # SQLite implementation (class-based, date filtering, granularity grouping)
-│   │       ├── chart-service.ts      # Service layer (getExerciseProgress, getAllExercisesProgress, etc.)
+│   │       ├── chart-repo-impl.ts    # SQLite implementation (factory function, native JS)
 │   │       ├── chart-utils.ts        # groupByGranularity, toISOWeekKey, toMonthKey
 │   │       └── chart-server-actions.ts # getExerciseChartData, getAllExerciseChartData, getExercisesWithLogsAction, getPeakVolumeAction, getIntensitySplitAction
 │   │
 │   └── shared/
 │       ├── errors/app-error.ts       # AppError class (message, status, cause, toJSON)
 │       └── utils/
-│           └── date.ts               # formatDate, getTodayISO, dayOfWeekToIndex, jsDayToAppIndex
+│           └── date.ts               # formatDate, getTodayISO, jsDayToAppIndex
 │
 ├── tests/
 │   ├── e2e/                          # Playwright E2E tests
@@ -135,6 +134,7 @@ kachalka/
 │           ├── errors/               # app-error tests
 │           └── utils/                # date tests
 │
+├── plans/                            # Implementation plans (review results, feature plans)
 ├── data/                             # SQLite database files
 │   └── kachalka.sqlite               # Main database (created by migrations)
 │
@@ -142,7 +142,6 @@ kachalka/
 │   ├── seed-bruno-data.js            # Bruno seed script — creates user, exercises, 7 months of workout logs (Mon/Wed/Fri)
 │   └── codegen.sh                    # Playwright codegen helper
 │
-├── plans/                            # Implementation plans
 ├── package.json
 ├── tsconfig.json                     # Strict TS, @/* path alias, esnext/bundler module resolution
 ├── tailwind.config.js                # Military palette, custom fonts, neo-brutalism spacing
@@ -176,7 +175,7 @@ use-cases/*.ts    (business logic — factory functions returning { execute() })
        ↓
 *-entity.ts       (domain types — value objects + validation, zero dependencies)
 
-*-repo-impl.ts    (implementation — Drizzle + SQLite, Ramda transformations)
+*-repo-impl.ts    (implementation — Drizzle + SQLite, factory functions)
 ```
 
 ### Feature Details
@@ -185,9 +184,9 @@ use-cases/*.ts    (business logic — factory functions returning { execute() })
 |---------|--------|---------------------|-----------|----------------|
 | **user** | `UserId` value object, `createUser()` validation | `findById`, `findByName`, `findAll`, `create`, `delete` | `createUserUseCase`, `getUsersUseCase` | `createUserAction`, `getUsersAction`, `deleteUserAction` |
 | **exercise** | `ExerciseId` value object, `createExercise()` validation | `findById`, `findByName`, `findAll`, `create`, `updateName`, `delete`, `findByOwner`, `inAnyRoutine` | `createExerciseUseCase`, `listExercisesUseCase`, `renameExerciseUseCase`, `deleteExerciseUseCase` | `createExerciseAction`, `renameExerciseAction`, `deleteExerciseAction`, `listExercisesAction` |
-| **routine** | `DayOfWeek` type, `RoutineId` value object, `createRoutineAssignment()` validation | `findById`, `findByUserAndDay`, `findByUserExerciseAndDay`, `findAllByUser`, `findAllByUserGroupedByDay`, `create`, `delete`, `exists`, `exerciseExists` | `assignExerciseUseCase`, `removeExerciseUseCase`, `getUserRoutineUseCase` | `assignExerciseAction`, `removeExerciseAction`, `getUserRoutineAction` |
+| **routine** | `DayOfWeek` type, `RoutineId` value object, `createRoutineAssignment()`, `DAY_NAMES`, `DAY_LABELS` | `findById`, `findByUserAndDay`, `findAllByUserGroupedByDay`, `create`, `delete`, `exerciseExists` | `assignExerciseUseCase`, `removeExerciseUseCase`, `getUserRoutineUseCase` | `assignExerciseAction`, `removeExerciseAction`, `getUserRoutineAction` |
 | **workout** | `WorkoutSet` type, `WorkoutLog` type, `validateSet()`, `calculateVolume()`, `createEmptyLog()` | `findById`, `findByDateAndExercise`, `findByDate`, `findAllByUser`, `create`, `update`, `delete`, `findByDayOfWeek`, `findLatestForExercise`, `findHistoryByDate` | `logWorkoutUseCase` (upsert), `updateWorkoutUseCase`, `deleteWorkoutUseCase`, `getTodayExercisesUseCase`, `getUserVolumeUseCase`, `getWorkoutHistoryUseCase` | `logWorkoutAction`, `updateWorkoutAction`, `deleteWorkoutAction`, `getTodayExercisesAction`, `getHistoryAction`, `deleteHistoryEntryAction` |
-| **chart** | `ChartDataPoint`, `ChartBarData`, `RangeFilter`, `TimeGranularity`, `IntensitySplit` | `getVolumeByDate`, `getPeakVolume`, `getIntensitySplit`, `getExercisesWithLogs` | N/A (class-based `ChartService`) | `getExerciseChartData`, `getAllExerciseChartData`, `getExercisesWithLogsAction`, `getPeakVolumeAction`, `getIntensitySplitAction` |
+| **chart** | `ChartDataPoint`, `ChartBarData`, `RangeFilter`, `TimeGranularity`, `IntensitySplit` | `getVolumeByDate`, `getPeakVolume`, `getIntensitySplit`, `getExercisesWithLogs` | N/A (direct repo calls from server actions) | `getExerciseChartData`, `getAllExerciseChartData`, `getExercisesWithLogsAction`, `getPeakVolumeAction`, `getIntensitySplitAction` |
 
 ### Key Business Rules
 
@@ -198,6 +197,18 @@ use-cases/*.ts    (business logic — factory functions returning { execute() })
 - **Day mapping** — JS `getDay()` returns 0=Sun..6=Sat; app uses 0=Mon..6=Sun internally; conversion via `jsDayToAppIndex()`
 - **Workout upsert** — `logWorkout` creates a new log or replaces sets if one already exists for that exercise/date
 - **Empty set filtering** — auto-save filters out sets where both weight and reps are 0
+
+### Day-of-Week Reference
+
+All day-of-week data is canonicalized in `src/features/routine/routine-entity.ts`:
+
+- **`DayOfWeek`** — union type: `'Monday' | 'Tuesday' | ... | 'Sunday'`
+- **`DAY_NAMES`** — `DayOfWeek[]` in app order (Mon=0 .. Sun=6)
+- **`DAY_LABELS`** — abbreviated labels: `['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']`
+- **`dayOfWeekToNumber(day)`** — converts day name to 0-6 index
+- **`numberToDayOfWeek(n)`** — converts 0-6 index to day name
+
+Import from `@/features/routine/routine-entity`. Do not define your own day arrays.
 
 ## User Flow
 
@@ -294,8 +305,9 @@ The root layout (`src/app/layout.tsx`) calls `runMigrations()` + `seedDatabase()
 ### Code Patterns
 
 - **Factory functions for use cases:** `createXxxUseCase(repo)` returns `{ execute(...) }` — not classes
+- **Factory functions for repos:** `createSqliteXxxRepository(db)` returns the interface — not classes (chart was the last class-based repo, converted to factory)
 - **Value object pattern:** `UserId`, `ExerciseId`, `RoutineId` all use `Object.freeze({ make(n): { value: n } })`
-- **Ramda everywhere:** Repo impls use `R.map`, `R.filter`, `R.reduce`, `R.groupBy` for data transformations
+- **Native JS preferred:** Use `Array.map()`, `Array.filter()`, `Array.reduce()` over Ramda equivalents. Ramda is retained only where it adds value (e.g., `R.groupBy`, `R.concat`)
 - **Drizzle unwrapping:** `workout-repo-impl.ts` has explicit unwrapping of Drizzle value objects (`{ value: ... }`) for serialization
 - **JSON handling:** `workout-repo-impl.ts` handles both array and string formats for JSON columns (Drizzle JSON mode quirk)
 - **`'use server'`** directive on all server action files
@@ -320,9 +332,12 @@ The root layout (`src/app/layout.tsx`) calls `runMigrations()` + `seedDatabase()
 - **`@/*` path alias** maps to `./src/*` in both tsconfig and vitest config
 - **`dynamic = 'force-dynamic'`** on pages that need per-request data (today, history)
 - **`seed.ts` has top-level side effects** — `seedDatabase()` and `seedProgressData()` run on module load, not just when called
+- **No route groups** — the `(main)` route group was removed; all routes are flat under `src/app/`
 
 ## Known Quirks
 
 - **Users have no email** — the schema previously had an `email` column that was removed in migration 0001
-- **Exercise rename does NOT cascade** to routine assignments (the old CLAUDE.md said it did, but the code shows rename only updates the exercises table)
+- **Exercise rename does NOT cascade** to routine assignments (the code shows rename only updates the exercises table)
 - **`scripts/seed-bruno-data.js`** generates dates dynamically (last 7 months from a fixed date), not seeded statically
+- **`WorkoutLog` type** is defined in `types.ts` (canonical, `id: number`) and re-exported from `workout-entity.ts` — never define it locally
+- **Day-of-week** is canonicalized in `routine-entity.ts` — import `DAY_NAMES`, `DAY_LABELS`, `DayOfWeek`, `dayOfWeekToNumber`, `numberToDayOfWeek` from there
