@@ -21,7 +21,7 @@ import {
   getDayLabel,
   isDaySelected,
   resolveDaySelection,
-} from '@/app/plan/plan-utils'
+} from './utils'
 import { useLoading } from '@/app/components/loading-context'
 
 const DAYS: DayOfWeek[] = [
