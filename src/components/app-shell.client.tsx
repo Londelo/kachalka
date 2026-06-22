@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import Header from '@/app/components/header'
-import SideDrawer from '@/app/components/side-drawer'
+import Header from '@/components/header'
+import SideDrawer from '@/components/side-drawer'
 import type { ReactNode } from 'react'
 
 export default function AppShell({ children }: { children: ReactNode }) {

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { logWorkoutAction, getTodayExercisesAction } from '@/features/workout/workout-server-actions'
-import { useLoading } from '@/app/components/loading-context'
+import { useLoading } from '@/components/loading-context'
 import type { WorkoutSet } from '@/features/workout/types'
 import { jsDayToAppIndex } from '@/shared/utils/date'
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import AddUserModal from '@/app/components/add-user-modal'
+import AddUserModal from '@/components/add-user-modal'
 
 vi.mock('@/features/user/user-server-actions', () => ({
   createUserAction: vi.fn(),

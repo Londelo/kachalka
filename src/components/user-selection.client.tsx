@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import AddUserModal from '@/app/components/add-user-modal'
+import AddUserModal from '@/components/add-user-modal'
 
 interface UserSelectionClientProps {
   initialUsers: { id: { value: number }; name: string }[]

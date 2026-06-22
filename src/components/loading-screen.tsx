@@ -1,6 +1,6 @@
 'use client'
 
-import { useLoading } from '@/app/components/loading-context'
+import { useLoading } from '@/components/loading-context'
 
 export default function LoadingScreen() {
   const { loading } = useLoading()

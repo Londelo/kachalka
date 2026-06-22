@@ -22,7 +22,7 @@ import {
   isDaySelected,
   resolveDaySelection,
 } from './utils'
-import { useLoading } from '@/app/components/loading-context'
+import { useLoading } from '@/components/loading-context'
 
 const DAYS: DayOfWeek[] = [
   "Monday",
