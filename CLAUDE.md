@@ -1,136 +1,328 @@
-# CLAUDE.md
+# kachalka — Project Overview
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## What is this?
 
-## Project
+A Next.js weightlifting workout tracker called **Kachalka** (code name: **IRON COMMAND**). Users create accounts, build weekly exercise routines, log sets/reps/weight on scheduled days, and view progress charts. Military/tactical UI theme with neo-brutalism styling (hard shadows, sharp corners, no border-radius).
 
-**kachalka** — A Next.js weightlifting workout tracker. Users create accounts, build weekly exercise routines, log sets/reps/weight on scheduled days, and view progress charts. Military/tactical themed UI (codename: IRON COMMAND).
+## Tech Stack
 
-## Commands
+- **Framework:** Next.js 15 (App Router) + React 19 + TypeScript
+- **Database:** better-sqlite3 (single-file SQLite) + Drizzle ORM
+- **Styling:** Tailwind CSS with neo-brutalism (hard shadows, sharp corners, military palette)
+- **Charts:** Recharts (bar charts for volume progression)
+- **Functional helpers:** Ramda — heavy use throughout (`R.map`, `R.filter`, `R.reduce`, `R.groupBy`, `R.flatten`, `R.concat`, `R.sum`, `R.toPairs`, `R.prop`, `R.cond`, `R.equals`, `R.isEmpty`)
+- **Testing:** Vitest (unit + integration) + Playwright (E2E)
+- **Fonts:** Epilogue (headings), Space Grotesk (labels), Inter (body), Material Symbols Outlined (icons)
+
+## Directory Structure
+
+```
+kachalka/
+├── src/
+│   ├── app/                          # Next.js App Router
+│   │   ├── layout.tsx                # Root layout — runs migrations + seeds, wraps AppShell
+│   │   ├── page.tsx                  # User selection page (login) — SSR, calls getUsersAction
+│   │   ├── globals.css               # Tailwind directives + neo-brutalism CSS vars
+│   │   ├── (main)/                   # Authenticated route group
+│   │   │   ├── layout.tsx            # Wraps children in <main id="main-layout">
+│   │   │   ├── today/page.tsx        # Today's workout — log sets with auto-save + debounce
+│   │   │   ├── plan/page.tsx         # My Battle Plan — assign exercises to days, inline creation
+│   │   │   ├── history/              # War Logs
+│   │   │   │   ├── page.tsx          # SSR shell (dynamic = 'force-dynamic')
+│   │   │   │   └── HistoryPageClient.tsx  # Client-side history viewer + detail modal + delete
+│   │   │   └── plan/page.tsx         # My Battle Plan — full client page
+│   │   ├── components/
+│   │   │   ├── add-user-modal.tsx    # Modal for creating new users
+│   │   │   ├── app-shell.client.tsx  # Shell: Header + SideDrawer + children
+│   │   │   ├── header.tsx            # Top nav bar (title + account link + menu button)
+│   │   │   ├── loading-context.tsx   # Loading state context (Set-based, multi-key)
+│   │   │   ├── loading-provider.client.tsx  # Provider wrapper
+│   │   │   ├── loading-screen.tsx    # Hourglass loading overlay
+│   │   │   ├── side-drawer.tsx       # Slide-out navigation drawer (4 tabs)
+│   │   │   └── user-selection.client.tsx  # User cards + cookie management
+│   │   ├── progress/page.tsx         # Force Progression — Recharts bar chart with filters
+│   │   ├── root-layout-client.tsx    # Client-side root layout (Header + SideDrawer + LoadingProvider)
+│   │   └── plan/plan-utils.ts        # Plan page helpers (day selection, assignment lookup)
+│   │
+│   ├── config/
+│   │   ├── db.ts                     # SQLite singleton + Drizzle instance (WAL + FK pragma)
+│   │   └── env.ts                    # Env var validation (NODE_ENV, DATABASE_PATH)
+│   │
+│   ├── db/
+│   │   ├── schema.ts                 # Drizzle table definitions (4 tables)
+│   │   ├── migrate.ts                # Migration runner — checks required tables, runs all .sql files
+│   │   ├── seed.ts                   # Bruno seed + progress data (runs on module load)
+│   │   └── migrations/               # Drizzle migration SQL files
+│   │       ├── 0000_square_shadowcat.sql
+│   │       ├── 0001_init.sql          # Full schema with constraints
+│   │       └── meta/                   # Drizzle Kit snapshots
+│   │
+│   ├── features/                     # Clean Architecture feature modules
+│   │   ├── user/                     # User management (create, list, delete)
+│   │   │   ├── user-entity.ts        # UserId value object + createUser (name validation)
+│   │   │   ├── user-repository.ts    # Interface (findById, findByName, findAll, create, delete)
+│   │   │   ├── user-repo-impl.ts     # SQLite implementation (Drizzle + Ramda mapping)
+│   │   │   ├── create-user.ts        # Use case: validate + check duplicate + create
+│   │   │   ├── get-users.ts          # Use case: return all users
+│   │   │   └── user-server-actions.ts # createUserAction, getUsersAction, deleteUserAction
+│   │   │
+│   │   ├── exercise/                 # Shared global exercise pool
+│   │   │   ├── exercise-entity.ts    # ExerciseId value object + createExercise (name + owner validation)
+│   │   │   ├── exercise-repository.ts # Interface (findById, findByName, findAll, create, updateName, delete, findByOwner, inAnyRoutine)
+│   │   │   ├── exercise-repo-impl.ts  # SQLite implementation
+│   │   │   ├── create-exercise.ts    # Use case: validate + create
+│   │   │   ├── list-exercises.ts     # Use case: return all exercises
+│   │   │   ├── rename-exercise.ts    # Use case: ownership check + validate + update
+│   │   │   ├── delete-exercise.ts    # Use case: ownership check + routine dependency check + delete
+│   │   │   └── exercise-server-actions.ts # createExerciseAction, renameExerciseAction, deleteExerciseAction, listExercisesAction
+│   │   │
+│   │   ├── routine/                  # Per-user exercise-to-day assignments
+│   │   │   ├── routine-entity.ts     # DayOfWeek type, RoutineId value object, createRoutineAssignment
+│   │   │   ├── routine-repository.ts # Interface (findById, findByUserAndDay, findAllByUserGroupedByDay, create, delete, exists, exerciseExists)
+│   │   │   ├── routine-repo-impl.ts  # SQLite implementation (groupByDay aggregation)
+│   │   │   ├── assign-exercise.ts    # Use case: exercise exists? not-already-assigned? + create
+│   │   │   ├── remove-exercise.ts    # Use case: ownership check + delete
+│   │   │   ├── get-user-routine.ts   # Use case: return routine grouped by day
+│   │   │   └── routine-server-actions.ts # assignExerciseAction, removeExerciseAction, getUserRoutineAction
+│   │   │
+│   │   ├── workout/                  # Log workouts, history, volume calc
+│   │   │   ├── types.ts              # WorkoutSet {id, reps, weight}, WorkoutLog
+│   │   │   ├── workout-entity.ts     # validateSet, calculateVolume, createEmptyLog
+│   │   │   ├── workout-repository.ts # Interface (findById, findByDateAndExercise, findByDate, findAllByUser, create, update, delete, findByDayOfWeek, findLatestForExercise, findHistoryByDate)
+│   │   │   ├── workout-repo-impl.ts  # SQLite implementation (Drizzle joins, JSON parsing, Drizzle unwrap)
+│   │   │   ├── log-workout.ts        # Use case: upsert (create or update by date+exercise)
+│   │   │   ├── update-workout.ts     # Use case: ownership check + update
+│   │   │   ├── delete-workout.ts     # Use case: ownership check + delete
+│   │   │   ├── get-today-exercises.ts # Use case: join routines + exercises + last workout log
+│   │   │   ├── get-user-volume.ts    # Use case: sum all volumes
+│   │   │   ├── get-workout-history.ts # Use case: return history grouped by date
+│   │   │   └── workout-server-actions.ts # logWorkoutAction, updateWorkoutAction, deleteWorkoutAction, getTodayExercisesAction, getHistoryAction, deleteHistoryEntryAction
+│   │   │
+│   │   └── chart/                    # Progress chart data aggregation
+│   │       ├── chart-entity.ts       # ChartDataPoint, ChartBarData, RangeFilter, TimeGranularity, IntensitySplit
+│   │       ├── chart-repository.ts   # Interface (getVolumeByDate, getPeakVolume, getIntensitySplit, getExercisesWithLogs)
+│   │       ├── chart-repo-impl.ts    # SQLite implementation (class-based, date filtering, granularity grouping)
+│   │       ├── chart-service.ts      # Service layer (getExerciseProgress, getAllExercisesProgress, etc.)
+│   │       ├── chart-utils.ts        # groupByGranularity, toISOWeekKey, toMonthKey
+│   │       └── chart-server-actions.ts # getExerciseChartData, getAllExerciseChartData, getExercisesWithLogsAction, getPeakVolumeAction, getIntensitySplitAction
+│   │
+│   ├── shared/
+│   │   ├── errors/app-error.ts       # AppError class (message, status, cause, toJSON)
+│   │   ├── types/day-of-week.ts      # DayOfWeek type (re-exported from features/routine)
+│   │   └── utils/
+│   │       ├── date.ts               # formatDate, getTodayISO, dayOfWeekToIndex, jsDayToAppIndex
+│   │       └── volume.ts             # calculateVolume (duplicate of workout-entity version)
+│   │
+│   └── app/plan/plan-utils.ts        # Plan page helpers (getAssignmentsForDay, resolveDaySelection, isDaySelected, etc.)
+│
+├── tests/                            # Vitest tests mirroring src/ structure
+│   ├── features/                     # Feature tests (entity, repo, use case, server action)
+│   ├── shared/                       # Shared utility tests
+│   ├── config/                       # DB + env tests
+│   ├── db/                           # Schema + migration tests
+│   └── app/components/               # Component tests
+│
+├── e2e/                              # Playwright E2E tests
+│   ├── create-exercise.spec.ts       # Full create-exercise flow on plan page
+│   ├── helpers.ts                    # loginAsBruno, logout helpers
+│   └── screenshots/                  # Debug screenshots
+│
+├── data/                             # SQLite database files
+│   └── kachalka.sqlite               # Main database (created by migrations)
+│
+├── scripts/
+│   ├── seed-bruno-data.js            # Bruno seed script — creates user, exercises, 7 months of workout logs (Mon/Wed/Fri)
+│   └── codegen.sh                    # Playwright codegen helper
+│
+├── plans/                            # Implementation plans
+├── screenshots/                      # Reference screenshots
+├── package.json
+├── tsconfig.json                     # Strict TS, @/* path alias, esnext/bundler module resolution
+├── tailwind.config.js                # Military palette, custom fonts, neo-brutalism spacing
+├── vitest.config.ts                  # jsdom environment, @/* alias, setup: @testing-library/jest-dom/vitest
+├── playwright.config.ts              # Chromium, port 3111, auto-seed + dev server
+├── drizzle.config.ts                 # SQLite dialect, schema from src/db/schema.ts
+└── next.config.ts                    # Empty (default config)
+```
+
+## Database Schema
+
+All tables use `integer` primary keys with `autoIncrement`. Timestamps stored as Unix epoch seconds (`integer` with `mode: 'timestamp'`). The `sets` column in `workout_logs` stores JSON arrays.
+
+| Table | Columns | Notes |
+|-------|---------|-------|
+| **users** | id, name (unique), created_at, is_active | name is globally unique; no email column (removed in later migration) |
+| **exercises** | id, name, user_id (FK→users), created_at, updated_at | Owned by creator; only owner can rename/delete. Rename does NOT cascade to routines (exercise name is stored as string in UI, not linked) |
+| **user_routines** | id, user_id (FK→users), exercise_id (FK→exercises), day_of_week, created_at | Unique constraint on (user_id, exercise_id, day_of_week). day_of_week is 0=Mon..6=Sun (app internal) |
+| **workout_logs** | id, user_id (FK→users), exercise_id (FK→exercises), date (YYYY-MM-DD string), sets (JSON), created_at, updated_at | JSON sets = `[{ id, reps, weight }, ...]` |
+
+## Feature Architecture
+
+Each feature follows Clean Architecture with inward dependency flow:
+
+```
+server-actions.ts  (interface adapter — Next.js specific, 'use server')
+       ↓
+use-cases/*.ts    (business logic — factory functions returning { execute() })
+       ↓
+*-repository.ts   (interface — TypeScript interfaces, contracts only)
+       ↓
+*-entity.ts       (domain types — value objects + validation, zero dependencies)
+
+*-repo-impl.ts    (implementation — Drizzle + SQLite, Ramda transformations)
+```
+
+### Feature Details
+
+| Feature | Entity | Repository Interface | Use Cases | Server Actions |
+|---------|--------|---------------------|-----------|----------------|
+| **user** | `UserId` value object, `createUser()` validation | `findById`, `findByName`, `findAll`, `create`, `delete` | `createUserUseCase`, `getUsersUseCase` | `createUserAction`, `getUsersAction`, `deleteUserAction` |
+| **exercise** | `ExerciseId` value object, `createExercise()` validation | `findById`, `findByName`, `findAll`, `create`, `updateName`, `delete`, `findByOwner`, `inAnyRoutine` | `createExerciseUseCase`, `listExercisesUseCase`, `renameExerciseUseCase`, `deleteExerciseUseCase` | `createExerciseAction`, `renameExerciseAction`, `deleteExerciseAction`, `listExercisesAction` |
+| **routine** | `DayOfWeek` type, `RoutineId` value object, `createRoutineAssignment()` validation | `findById`, `findByUserAndDay`, `findByUserExerciseAndDay`, `findAllByUser`, `findAllByUserGroupedByDay`, `create`, `delete`, `exists`, `exerciseExists` | `assignExerciseUseCase`, `removeExerciseUseCase`, `getUserRoutineUseCase` | `assignExerciseAction`, `removeExerciseAction`, `getUserRoutineAction` |
+| **workout** | `WorkoutSet` type, `WorkoutLog` type, `validateSet()`, `calculateVolume()`, `createEmptyLog()` | `findById`, `findByDateAndExercise`, `findByDate`, `findAllByUser`, `create`, `update`, `delete`, `findByDayOfWeek`, `findLatestForExercise`, `findHistoryByDate` | `logWorkoutUseCase` (upsert), `updateWorkoutUseCase`, `deleteWorkoutUseCase`, `getTodayExercisesUseCase`, `getUserVolumeUseCase`, `getWorkoutHistoryUseCase` | `logWorkoutAction`, `updateWorkoutAction`, `deleteWorkoutAction`, `getTodayExercisesAction`, `getHistoryAction`, `deleteHistoryEntryAction` |
+| **chart** | `ChartDataPoint`, `ChartBarData`, `RangeFilter`, `TimeGranularity`, `IntensitySplit` | `getVolumeByDate`, `getPeakVolume`, `getIntensitySplit`, `getExercisesWithLogs` | N/A (class-based `ChartService`) | `getExerciseChartData`, `getAllExerciseChartData`, `getExercisesWithLogsAction`, `getPeakVolumeAction`, `getIntensitySplitAction` |
+
+### Key Business Rules
+
+- **User identity** stored in cookie `kachalka.userId` (set on user selection via client-side JS)
+- **Exercise ownership** — exercises are owned by the user who creates them; only the owner can rename or delete
+- **Exercise deletion guard** — cannot delete an exercise that is part of a routine
+- **Routine assignment uniqueness** — one exercise per day per user (enforced by DB unique constraint)
+- **Day mapping** — JS `getDay()` returns 0=Sun..6=Sat; app uses 0=Mon..6=Sun internally; conversion via `jsDayToAppIndex()`
+- **Workout upsert** — `logWorkout` creates a new log or replaces sets if one already exists for that exercise/date
+- **Empty set filtering** — auto-save filters out sets where both weight and reps are 0
+
+## User Flow
+
+1. **Landing page (`/`)** — Select or create a user account; cookie `kachalka.userId` set client-side; redirect to `/today`
+2. **Today's Battle (`/today`)** — See exercises scheduled for today (based on day-of-week from routine), log sets per exercise; auto-save with 500ms debounce; toggle between current and past session view
+3. **My Battle Plan (`/plan`)** — Select a day of the week, assign existing exercises or create new ones inline; remove exercises from days
+4. **War Logs (`/history`)** — Browse workout history grouped by date, drill into exercise details (sets, volume, max weight); delete history entries
+5. **Force Progression (`/progress`)** — Volume bar chart filtered by exercise, time range (6M/1Y/ALL), and granularity (session/week/month)
+
+## Testing
+
+### Unit/Integration Tests (Vitest)
+
+**Config:** `vitest.config.ts` — jsdom environment, `@testing-library/jest-dom/vitest` setup, `@/*` alias, tests in `tests/**/*.spec.ts` and `src/**/*.test.ts`.
+
+**Coverage by layer:**
+
+| Layer | Test files | What's tested |
+|-------|-----------|---------------|
+| **Entity** | `user-entity.test.ts`, `exercise-entity.spec.ts`, `workout-entity.spec.ts`, `routine-entity.spec.ts`, `chart-entity.test.ts` | Value object factories, validation rules, edge cases (negative, empty, boundary) |
+| **Repository Impl** | `user-repo-impl.spec.ts`, `exercise-repo-impl.spec.ts`, `routine-repo-impl.spec.ts`, `workout-repo-impl.spec.ts`, `chart-repo-impl.test.ts` | In-memory SQLite, real SQL, CRUD operations, data integrity |
+| **Use Case** | `log-workout.spec.ts`, `create-exercise.spec.ts`, `assign-exercise.spec.ts`, `rename-exercise.spec.ts`, `delete-exercise.spec.ts`, `remove-exercise.spec.ts`, `get-users.spec.ts`, `get-user-routine.spec.ts`, `get-today-exercises.spec.ts`, `update-workout.spec.ts`, `delete-workout.spec.ts` | Business logic, mocked repositories, error propagation |
+| **Server Actions** | `user-server-actions.spec.ts`, `exercise-server-actions.spec.ts`, `routine-server-actions.spec.ts`, `workout-server-actions.spec.ts` | Mocked DB/repos via `vi.mock()`, success/failure paths, error handling, dynamic `import()` |
+| **Utilities** | `date.spec.ts`, `volume.spec.ts`, `chart-utils.spec.ts`, `range-filter.spec.ts`, `time-granularity.spec.ts` | Pure function correctness |
+| **Config** | `db.spec.ts`, `env.spec.ts`, `schema.spec.ts`, `migrate.spec.ts` | DB setup, env validation, schema structure, migration behavior |
+| **Components** | `add-user-modal.test.tsx` | React component rendering, user interaction |
+
+### Test Patterns
+
+- **Entity tests:** `describe('EntityName', () => { describe('methodName', () => { it('...', ...) }) })` — nested describe blocks
+- **Repo tests:** In-memory SQLite (`new Database(':in-memory:')`), run migrations manually, test real SQL operations
+- **Use case tests:** Mock repository with `vi.fn()` via `makeRepo()` helper pattern, test business logic
+- **Server action tests:** `vi.mock()` for all dependencies, dynamic `import()` for tested module, `vi.clearAllMocks()` in `beforeEach`
+- **Component tests:** `@testing-library/react`, `@testing-library/jest-dom/vitest` setup
+
+### E2E Tests (Playwright)
+
+**Config:** `playwright.config.ts` — Chromium only, port 3111, auto-seed + dev server on test start (`npm run seed && npx next dev -p 3111`), screenshots on failure, traces on first retry.
+
+**Test file:** `e2e/create-exercise.spec.ts` — Full user flow: login as Bruno → navigate to plan → select day → create exercise → verify assignment card appears.
+
+**Helpers:** `e2e/helpers.ts` — `loginAsBruno(page)` sets cookie, `logout(page)` clears cookies.
+
+## Build & Run
 
 ```bash
-npm run dev          # Start dev server (auto-runs seed script: creates Bruno user + Mon/Wed/Fri routine + 7 months of workout data)
+npm run dev          # Start dev server (auto-runs migrations + seed)
 npm run build        # Production build
 npm start            # Start production server
-npm run seed         # Run seed script only (creates Bruno user + workout data)
-npm run typecheck    # TypeScript type checking (tsc --noEmit)
-npm test             # Run all tests (vitest run)
-npm run test:watch   # Watch mode tests (vitest)
+npm run seed         # Run seed script (deletes DB, recreates Bruno data)
+npm run typecheck    # TypeScript check
+npm test             # Run all Vitest tests
+npm run test:watch   # Watch mode
+npm run test:e2e     # Run Playwright E2E tests
+npm run test:e2e:headed    # E2E with visible browser
+npm run test:e2e:ui        # E2E with Playwright UI
+npm run test:e2e:codegen     # Playwright codegen
 ```
 
-### Database / Migrations
+### Seed Data
 
-```bash
-npx drizzle-kit generate   # Generate migration SQL from schema changes
-npx drizzle-kit push        # Push schema changes directly to DB
-npx drizzle-kit migrate     # Run pending migrations
-```
+- **`seedDatabase()`** (in `src/db/seed.ts`): Creates "Bruno" user, "Pull Up" exercise, Mon-Sun routine, 7 workout logs (Jan 2025)
+- **`seedProgressData()`** (in `src/db/seed.ts`): Creates 6 exercises (Bench Press, Squat, Deadlift, Overhead Press, Barbell Row, Barbell Curl) + 6+ months of workout logs for progress chart testing
+- **`scripts/seed-bruno-data.js`**: Full seed script — deletes DB, runs migrations, creates Bruno with 3 exercises (Barbell Curl, Pull-Up, Squat), Mon/Wed/Fri routines, ~7 months of workout logs. Used by E2E test startup.
 
-Schema lives in `src/db/schema.ts`, migrations in `src/db/migrations/`.
+### Dev Server Startup
 
-## Architecture
+The root layout (`src/app/layout.tsx`) calls `runMigrations()` + `seedDatabase()` + `seedProgressData()` on every request. This means:
+- Migrations run on every request (idempotent — skips if tables exist)
+- Bruno user + progress data seeded on every request (idempotent — skips if data exists)
+- E2E tests use `scripts/seed-bruno-data.js` instead (full DB reset)
 
-### Framework & Stack
+## Coding Style
 
-- Next.js 15 App Router with React 19 + TypeScript (strict mode)
-- better-sqlite3 (single-file SQLite) + Drizzle ORM
-- Tailwind CSS, Recharts for charts, Ramda for data transformation
-- Vitest (node environment, jsdom for DOM tests)
+### Naming Conventions
 
-### Path Alias
+- **Files:** kebab-case (`user-server-actions.ts`, `day-of-week.ts`)
+- **Functions:** camelCase (`createUser`, `getTodayExercisesAction`, `groupByGranularity`)
+- **Types/Interfaces:** PascalCase (`WorkoutSet`, `WorkoutRepository`, `ChartDataPoint`)
+- **Value objects:** `XxxId` with `Object.freeze({ make(n): { value: n } })` pattern
+- **Server actions:** `XxxAction` suffix (`createUserAction`, `logWorkoutAction`)
+- **Use cases:** `XxxUseCase` factory — `createXxxUseCase(repo)` returns `{ execute() }`
+- **Data IDs:** Every interactive element has `data-id` or `id` attribute for testing/selectors
 
-`@/*` → `./src/*` (configured in tsconfig.json and vitest.config.ts alias)
+### Error Handling
 
-### Directory Structure
+- **`AppError`** class with `message`, `status`, `cause`, and `toJSON()` — but mostly plain `Error` strings are used directly
+- **Server actions** use try/catch with `instanceof Error` check, return `{ success, data?, error? }` pattern
+- **Use cases** throw errors; server actions catch and return failure response
+- **No centralized error boundary** — errors surface to user via inline error messages in components
 
-```
-src/
-├── app/                          # Next.js App Router
-│   ├── layout.tsx                # Root layout — runs migrations + seed on every request
-│   ├── page.tsx                  # Landing: user selection/login
-│   ├── (main)/                   # Authenticated route group (requires active user cookie)
-│   │   ├── today/page.tsx        # Today's workout — log sets with auto-save
-│   │   ├── plan/page.tsx         # My Battle Plan — assign exercises to days
-│   │   ├── history/page.tsx      # War Logs — workout history
-│   │   └── progress/page.tsx     # Force Progression — volume charts
-│   └── components/               # Shared UI components
-│       ├── header.tsx
-│       ├── bottom-nav.tsx
-│       ├── nav-wrapper.client.tsx
-│       ├── user-selection.client.tsx
-│       └── add-exercise-button.tsx
-├── config/
-│   ├── db.ts                     # SQLite singleton (better-sqlite3 + Drizzle)
-│   └── env.ts                    # Env var validation
-├── db/
-│   ├── schema.ts                 # Drizzle table definitions
-│   ├── migrate.ts                # Migration runner
-│   ├── seed.ts                   # Seed script
-│   └── migrations/               # SQL migration files
-├── features/                     # Clean Architecture feature modules
-│   ├── user/                     # User management (CRUD, selection, cookie)
-│   ├── exercise/                 # Exercise pool (create, rename, delete, list)
-│   ├── routine/                  # Per-user exercise-to-day assignments
-│   ├── workout/                  # Log workouts, history, volume calculation
-│   └── chart/                    # Progress chart data aggregation
-└── shared/
-    ├── errors/app-error.ts       # Base error type
-    ├── types/day-of-week.ts      # DayOfWeek type + conversion utilities
-    └── utils/                    # Date helpers, volume calc
-```
+### Code Patterns
 
-### Feature Module Pattern (Clean Architecture)
+- **Factory functions for use cases:** `createXxxUseCase(repo)` returns `{ execute(...) }` — not classes
+- **Value object pattern:** `UserId`, `ExerciseId`, `RoutineId` all use `Object.freeze({ make(n): { value: n } })`
+- **Ramda everywhere:** Repo impls use `R.map`, `R.filter`, `R.reduce`, `R.groupBy` for data transformations
+- **Drizzle unwrapping:** `workout-repo-impl.ts` has explicit unwrapping of Drizzle value objects (`{ value: ... }`) for serialization
+- **JSON handling:** `workout-repo-impl.ts` handles both array and string formats for JSON columns (Drizzle JSON mode quirk)
+- **`'use server'`** directive on all server action files
+- **`useLoading()`** context pattern for loading state — `start(key)` / `end(key)` with Set-based tracking
 
-Each feature follows inward dependency flow:
+### UI Patterns
 
-```
-server-actions.ts   →  interface adapter (Next.js-specific, handles try/catch, gets DB)
-         ↓
-use-cases/*.ts      →  business logic (pure functions, no framework deps)
-         ↓
-*-repository.ts     →  interface (contracts only, no implementation)
-         ↓
-*-entity.ts         →  domain types (zero dependencies, value objects)
+- **Neo-brutalism:** `neo-shadow` (4px hard shadow), `active-press` (translate on :active), zero border-radius
+- **Military palette:** `background: #fbfbe2` (cream), `primary: #a20000` (red), `on-surface: #1b1d0e` (dark)
+- **Material Symbols:** `fontVariationSettings: 'FILL' 0` for outlined icons
+- **CSS custom property:** `--header-height: 3.5rem`
+- **Militaristic language:** "Today's Battle", "War Logs", "Force Progression", "Battle Plan", "Commander", "Assets", "Deploy"
+- **Data attributes:** `data-id="exercise-card-${exercise.exerciseId}"`, `id="plan-page"`, etc. for testing/selectors
 
-*-repo-impl.ts      →  implementation (Drizzle + SQLite)
-```
+## Key Implementation Details
 
-Every feature has these layers:
-- **Entity** (`*-entity.ts`): Domain types with validation (e.g., `createUser()`, `ExerciseId.make()`). Uses value objects for IDs (e.g., `{ value: number }`) to prevent mixing up IDs.
-- **Repository interface** (`*-repository.ts`): TypeScript interface defining data operations.
-- **Repository impl** (`*-repo-impl.ts`): Concrete SQLite/Drizzle implementation. Factory function that takes a DB instance.
-- **Use cases** (`*-use-case.ts`): Business logic functions that compose repository calls.
-- **Server actions** (`*-server-actions.ts`): `@server` entry points that wire up DB → repo → use case.
+- **`'use server'`** directive on all server action files — no separate API routes
+- **`crypto.getRandomValues()`** used instead of `crypto.randomUUID()` for Edge Runtime compatibility
+- **WAL mode** enabled on SQLite (`journal_mode = WAL`) for concurrent read/write
+- **Foreign keys** enabled (`foreign_keys = ON`)
+- **DB singleton** pattern — single `Database` instance per process via `getDatabase()`
+- **`@/*` path alias** maps to `./src/*` in both tsconfig and vitest config
+- **`dynamic = 'force-dynamic'`** on pages that need per-request data (today, history)
+- **`seed.ts` has top-level side effects** — `seedDatabase()` and `seedProgressData()` run on module load, not just when called
 
-### Database Schema
+## Known Quirks
 
-| Table | Key Fields | Notes |
-|-------|-----------|-------|
-| `users` | id, name (unique), email, is_active | User accounts |
-| `exercises` | id, name, user_id (owner) | Shared global pool; owned by creator |
-| `user_routines` | id, user_id, exercise_id, day_of_week | Per-user exercise scheduling; unique on (user_id, exercise_id, day_of_week) |
-| `workout_logs` | id, user_id, exercise_id, date, sets (JSON) | Logged sets with reps/weight |
-
-### Key Implementation Details
-
-- **User identity**: Stored in cookie `kachalka.userId` (set via `user-selection.client.tsx`)
-- **Auto-seed**: `scripts/seed-bruno-data.js` runs on every `dev` start — creates a "Bruno" user with Mon/Wed/Fri routine (barbell curls, pull-ups, squats) and 7 months of workout history
-- **Root layout**: Calls `runMigrations()` + `seedDatabase()` + `seedProgressData()` on every request
-- **Debounce auto-save**: Today page debounces by 500ms per exercise; filters empty sets (both weight and reps = 0)
-- **Day mapping**: JS `getDay()` returns 0=Sun..6=Sat; app uses 0=Mon..6= internally via `dayOfWeekToNumber()`/`numberToDayOfWeek()` conversion
-- **ID generation**: `crypto.randomUUID` was replaced with `generateId()` using `crypto.getRandomValues()` for Edge Runtime compatibility
-- **Database singleton**: `getDatabase()` in `config/db.ts` returns a singleton SQLite instance with WAL mode and foreign keys enabled
-
-### Testing
-
-Tests mirror `src/` structure under `tests/`. Run with `npm test` (all) or `npm run test:watch` (watch mode). Vitest config in `vitest.config.ts` uses node environment with globals enabled and `@/*` alias.
-
-### Pages & Routes
-
-| Route | Page | Description |
-|-------|------|-------------|
-| `/` | User Selection | Pick or create user, sets cookie |
-| `/today` | Today's Battle | Log today's workout, auto-save sets |
-| `/plan` | My Battle Plan | Assign exercises to days, create exercises inline |
-| `/history` | War Logs | Browse workout history |
-| `/progress` | Force Progression | Volume bar charts with filters (6M/1Y/ALL, session/week/month) |
+- **Config page** directory exists but is empty (page was removed)
+- **`data/kachalka.db-shm`** and **`data/kachalka.db-wal`** are SQLite journal files (keep alongside `.sqlite`)
+- **No Docker** — runs directly via `npm run dev`
+- **`root-layout-client.tsx`** and **`app-shell.client.tsx`** are nearly identical — both wrap children with Header + SideDrawer + LoadingProvider
+- **`seed-bruno-data.js`** deletes the entire DB on each run (including WAL/SHM files) — not idempotent, meant for dev/E2E setup
+- **`0000_square_shadowcat.sql`** is an older migration that appears to be a no-op or placeholder (the `0001_init.sql` contains the full schema)
+- **`move-user-btn.md`** exists in `src/app/(main)/plan/` — likely a leftover design note
+- **`volume.ts`** in shared/utils duplicates `calculateVolume` from `workout-entity.ts` — slight code duplication
+- **`DayOfWeek` type** exists in both `shared/types/day-of-week.ts` and `features/routine/routine-entity.ts` — same content, imported from different places
+- **Users have no email** — the schema previously had an `email` column that was removed in migration 0001
+- **Exercise rename does NOT cascade** to routine assignments (the old CLAUDE.md said it did, but the code shows rename only updates the exercises table)
+- **`scripts/seed-bruno-data.js`** generates dates dynamically (last 7 months from a fixed date), not seeded statically
