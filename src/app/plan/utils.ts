@@ -15,17 +15,6 @@ export function getDayLabel(dayIndex: number): string {
   return DAY_LABELS[dayIndex]
 }
 
-export function resolveDaySelection(
-  currentSelectedDay: number,
-  currentAddingDay: number | null,
-  clickedDayIndex: number,
-): { nextSelectedDay: number; nextAddingDay: number | null } {
-  if (currentSelectedDay === clickedDayIndex && (currentAddingDay === null || currentAddingDay === clickedDayIndex)) {
-    return { nextSelectedDay: clickedDayIndex, nextAddingDay: clickedDayIndex }
-  }
-  return { nextSelectedDay: clickedDayIndex, nextAddingDay: null }
-}
-
-export function isDaySelected(selectedDay: number, addingDay: number | null, checkDay: number): boolean {
-  return selectedDay === checkDay && addingDay !== checkDay
+export function isDaySelected(selectedDay: number, checkDay: number): boolean {
+  return selectedDay === checkDay
 }

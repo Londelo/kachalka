@@ -94,7 +94,7 @@ console.log('\n=== CREATING ROUTINES ===')
 const insertRoutine = db.prepare(
   'INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)',
 )
-const workoutDays = [1, 3, 5] // Mon, Wed, Fri
+const workoutDays = [0, 2, 4] // Mon=0, Wed=2, Fri=4 (app internal day numbering)
 for (const day of workoutDays) {
   for (const name of exerciseNames) {
     insertRoutine.run(userId, exerciseIds[name], day)

@@ -13,6 +13,8 @@ trap cleanup EXIT
 echo "Wiping test data..."
 node scripts/cleanup-test-data.js
 
+# Test data setup is handled within each test file
+
 echo "Starting dev server on port $PORT..."
 npx next dev -p "$PORT" &
 SERVER_PID=$!
