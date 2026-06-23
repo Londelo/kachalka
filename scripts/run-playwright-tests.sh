@@ -10,8 +10,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "Seeding Bruno data..."
-node scripts/seed-bruno-data.js
+echo "Wiping test data..."
+node scripts/cleanup-test-data.js
 
 echo "Starting dev server on port $PORT..."
 npx next dev -p "$PORT" &
