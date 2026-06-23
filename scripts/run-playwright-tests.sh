@@ -13,6 +13,9 @@ trap cleanup EXIT
 echo "Wiping test data..."
 node scripts/cleanup-test-data.js
 
+echo "Creating test user and exercises..."
+node scripts/seed-test-data.js
+
 echo "Starting dev server on port $PORT..."
 npx next dev -p "$PORT" &
 SERVER_PID=$!

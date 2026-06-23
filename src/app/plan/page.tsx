@@ -98,6 +98,7 @@ export default function PlanPage() {
 
     setLoading(false)
     end('plan')
+    return true
   }, [start, end])
 
   useEffect(() => {
