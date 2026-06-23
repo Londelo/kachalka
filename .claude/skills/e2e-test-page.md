@@ -67,16 +67,48 @@ Common bugs to watch for:
 npm run test:e2e -- tests/e2e/<feature>.spec.ts --retries=0
 ```
 
-If tests fail due to missing data, ensure `scripts/run-playwright-tests.sh` seeds test data:
-```bash
-echo "Wiping test data..."
-node scripts/cleanup-test-data.js
-echo "Creating test user and exercises..."
-node scripts/seed-test-data.js
-echo "Starting dev server on port $PORT..."
+### Data Setup Pattern
+
+Each test file manages its own data — no shared seed scripts. Use this pattern:
+
+```ts
+import Database from 'better-sqlite3'
+import { test, expect } from '@playwright/test'
+import { loginAsBruno } from './helpers'
+
+// Module-level DB singleton — opened once per test file worker
+const db = new Database('data/kachalka.db')
+db.pragma('foreign_keys = ON')
+
+// Clean slate before tests
+db.exec("DELETE FROM workout_logs")
+db.exec("DELETE FROM user_routines")
+db.exec("DELETE FROM exercises")
+db.exec("DELETE FROM users")
+db.exec("DELETE FROM sqlite_sequence")
+
+// Helper functions (module-level, shared across tests in file)
+function createExercises(names: string[]): number[] { /* INSERT + return IDs */ }
+function assignExercise(exerciseId: number, dayOfWeek: number): void { /* INSERT routine */ }
+function cleanupBruno(): void { /* DELETE Bruno data + reset sequence */ }
+
+// beforeEach: ensure Bruno exists (idempotent)
+test.beforeEach(async ({ page }) => {
+  db.prepare('INSERT OR REPLACE INTO users (id, name, is_active) VALUES (1, ?, ?)').run('Bruno', 1)
+  db.exec("DELETE FROM sqlite_sequence WHERE name IN ('users', 'exercises')")
+})
+
+// afterEach: clean up so each test starts fresh
+test.afterEach(() => { cleanupBruno() })
 ```
 
-Create `scripts/seed-test-data.js` if it doesn't exist — minimal seed: Bruno user + basic exercises, no routines.
+**Key rules:**
+- Use `INSERT OR REPLACE` for Bruno (not `INSERT OR IGNORE`) — specifying an explicit `id` in SQLite doesn't trigger ignore behavior for auto-increment PKs
+- Reset `sqlite_sequence` in both `beforeEach` and `afterEach` to keep exercise IDs starting at 1
+- Each test creates only the data it specifically needs
+- Shared helpers (`createExercises`, `assignExercise`) are module-level functions — DRY
+- `loginAsBruno(page)` from helpers.ts sets the cookie; the DB setup is separate and in-process
+- `scripts/run-playwright-tests.sh` calls `cleanup-test-data.js` only (wipes everything); no seed script needed
 
 ## Bug Fixes
 

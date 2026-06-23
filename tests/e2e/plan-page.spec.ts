@@ -1,36 +1,86 @@
+import Database from 'better-sqlite3'
 import { test, expect } from '@playwright/test'
-import { loginAsBruno, logout } from './helpers'
+import { loginAsBruno } from './helpers'
 
-// Helper: create a user and return their ID cookie value
-async function createTestUser(page: ReturnType<typeof page>, name: string): Promise<string> {
-  // Navigate to home to create user
-  await page.goto('http://localhost:3111/')
-  await expect(page.getByRole('heading', { name: 'SELECT COMMANDER' })).toBeVisible()
-  await page.getByRole('button', { name: 'Add User' }).click()
-  await page.locator('#add-user-name-input').fill(name)
-  await page.locator('#add-user-submit').click()
-  // Wait for user to be created and visible
-  await expect(page.getByRole('button', { name })).toBeVisible()
-  return name
+// ============================================================================
+// Database setup — runs once per test file worker
+// ============================================================================
+
+const db = new Database('data/kachalka.db')
+db.pragma('foreign_keys = ON')
+
+// Clean slate before any tests run
+db.exec("DELETE FROM workout_logs")
+db.exec("DELETE FROM user_routines")
+db.exec("DELETE FROM exercises")
+db.exec("DELETE FROM users")
+db.exec("DELETE FROM sqlite_sequence")
+
+// ============================================================================
+// Data helpers
+// ============================================================================
+
+/** Create exercises for Bruno and return their IDs. */
+function createExercises(names: string[]): number[] {
+  const ids: number[] = []
+  const insert = db.prepare('INSERT INTO exercises (name, user_id) VALUES (?, 1)')
+  for (const name of names) {
+    const info = insert.run(name)
+    ids.push(Number(info.lastInsertRowid))
+  }
+  return ids
 }
 
-// Helper: navigate to plan page after login
-async function goToPlan(page: ReturnType<typeof page>): Promise<void> {
-  // Login with known cookie and go directly to plan
-  await loginAsBruno(page)
-  await page.goto('http://localhost:3111/plan')
-  await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
-  await expect(page.getByText('LOADING...')).not.toBeVisible({ timeout: 10000 })
+/** Assign an exercise to a day of week for Bruno. */
+function assignExercise(exerciseId: number, dayOfWeek: number): void {
+  db.prepare(
+    'INSERT OR IGNORE INTO user_routines (user_id, exercise_id, day_of_week) VALUES (1, ?, ?)',
+  ).run(exerciseId, dayOfWeek)
 }
+
+/** Clean up Bruno's exercises and routines between tests. */
+function cleanupBruno(): void {
+  db.exec("DELETE FROM workout_logs WHERE user_id = 1")
+  db.exec("DELETE FROM user_routines WHERE user_id = 1")
+  db.exec("DELETE FROM exercises WHERE user_id = 1")
+  // Reset auto-increment so next test's exercises start at id=1
+  db.exec("DELETE FROM sqlite_sequence WHERE name = 'exercises'")
+}
+
+// ============================================================================
+// Shared setup — runs before every test
+// ============================================================================
+
+test.beforeEach(async ({ page }) => {
+  // Ensure Bruno exists with id=1 (REPLACE handles re-creation after afterEach cleanup)
+  db.prepare('INSERT OR REPLACE INTO users (id, name, is_active) VALUES (1, ?, ?)').run(
+    'Bruno',
+    1,
+  )
+  // Reset auto-increment counters so exercise IDs start at 1
+  db.exec("DELETE FROM sqlite_sequence WHERE name IN ('users', 'exercises')")
+})
+
+test.afterEach(() => {
+  // Clean up all Bruno data so each test starts fresh
+  cleanupBruno()
+})
 
 // ============================================================================
 // Plan page E2E tests
 // ============================================================================
 
 test('plan page loads with existing assignments', async ({ page }) => {
-  // Create Bruno + exercises + assignments via the seed script
-  // For this test we use the existing Bruno (id=1) from the app's seed
-  await goToPlan(page)
+  // Create exercises assigned to various days so the plan page has data
+  createExercises(['Barbell Curl', 'Pull-Up', 'Squat'])
+  assignExercise(1, 0) // MON
+  assignExercise(2, 2) // WED
+  assignExercise(3, 4) // FRI
+
+  await loginAsBruno(page)
+  await page.goto('http://localhost:3111/plan')
+  await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
+  await expect(page.getByText('LOADING...')).not.toBeVisible({ timeout: 10000 })
 
   // Verify day selector buttons are visible
   await expect(page.getByRole('button', { name: 'MON' })).toBeVisible()
@@ -41,8 +91,7 @@ test('plan page loads with existing assignments', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'SAT' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'SUN' })).toBeVisible()
 
-  // The default day should show CURRENT ASSETS or empty state
-  // (depends on what day of week today is and what's seeded)
+  // The default day should show CURRENT ASSETS
   await expect(page.getByRole('heading', { name: 'CURRENT ASSETS' })).toBeVisible()
 
   // ADD EXERCISE button visible
@@ -50,10 +99,12 @@ test('plan page loads with existing assignments', async ({ page }) => {
 })
 
 test('shows empty state on a day with no exercises', async ({ page }) => {
-  await goToPlan(page)
+  // No exercises created — Bruno has a clean slate
+  await loginAsBruno(page)
+  await page.goto('http://localhost:3111/plan')
+  await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
-  // Click MON — create an exercise there first, then remove it to test empty state
-  // For a clean empty state test, pick a day and verify it shows empty or has exercises
+  // Click MON — should show empty state
   await page.getByRole('button', { name: 'MON' }).click()
 
   // Check if MON has exercises or empty state
@@ -63,24 +114,24 @@ test('shows empty state on a day with no exercises', async ({ page }) => {
     .catch(() => false)
 
   if (hasEmptyState) {
-    // Empty state — verify ADD EXERCISE is visible
     await expect(page.getByRole('button', { name: 'ADD EXERCISE' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'close' })).not.toBeVisible()
   } else {
-    // Has exercises — verify cards are visible
     await expect(page.getByRole('heading', { name: 'CURRENT ASSETS' })).toBeVisible()
     await expect(page.locator('[id^="assignment-card-"]')).toHaveCountGreaterThan(0)
   }
 })
 
 test('day selection toggles adding mode', async ({ page }) => {
-  await goToPlan(page)
+  await loginAsBruno(page)
+  await page.goto('http://localhost:3111/plan')
+  await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click MON — should be selected (shows assignments or empty state, ADD EXERCISE visible)
   await page.getByRole('button', { name: 'MON' }).click()
   await expect(page.getByRole('button', { name: 'ADD EXERCISE' })).toBeVisible()
 
-  // Click MON again — should enter "adding" mode (hides assignments, hides ADD EXERCISE)
+  // Click MON again — should enter "adding" mode
   await page.getByRole('button', { name: 'MON' }).click()
   await expect(page.getByRole('heading', { name: 'CURRENT ASSETS' })).not.toBeVisible()
   await expect(page.getByRole('button', { name: 'ADD EXERCISE' })).not.toBeVisible()
@@ -91,16 +142,19 @@ test('day selection toggles adding mode', async ({ page }) => {
 })
 
 test('creates new exercise inline and auto-assigns to selected day', async ({ page }) => {
-  await goToPlan(page)
+  await loginAsBruno(page)
+  await page.goto('http://localhost:3111/plan')
+  await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
-  // Click a day (MON)
+  // Click MON
   await page.getByRole('button', { name: 'MON' }).click()
 
   // Click ADD EXERCISE
   await page.getByRole('button', { name: 'ADD EXERCISE' }).click()
 
   // Modal opens — switch to new exercise mode
-  await page.getByRole('button', { name: 'Create new exercise' }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.getByLabel('Create new exercise').click()
   await expect(page.getByRole('heading', { name: 'NEW EXERCISE' })).toBeVisible()
 
   // Type exercise name and submit
@@ -115,7 +169,12 @@ test('creates new exercise inline and auto-assigns to selected day', async ({ pa
 })
 
 test('selects existing exercise to assign', async ({ page }) => {
-  await goToPlan(page)
+  // Pre-create an exercise so there's something to select
+  const ids = createExercises(['Barbell Curl'])
+
+  await loginAsBruno(page)
+  await page.goto('http://localhost:3111/plan')
+  await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click MON
   await page.getByRole('button', { name: 'MON' }).click()
@@ -138,7 +197,8 @@ test('selects existing exercise to assign', async ({ page }) => {
     await expect(page.getByRole('heading', { name: 'CURRENT ASSETS' })).toBeVisible()
   } else {
     // All exercises assigned — create a new one
-    await page.getByRole('button', { name: 'Create new exercise' }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.getByLabel('Create new exercise').click()
     await page.getByPlaceholder('Enter exercise name...').fill('Test Drill Beta')
     await page.getByRole('button', { name: 'ADD', exact: true }).click()
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 })
@@ -146,7 +206,14 @@ test('selects existing exercise to assign', async ({ page }) => {
 })
 
 test('removes exercise from day', async ({ page }) => {
-  await goToPlan(page)
+  // Create exercises assigned to MON so we have something to remove
+  createExercises(['Barbell Curl', 'Pull-Up'])
+  assignExercise(1, 0) // MON
+  assignExercise(2, 0) // MON
+
+  await loginAsBruno(page)
+  await page.goto('http://localhost:3111/plan')
+  await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click MON
   await page.getByRole('button', { name: 'MON' }).click()
@@ -164,7 +231,8 @@ test('removes exercise from day', async ({ page }) => {
   } else {
     // No exercises — create one then remove it
     await page.getByRole('button', { name: 'ADD EXERCISE' }).click()
-    await page.getByRole('button', { name: 'Create new exercise' }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.getByLabel('Create new exercise').click()
     await page.getByPlaceholder('Enter exercise name...').fill('Test Drill Gamma')
     await page.getByRole('button', { name: 'ADD', exact: true }).click()
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 })
@@ -177,42 +245,54 @@ test('removes exercise from day', async ({ page }) => {
 })
 
 test('duplicate assignment guard prevents assigning same exercise twice', async ({ page }) => {
-  await goToPlan(page)
+  // Create 2 exercises: one already assigned to MON, one unassigned
+  // The UI filters out assigned exercises from the select dropdown.
+  // This test verifies that behavior: Barbell Curl is on MON so it should NOT
+  // appear in the dropdown, while Pull-Up is available.
+  createExercises(['Barbell Curl', 'Pull-Up'])
+  assignExercise(1, 0) // MON — already assigned, filters out of dropdown
+
+  await loginAsBruno(page)
+  await page.goto('http://localhost:3111/plan')
+  await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click MON
   await page.getByRole('button', { name: 'MON' }).click()
 
-  // Check if there are available exercises to try to duplicate
-  const availableExercises = await page.locator('select option:not([value=""])').count()
+  // Verify Barbell Curl appears in the assignment list
+  await expect(page.locator('[id^="assignment-card-"]').filter({ hasText: 'Barbell Curl' })).toBeVisible()
 
-  if (availableExercises > 0) {
-    // Try to assign an exercise that might already be on this day
-    // First, check what's already assigned
-    const assignedNames = await page.locator('[id^="assignment-card-"] h4').all()
-    if (assignedNames.length > 0) {
-      const firstAssigned = await assignedNames[0].textContent()
-      if (firstAssigned) {
-        await page.getByRole('button', { name: 'ADD EXERCISE' }).click()
-        await page.locator('select').selectOption({ label: firstAssigned })
-        await page.getByRole('button', { name: 'ASSIGN' }).click()
-        await expect(page.getByRole('alert')).toBeVisible()
-        await expect(page.getByText('already assigned')).toBeVisible()
-        // Close the modal
-        await page.getByRole('button', { name: 'CANCEL' }).click()
-      }
-    }
-  }
+  // Open modal — should be in select mode (Pull-Up is available, Barbell Curl is filtered out)
+  await page.getByRole('button', { name: 'ADD EXERCISE' }).click()
+  await expect(page.getByRole('heading', { name: 'ASSIGN EXERCISE' })).toBeVisible()
+
+  // Verify the already-assigned exercise is NOT in the select dropdown
+  // (this is the UI's duplicate guard — it prevents selecting already-assigned exercises)
+  const selectOptions = await page.locator('select option:not([value=""])').all()
+  const optionTexts = await Promise.all(selectOptions.map((o) => o.textContent()))
+  const hasBarbellCurl = optionTexts.some((t) => t?.includes('Barbell Curl'))
+  expect(hasBarbellCurl).toBe(false)
+
+  // Verify the unassigned exercise IS available
+  const hasPullUp = optionTexts.some((t) => t?.includes('Pull-Up'))
+  expect(hasPullUp).toBe(true)
+
+  // Close the modal
+  await page.getByRole('button', { name: 'CANCEL' }).click()
 })
 
 test('exercise name validation rejects empty name', async ({ page }) => {
-  await goToPlan(page)
+  await loginAsBruno(page)
+  await page.goto('http://localhost:3111/plan')
+  await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click MON
   await page.getByRole('button', { name: 'MON' }).click()
   await page.getByRole('button', { name: 'ADD EXERCISE' }).click()
 
   // Switch to new exercise mode
-  await page.getByRole('button', { name: 'Create new exercise' }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.getByLabel('Create new exercise').click()
   await expect(page.getByRole('heading', { name: 'NEW EXERCISE' })).toBeVisible()
 
   // ADD button should be disabled when name is empty
@@ -224,7 +304,9 @@ test('exercise name validation rejects empty name', async ({ page }) => {
 })
 
 test('modal closes via overlay click', async ({ page }) => {
-  await goToPlan(page)
+  await loginAsBruno(page)
+  await page.goto('http://localhost:3111/plan')
+  await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click ADD EXERCISE to open modal
   await page.getByRole('button', { name: 'ADD EXERCISE' }).click()
@@ -238,7 +320,9 @@ test('modal closes via overlay click', async ({ page }) => {
 })
 
 test('modal closes via CANCEL button', async ({ page }) => {
-  await goToPlan(page)
+  await loginAsBruno(page)
+  await page.goto('http://localhost:3111/plan')
+  await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click ADD EXERCISE to open modal
   await page.getByRole('button', { name: 'ADD EXERCISE' }).click()
@@ -252,7 +336,9 @@ test('modal closes via CANCEL button', async ({ page }) => {
 })
 
 test('creates exercise on new mode and assigns to day', async ({ page }) => {
-  await goToPlan(page)
+  await loginAsBruno(page)
+  await page.goto('http://localhost:3111/plan')
+  await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click MON
   await page.getByRole('button', { name: 'MON' }).click()
@@ -261,7 +347,8 @@ test('creates exercise on new mode and assigns to day', async ({ page }) => {
   await page.getByRole('button', { name: 'ADD EXERCISE' }).click()
 
   // Switch to new exercise mode
-  await page.getByRole('button', { name: 'Create new exercise' }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.getByLabel('Create new exercise').click()
   await expect(page.getByRole('heading', { name: 'NEW EXERCISE' })).toBeVisible()
 
   // Type name and submit
@@ -276,13 +363,16 @@ test('creates exercise on new mode and assigns to day', async ({ page }) => {
 })
 
 test('switches from new mode back to select mode in modal', async ({ page }) => {
-  await goToPlan(page)
+  await loginAsBruno(page)
+  await page.goto('http://localhost:3111/plan')
+  await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click ADD EXERCISE
   await page.getByRole('button', { name: 'ADD EXERCISE' }).click()
 
   // Switch to new exercise mode
-  await page.getByRole('button', { name: 'Create new exercise' }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.getByLabel('Create new exercise').click()
   await expect(page.getByRole('heading', { name: 'NEW EXERCISE' })).toBeVisible()
 
   // Click the back button to return to select mode
@@ -298,11 +388,14 @@ test('switches from new mode back to select mode in modal', async ({ page }) => 
 })
 
 test('error state displays error banner for long exercise name', async ({ page }) => {
-  await goToPlan(page)
+  await loginAsBruno(page)
+  await page.goto('http://localhost:3111/plan')
+  await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Open modal and switch to new exercise mode
   await page.getByRole('button', { name: 'ADD EXERCISE' }).click()
-  await page.getByRole('button', { name: 'Create new exercise' }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.getByLabel('Create new exercise').click()
 
   // Try to create an exercise with a very long name (>100 chars)
   await page.getByPlaceholder('Enter exercise name...').fill('a'.repeat(101))
