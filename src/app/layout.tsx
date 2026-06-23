@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import './globals.css'
 import { runMigrations } from '@/db/migrate'
-import { seedDatabase, seedProgressData } from '@/db/seed'
 import AppShell from '@/components/app-shell.client'
 import LoadingProviderClient from '@/components/loading-provider.client'
 import LoadingScreen from '@/components/loading-screen'
@@ -13,8 +12,6 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   runMigrations()
-  seedDatabase()
-  seedProgressData()
 
   return (
     <html lang="en">

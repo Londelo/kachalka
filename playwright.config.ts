@@ -13,10 +13,4 @@ export default defineConfig({
       use: { browserName: 'chromium' },
     },
   ],
-  webServer: {
-    command: 'npm run seed && npx next dev -p 3111',
-    port: 3111,
-    reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
-  },
 })
