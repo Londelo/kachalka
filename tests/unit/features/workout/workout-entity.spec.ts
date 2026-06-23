@@ -4,27 +4,27 @@ import type { WorkoutSet } from '@/features/workout/types'
 
 describe('validateSet', () => {
   it('passes for a valid set', () => {
-    const validSet: WorkoutSet = { reps: 5, weight: 100}
+    const validSet: WorkoutSet = { id: 's1', reps: 5, weight: 100 }
     expect(() => validateSet(validSet)).not.toThrow()
   })
 
   it('allows weight of 0', () => {
-    const set: WorkoutSet = { reps: 5, weight: 0}
+    const set: WorkoutSet = { id: 's1', reps: 5, weight: 0 }
     expect(() => validateSet(set)).not.toThrow()
   })
 
   it('throws when weight is negative', () => {
-    const set: WorkoutSet = { reps: 5, weight: -10}
+    const set: WorkoutSet = { id: 's1', reps: 5, weight: -10 }
     expect(() => validateSet(set)).toThrow('Weight must be non-negative')
   })
 
   it('throws when reps is 0', () => {
-    const set: WorkoutSet = { reps: 0, weight: 100}
+    const set: WorkoutSet = { id: 's1', reps: 0, weight: 100 }
     expect(() => validateSet(set)).toThrow('Reps must be at least 1')
   })
 
   it('throws when reps is negative', () => {
-    const set: WorkoutSet = { reps: -1, weight: 100}
+    const set: WorkoutSet = { id: 's1', reps: -1, weight: 100 }
     expect(() => validateSet(set)).toThrow('Reps must be at least 1')
   })
 })
@@ -64,7 +64,7 @@ describe('WorkoutLog type structure', () => {
       userId: 1,
       exerciseId: 2,
       date: '2025-01-01',
-      sets: [{ reps: 5, weight: 100}],
+      sets: [{ id: 's1', reps: 5, weight: 100 }],
       createdAt: '2025-01-01T00:00:00.000Z',
       updatedAt: '2025-01-01T00:00:00.000Z',
     }

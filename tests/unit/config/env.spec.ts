@@ -1,6 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { validateEnv } from '@/config/env'
 
+function setEnv(key: string, value: string | undefined): void {
+  Object.defineProperty(process.env, key, {
+    value,
+    writable: true,
+    configurable: true,
+    enumerable: true,
+  })
+}
+
 describe('validateEnv', () => {
   const originalEnv = { ...process.env }
 
@@ -16,8 +25,8 @@ describe('validateEnv', () => {
 
   describe('returns validated config', () => {
     it('when all required vars are present', () => {
-      (process.env as NodeJS.ProcessEnv).NODE_ENV = 'development'
-      process.env.DATABASE_PATH = './data/lifting.db'
+      setEnv('NODE_ENV', 'development')
+      setEnv('DATABASE_PATH', './data/lifting.db')
 
       const result = validateEnv()
 
@@ -26,8 +35,8 @@ describe('validateEnv', () => {
     })
 
     it('with NODE_ENV=production', () => {
-      (process.env as NodeJS.ProcessEnv).NODE_ENV = 'production'
-      process.env.DATABASE_PATH = './data/lifting.db'
+      setEnv('NODE_ENV', 'production')
+      setEnv('DATABASE_PATH', './data/lifting.db')
 
       const result = validateEnv()
 
@@ -35,8 +44,8 @@ describe('validateEnv', () => {
     })
 
     it('with absolute DATABASE_PATH', () => {
-      (process.env as NodeJS.ProcessEnv).NODE_ENV = 'development'
-      process.env.DATABASE_PATH = '/absolute/path/to/db.sqlite'
+      setEnv('NODE_ENV', 'development')
+      setEnv('DATABASE_PATH', '/absolute/path/to/db.sqlite')
 
       const result = validateEnv()
 
@@ -44,8 +53,8 @@ describe('validateEnv', () => {
     })
 
     it('accepts NODE_ENV=test', () => {
-      (process.env as NodeJS.ProcessEnv).NODE_ENV = 'test'
-      process.env.DATABASE_PATH = './data/lifting.db'
+      setEnv('NODE_ENV', 'test')
+      setEnv('DATABASE_PATH', './data/lifting.db')
 
       const result = validateEnv()
 
@@ -55,14 +64,14 @@ describe('validateEnv', () => {
 
   describe('throws for missing DATABASE_PATH', () => {
     it('when not set', () => {
-      (process.env as NodeJS.ProcessEnv).NODE_ENV = 'development'
+      setEnv('NODE_ENV', 'development')
 
       expect(() => validateEnv()).toThrow('DATABASE_PATH')
     })
 
     it('when empty string', () => {
-      (process.env as NodeJS.ProcessEnv).NODE_ENV = 'development'
-      process.env.DATABASE_PATH = ''
+      setEnv('NODE_ENV', 'development')
+      setEnv('DATABASE_PATH', '')
 
       expect(() => validateEnv()).toThrow('DATABASE_PATH')
     })
@@ -70,14 +79,14 @@ describe('validateEnv', () => {
 
   describe('throws for missing NODE_ENV', () => {
     it('when not set', () => {
-      process.env.DATABASE_PATH = './data/lifting.db'
+      setEnv('DATABASE_PATH', './data/lifting.db')
 
       expect(() => validateEnv()).toThrow('NODE_ENV')
     })
 
     it('when empty string', () => {
-      (process.env as NodeJS.ProcessEnv).NODE_ENV = ''
-      process.env.DATABASE_PATH = './data/lifting.db'
+      setEnv('NODE_ENV', '')
+      setEnv('DATABASE_PATH', './data/lifting.db')
 
       expect(() => validateEnv()).toThrow('NODE_ENV')
     })
@@ -85,8 +94,8 @@ describe('validateEnv', () => {
 
   describe('throws for invalid NODE_ENV', () => {
     it('for unsupported values like staging', () => {
-      (process.env as NodeJS.ProcessEnv).NODE_ENV = 'staging'
-      process.env.DATABASE_PATH = './data/lifting.db'
+      setEnv('NODE_ENV', 'staging')
+      setEnv('DATABASE_PATH', './data/lifting.db')
 
       expect(() => validateEnv()).toThrow(/NODE_ENV/)
     })

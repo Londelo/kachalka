@@ -1,18 +1,18 @@
 import { describe, it, expect } from 'vitest'
-import Database from 'better-sqlite3'
+import Database, { type Database as DatabaseType } from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import * as schema from '@/db/schema'
 import { createSqliteUserRepository } from '@/features/user/user-repo-impl'
 import type { UserRepository } from '@/features/user/user-repository'
 
-function setupDb(): Database {
+function setupDb(): DatabaseType {
   const db = new Database(':memory:')
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
-  return db
+  return db as DatabaseType
 }
 
-function runMigration(db: Database): void {
+function runMigration(db: DatabaseType): void {
   db.exec(`
     CREATE TABLE users (
       id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
