@@ -56,15 +56,10 @@ test.afterEach(() => {
 // Basic page rendering
 // ──────────────────────────────────────────────
 
-test('displays WAR LOGS heading', async ({ page }) => {
+test('renders header and subtitle for authenticated user', async ({ page }) => {
   await loginAsBruno(page)
   await page.goto('http://localhost:3111/history')
   await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
-})
-
-test('displays subtitle text', async ({ page }) => {
-  await loginAsBruno(page)
-  await page.goto('http://localhost:3111/history')
   await expect(page.getByText('CAMPAIGN HISTORY & PERFORMANCE DATA')).toBeVisible({ timeout: 10000 })
 })
 
@@ -122,44 +117,23 @@ test('multiple sessions display newest first', async ({ page }) => {
   }
 })
 
-test('exercise rows show correct exercise name', async ({ page }) => {
-  const [exerciseId] = createExercises(['Pull-Up'])
-  assignExercise(exerciseId, 4) // Friday
-  createWorkoutLog(exerciseId, '2026-06-19', [
+test('exercise rows display correct name, set count, and max weight', async ({ page }) => {
+  const [pullUpId, curlId, deadliftId] = createExercises(['Pull-Up', 'Barbell Curl', 'Deadlift'])
+  assignExercise(pullUpId, 4) // Friday
+  assignExercise(curlId, 0) // Monday
+  assignExercise(deadliftId, 2) // Wednesday
+
+  createWorkoutLog(pullUpId, '2026-06-19', [
     { reps: 8, weight: 50 },
     { reps: 8, weight: 55 },
     { reps: 8, weight: 60 },
   ])
-
-  await loginAsBruno(page)
-  await page.goto('http://localhost:3111/history')
-  await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
-
-  // Exercise name should appear in the clickable button
-  await expect(page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Pull-Up' })).toContainText('Pull-Up')
-})
-
-test('exercise row shows correct set count', async ({ page }) => {
-  const [exerciseId] = createExercises(['Barbell Curl'])
-  assignExercise(exerciseId, 0)
-  createWorkoutLog(exerciseId, '2026-06-22', [
+  createWorkoutLog(curlId, '2026-06-22', [
     { reps: 10, weight: 45 },
     { reps: 10, weight: 50 },
     { reps: 10, weight: 55 },
   ])
-
-  await loginAsBruno(page)
-  await page.goto('http://localhost:3111/history')
-  await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
-
-  // Three sets in the workout log
-  await expect(page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Barbell Curl' })).toContainText('3')
-})
-
-test('exercise row shows correct max weight', async ({ page }) => {
-  const [exerciseId] = createExercises(['Deadlift'])
-  assignExercise(exerciseId, 2)
-  createWorkoutLog(exerciseId, '2026-06-10', [
+  createWorkoutLog(deadliftId, '2026-06-10', [
     { reps: 5, weight: 135 },
     { reps: 5, weight: 185 },
     { reps: 3, weight: 225 },
@@ -169,9 +143,20 @@ test('exercise row shows correct max weight', async ({ page }) => {
   await page.goto('http://localhost:3111/history')
   await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
 
-  // Max weight should be 225
-  const exerciseBtn = page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Deadlift' })
-  await expect(exerciseBtn).toContainText('225')
+  // Exercise names
+  await expect(page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Pull-Up' })).toContainText('Pull-Up')
+  await expect(page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Barbell Curl' })).toContainText('Barbell Curl')
+  await expect(page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Deadlift' })).toContainText('Deadlift')
+
+  // Set counts
+  await expect(page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Pull-Up' })).toContainText('3')
+  await expect(page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Barbell Curl' })).toContainText('3')
+  await expect(page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Deadlift' })).toContainText('3')
+
+  // Max weights
+  await expect(page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Pull-Up' })).toContainText('60')
+  await expect(page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Barbell Curl' })).toContainText('55')
+  await expect(page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Deadlift' })).toContainText('225')
 })
 
 test('aggregate metrics show correct volume for session', async ({ page }) => {
@@ -213,48 +198,21 @@ test('aggregate metrics show correct volume for session', async ({ page }) => {
 // Set detail modal
 // ──────────────────────────────────────────────
 
-test('set detail modal opens on exercise click', async ({ page }) => {
-  const [exerciseId] = createExercises(['Squat'])
-  assignExercise(exerciseId, 4)
-  createWorkoutLog(exerciseId, '2026-06-16', [
+test('modal opens, displays exercise name, and shows set details', async ({ page }) => {
+  const [squatId, rowId, pullUpId] = createExercises(['Squat', 'Barbell Row', 'Pull-Up'])
+  assignExercise(squatId, 4)
+  assignExercise(rowId, 2)
+  assignExercise(pullUpId, 0)
+
+  createWorkoutLog(squatId, '2026-06-16', [
     { reps: 5, weight: 200 },
     { reps: 5, weight: 225 },
   ])
-
-  await loginAsBruno(page)
-  await page.goto('http://localhost:3111/history')
-  await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
-
-  // Click the exercise button to open the modal
-  await page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Squat' }).click()
-
-  // Modal should be visible
-  await expect(page.locator('#history-set-detail-modal')).toBeVisible()
-})
-
-test('modal shows correct exercise name in header', async ({ page }) => {
-  const [exerciseId] = createExercises(['Barbell Row'])
-  assignExercise(exerciseId, 2)
-  createWorkoutLog(exerciseId, '2026-06-11', [
+  createWorkoutLog(rowId, '2026-06-11', [
     { reps: 10, weight: 135 },
     { reps: 8, weight: 145 },
   ])
-
-  await loginAsBruno(page)
-  await page.goto('http://localhost:3111/history')
-  await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
-
-  // Click the exercise button in the session card for this date
-  await page.locator('#history-date-2026-06-11').locator('[id^="history-exercise-btn-"]').click()
-
-  // Modal header should show exercise name
-  await expect(page.locator('#history-set-detail-modal')).toContainText('Barbell Row')
-})
-
-test('modal shows individual set details', async ({ page }) => {
-  const [exerciseId] = createExercises(['Pull-Up'])
-  assignExercise(exerciseId, 0)
-  createWorkoutLog(exerciseId, '2026-06-01', [
+  createWorkoutLog(pullUpId, '2026-06-01', [
     { reps: 10, weight: 0 },
     { reps: 8, weight: 25 },
     { reps: 6, weight: 45 },
@@ -264,16 +222,19 @@ test('modal shows individual set details', async ({ page }) => {
   await page.goto('http://localhost:3111/history')
   await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
 
+  // Open modal by clicking Pull-Up exercise button
   await page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Pull-Up' }).click()
 
+  // Modal opens and shows exercise name in header
+  await expect(page.locator('#history-set-detail-modal')).toBeVisible()
+  await expect(page.locator('#history-set-detail-modal')).toContainText('Pull-Up')
+
+  // Modal shows individual set details (set numbers, weights, reps)
   const modal = page.locator('#history-set-detail-modal')
-  // Should show set numbers (01, 02, 03)
   await expect(modal).toContainText('SET:')
-  // Should show all weights
   await expect(modal).toContainText('0')
   await expect(modal).toContainText('25')
   await expect(modal).toContainText('45')
-  // Should show all rep counts
   await expect(modal).toContainText('10')
   await expect(modal).toContainText('8')
   await expect(modal).toContainText('6')
@@ -306,29 +267,13 @@ test('modal shows exercise summary (volume, sets, max)', async ({ page }) => {
   await expect(maxBlock.locator('p').nth(1)).toHaveText('275')
 })
 
-test('modal closes via backdrop click', async ({ page }) => {
-  const [exerciseId] = createExercises(['Bench Press'])
-  assignExercise(exerciseId, 0)
-  createWorkoutLog(exerciseId, '2026-06-09', [{ reps: 5, weight: 185 }])
+test('modal closes via backdrop click and CLOSE button', async ({ page }) => {
+  const [pressId, curlId] = createExercises(['Bench Press', 'Barbell Curl'])
+  assignExercise(pressId, 0)
+  assignExercise(curlId, 4)
 
-  await loginAsBruno(page)
-  await page.goto('http://localhost:3111/history')
-  await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
-
-  await page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Bench Press' }).click()
-  await expect(page.locator('#history-set-detail-modal')).toBeVisible()
-
-  // Click on the backdrop (outside the modal content)
-  await page.locator('#history-set-detail-modal').click({ position: { x: 0, y: 0 } })
-
-  // Modal should be gone
-  await expect(page.locator('#history-set-detail-modal')).not.toBeVisible()
-})
-
-test('modal closes via CLOSE button', async ({ page }) => {
-  const [exerciseId] = createExercises(['Overhead Press'])
-  assignExercise(exerciseId, 4)
-  createWorkoutLog(exerciseId, '2026-06-14', [
+  createWorkoutLog(pressId, '2026-06-09', [{ reps: 5, weight: 185 }])
+  createWorkoutLog(curlId, '2026-06-14', [
     { reps: 8, weight: 95 },
     { reps: 8, weight: 100 },
   ])
@@ -337,13 +282,17 @@ test('modal closes via CLOSE button', async ({ page }) => {
   await page.goto('http://localhost:3111/history')
   await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
 
-  await page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Overhead Press' }).click()
+  // Close via backdrop click
+  await page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Bench Press' }).click()
   await expect(page.locator('#history-set-detail-modal')).toBeVisible()
+  await page.locator('#history-set-detail-modal').click({ position: { x: 0, y: 0 } })
+  await expect(page.locator('#history-set-detail-modal')).not.toBeVisible()
 
-  // Click the CLOSE button — scoped to within the modal to avoid strict mode violation
+  // Close via CLOSE button
+  await page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Barbell Curl' }).click()
+  await expect(page.locator('#history-set-detail-modal')).toBeVisible()
   const modal = page.locator('#history-set-detail-modal')
   await modal.getByRole('button', { name: 'CLOSE', exact: true }).click()
-
   await expect(page.locator('#history-set-detail-modal')).not.toBeVisible()
 })
 
