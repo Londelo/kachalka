@@ -122,19 +122,15 @@ test('shows empty state on a day with no exercises', async ({ page }) => {
   }
 })
 
-test('day selection toggles adding mode', async ({ page }) => {
+test('day selection selects the day and shows assignments', async ({ page }) => {
+  // Clicking a day selects it — ADD EXERCISE button and CURRENT ASSETS always visible
   await loginAsBruno(page)
   await page.goto('http://localhost:3111/plan')
   await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
-  // Click MON — should be selected (shows assignments or empty state, ADD EXERCISE visible)
+  // Click MON — should be selected, ADD EXERCISE always visible
   await page.getByRole('button', { name: 'MON' }).click()
   await expect(page.getByRole('button', { name: 'ADD EXERCISE' })).toBeVisible()
-
-  // Click MON again — should enter "adding" mode
-  await page.getByRole('button', { name: 'MON' }).click()
-  await expect(page.getByRole('heading', { name: 'CURRENT ASSETS' })).not.toBeVisible()
-  await expect(page.getByRole('button', { name: 'ADD EXERCISE' })).not.toBeVisible()
 
   // Click TUE — should switch to TUE selected mode
   await page.getByRole('button', { name: 'TUE' }).click()
@@ -153,7 +149,9 @@ test('creates new exercise inline and auto-assigns to selected day', async ({ pa
   await page.getByRole('button', { name: 'ADD EXERCISE' }).click()
 
   // Modal opens — switch to new exercise mode
-  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.locator('#plan-modal')).toBeVisible()
+  // Click the "Create new exercise" icon button (aria-label="Create new exercise")
+  // to switch the modal from "select" mode (dropdown) to "new" mode (text input form)
   await page.getByLabel('Create new exercise').click()
   await expect(page.getByRole('heading', { name: 'NEW EXERCISE' })).toBeVisible()
 
@@ -162,7 +160,7 @@ test('creates new exercise inline and auto-assigns to selected day', async ({ pa
   await page.getByRole('button', { name: 'ADD', exact: true }).click()
 
   // Modal should close and exercise card should appear
-  await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 })
+  await expect(page.locator('#plan-modal')).not.toBeVisible({ timeout: 10000 })
   await expect(
     page.locator('[id^="assignment-card-"]').filter({ hasText: 'Test Drill Alpha' }),
   ).toBeVisible()
@@ -188,21 +186,12 @@ test('selects existing exercise to assign', async ({ page }) => {
   // Check if there are available exercises
   const availableExercises = await page.locator('select option:not([value=""])').count()
 
-  if (availableExercises > 0) {
-    // Select first available exercise
-    await page.locator('select').selectOption({ index: 1 })
-    await expect(page.getByRole('button', { name: 'ASSIGN' })).toBeEnabled()
-    await page.getByRole('button', { name: 'ASSIGN' }).click()
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 })
-    await expect(page.getByRole('heading', { name: 'CURRENT ASSETS' })).toBeVisible()
-  } else {
-    // All exercises assigned — create a new one
-    await expect(page.getByRole('dialog')).toBeVisible()
-    await page.getByLabel('Create new exercise').click()
-    await page.getByPlaceholder('Enter exercise name...').fill('Test Drill Beta')
-    await page.getByRole('button', { name: 'ADD', exact: true }).click()
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 })
-  }
+  // Select first available exercise
+  await page.locator('select').selectOption({ index: 1 })
+  await expect(page.getByRole('button', { name: 'ASSIGN' })).toBeEnabled()
+  await page.getByRole('button', { name: 'ASSIGN' }).click()
+  await expect(page.locator('#plan-modal')).not.toBeVisible({ timeout: 10000 })
+  await expect(page.getByRole('heading', { name: 'CURRENT ASSETS' })).toBeVisible()
 })
 
 test('removes exercise from day', async ({ page }) => {
@@ -222,26 +211,11 @@ test('removes exercise from day', async ({ page }) => {
   const initialCards = page.locator('[id^="assignment-card-"]')
   const initialCount = await initialCards.count()
 
-  if (initialCount > 0) {
-    // Click the first close button to remove the first exercise
-    await page.getByRole('button', { name: 'close' }).first().click()
+  // Click the first close button to remove the first exercise
+  await page.getByRole('button', { name: 'close' }).first().click()
 
-    // The assignment list should refresh — fewer cards
-    await expect(initialCards).toHaveCount(initialCount - 1)
-  } else {
-    // No exercises — create one then remove it
-    await page.getByRole('button', { name: 'ADD EXERCISE' }).click()
-    await expect(page.getByRole('dialog')).toBeVisible()
-    await page.getByLabel('Create new exercise').click()
-    await page.getByPlaceholder('Enter exercise name...').fill('Test Drill Gamma')
-    await page.getByRole('button', { name: 'ADD', exact: true }).click()
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 })
-
-    // Now remove it
-    await expect(page.locator('[id^="assignment-card-"]')).toHaveCount(1)
-    await page.getByRole('button', { name: 'close' }).first().click()
-    await expect(page.locator('[id^="assignment-card-"]')).toHaveCount(0)
-  }
+  // The assignment list should refresh — fewer cards
+  await expect(initialCards).toHaveCount(initialCount - 1)
 })
 
 test('duplicate assignment guard prevents assigning same exercise twice', async ({ page }) => {
@@ -291,7 +265,7 @@ test('exercise name validation rejects empty name', async ({ page }) => {
   await page.getByRole('button', { name: 'ADD EXERCISE' }).click()
 
   // Switch to new exercise mode
-  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.locator('#plan-modal')).toBeVisible()
   await page.getByLabel('Create new exercise').click()
   await expect(page.getByRole('heading', { name: 'NEW EXERCISE' })).toBeVisible()
 
@@ -310,13 +284,13 @@ test('modal closes via overlay click', async ({ page }) => {
 
   // Click ADD EXERCISE to open modal
   await page.getByRole('button', { name: 'ADD EXERCISE' }).click()
-  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.locator('#plan-modal')).toBeVisible()
 
   // Click the overlay (outside the modal content)
-  await page.locator('[role="dialog"]').click({ position: { x: 0, y: 0 } })
+  await page.locator('#plan-modal').click({ position: { x: 0, y: 0 } })
 
   // Modal should close
-  await expect(page.getByRole('dialog')).not.toBeVisible()
+  await expect(page.locator('#plan-modal')).not.toBeVisible()
 })
 
 test('modal closes via CANCEL button', async ({ page }) => {
@@ -326,13 +300,13 @@ test('modal closes via CANCEL button', async ({ page }) => {
 
   // Click ADD EXERCISE to open modal
   await page.getByRole('button', { name: 'ADD EXERCISE' }).click()
-  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.locator('#plan-modal')).toBeVisible()
 
   // Click CANCEL
   await page.getByRole('button', { name: 'CANCEL' }).click()
 
   // Modal should close
-  await expect(page.getByRole('dialog')).not.toBeVisible()
+  await expect(page.locator('#plan-modal')).not.toBeVisible()
 })
 
 test('creates exercise on new mode and assigns to day', async ({ page }) => {
@@ -347,7 +321,7 @@ test('creates exercise on new mode and assigns to day', async ({ page }) => {
   await page.getByRole('button', { name: 'ADD EXERCISE' }).click()
 
   // Switch to new exercise mode
-  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.locator('#plan-modal')).toBeVisible()
   await page.getByLabel('Create new exercise').click()
   await expect(page.getByRole('heading', { name: 'NEW EXERCISE' })).toBeVisible()
 
@@ -356,7 +330,7 @@ test('creates exercise on new mode and assigns to day', async ({ page }) => {
   await page.getByRole('button', { name: 'ADD', exact: true }).click()
 
   // Modal should close and new exercise card should appear
-  await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 })
+  await expect(page.locator('#plan-modal')).not.toBeVisible({ timeout: 10000 })
   await expect(
     page.locator('[id^="assignment-card-"]').filter({ hasText: 'Test Drill Delta' }),
   ).toBeVisible()
@@ -371,7 +345,7 @@ test('switches from new mode back to select mode in modal', async ({ page }) => 
   await page.getByRole('button', { name: 'ADD EXERCISE' }).click()
 
   // Switch to new exercise mode
-  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.locator('#plan-modal')).toBeVisible()
   await page.getByLabel('Create new exercise').click()
   await expect(page.getByRole('heading', { name: 'NEW EXERCISE' })).toBeVisible()
 
@@ -384,7 +358,7 @@ test('switches from new mode back to select mode in modal', async ({ page }) => 
 
   // Close modal
   await page.getByRole('button', { name: 'CANCEL' }).click()
-  await expect(page.getByRole('dialog')).not.toBeVisible()
+  await expect(page.locator('#plan-modal')).not.toBeVisible()
 })
 
 test('error state displays error banner for long exercise name', async ({ page }) => {
@@ -394,7 +368,7 @@ test('error state displays error banner for long exercise name', async ({ page }
 
   // Open modal and switch to new exercise mode
   await page.getByRole('button', { name: 'ADD EXERCISE' }).click()
-  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.locator('#plan-modal')).toBeVisible()
   await page.getByLabel('Create new exercise').click()
 
   // Try to create an exercise with a very long name (>100 chars)

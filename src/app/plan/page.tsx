@@ -13,12 +13,7 @@ import {
 } from "@/features/exercise/exercise-server-actions";
 import type { RoutineAssignment } from "@/features/routine/routine-entity";
 import { numberToDayOfWeek, DAY_NAMES } from "@/features/routine/routine-entity";
-import {
-  getAssignmentsForDay,
-  getDayLabel,
-  isDaySelected,
-  resolveDaySelection,
-} from './utils'
+import { getAssignmentsForDay, getDayLabel, isDaySelected } from './utils'
 import { useLoading } from '@/components/loading-context'
 
 const DAYS = DAY_NAMES;
@@ -41,7 +36,6 @@ export default function PlanPage() {
   const [selectedDay, setSelectedDay] = useState<number>(
     () => (new Date().getDay() + 6) % 7,
   );
-  const [addingDay, setAddingDay] = useState<number | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<ModalMode>("select");
   const [routine, setRoutine] = useState<Record<
@@ -134,8 +128,8 @@ export default function PlanPage() {
     );
     isSubmitting.current = false;
 
-    // selectedDay is always set when a day is clicked; addingDay can be null
-    // after the initial click, so selectedDay is the correct assignment target
+    // selectedDay is always set when a day is clicked (no toggle mode)
+    // so selectedDay is the correct assignment target
     if (result.success && result.assignment) {
       const refreshed = await loadData();
       if (!refreshed) {
@@ -202,14 +196,9 @@ export default function PlanPage() {
     }
   }
 
-  function handleDayClick(clickedDayIndex: number) {
-    const { nextSelectedDay, nextAddingDay } = resolveDaySelection(
-      selectedDay,
-      addingDay,
-      clickedDayIndex,
-    );
-    setSelectedDay(nextSelectedDay);
-    setAddingDay(nextAddingDay);
+  function handleDayClick(dayIndex: number) {
+    // Always just select the day — no toggle between viewing/adding modes
+    setSelectedDay(dayIndex);
   }
 
   function handleModalClose() {
@@ -267,7 +256,7 @@ export default function PlanPage() {
           {/* Day Selector */}
           <section id="plan-day-selector" className="mb-6 flex flex-wrap gap-2">
             {DAYS.map((_, dayIndex) => {
-              const selected = isDaySelected(selectedDay, addingDay, dayIndex);
+              const selected = isDaySelected(selectedDay, dayIndex);
               return (
                 <button
                   key={DAYS[dayIndex]}
@@ -286,7 +275,7 @@ export default function PlanPage() {
           </section>
 
           {/* Exercise Display — Selected Day Only */}
-          {isDaySelected(selectedDay, addingDay, selectedDay) && (
+          {isDaySelected(selectedDay, selectedDay) && (
             <section id="plan-current-assets" className="mb-6 space-y-3">
               <div className="flex items-center gap-1">
                 <span
@@ -344,7 +333,7 @@ export default function PlanPage() {
           )}
 
           {/* Add Exercise button — opens modal in select mode */}
-          {isDaySelected(selectedDay, addingDay, selectedDay) && (
+          {isDaySelected(selectedDay, selectedDay) && (
             <div className="mt-4 flex justify-center">
               <button
                 type="button"
@@ -360,6 +349,7 @@ export default function PlanPage() {
         {/* Add Existing Exercise Modal */}
         {showModal && (
           <div
+            id="plan-modal"
             className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
             onClick={handleModalClose}
             role="dialog"
