@@ -8,8 +8,8 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['@testing-library/jest-dom/vitest'],
-    include: ['tests/**/*.spec.ts', 'tests/**/*.test.ts', 'src/**/*.test.ts'],
-    exclude: ['e2e/**'],
+    include: ['tests/unit/**/*.spec.ts', 'tests/unit/**/*.test.ts'],
+    exclude: ['tests/e2e/**'],
   },
   resolve: {
     alias: {

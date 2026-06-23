@@ -43,6 +43,20 @@ export function numberToDayOfWeek(n: number): DayOfWeek {
   return day
 }
 
+/** Canonical list of day names in app order (Mon=0 .. Sun=6). */
+export const DAY_NAMES: DayOfWeek[] = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+]
+
+/** Abbreviated day labels for UI display. */
+export const DAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+
 export const RoutineId = Object.freeze({
   make(n: number): { value: number } {
     if (

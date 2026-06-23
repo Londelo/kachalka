@@ -1,14 +1,6 @@
-import type { WorkoutSet } from '@/features/workout/types'
+import type { WorkoutSet, WorkoutLog } from '@/features/workout/types'
 
-export type WorkoutLog = {
-  id: { value: number }
-  userId: number
-  exerciseId: number
-  date: string
-  sets: WorkoutSet[]
-  createdAt: string
-  updatedAt: string
-}
+export { WorkoutLog }
 
 export function validateSet(set: WorkoutSet): void {
   if (set.weight < 0) {

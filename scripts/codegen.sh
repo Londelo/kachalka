@@ -6,7 +6,7 @@
 set -e
 
 PORT=3111
-OUTPUT="${1:-e2e/recorded.spec.ts}"
+OUTPUT="${1:-tests/e2e/recorded.spec.ts}"
 PID_FILE=$(mktemp)
 
 cleanup() {

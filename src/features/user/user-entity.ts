@@ -1,5 +1,3 @@
-import * as R from 'ramda'
-
 export const UserId = Object.freeze({
   make(n: number): { value: number } {
     if (

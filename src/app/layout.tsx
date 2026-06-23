@@ -2,9 +2,9 @@ import type { ReactNode } from 'react'
 import './globals.css'
 import { runMigrations } from '@/db/migrate'
 import { seedDatabase, seedProgressData } from '@/db/seed'
-import AppShell from '@/app/components/app-shell.client'
-import LoadingProviderClient from '@/app/components/loading-provider.client'
-import LoadingScreen from '@/app/components/loading-screen'
+import AppShell from '@/components/app-shell.client'
+import LoadingProviderClient from '@/components/loading-provider.client'
+import LoadingScreen from '@/components/loading-screen'
 
 export const metadata = {
   title: 'Kachalka',

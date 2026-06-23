@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useLoading } from '@/app/components/loading-context'
+import { useLoading } from '@/components/loading-context'
 import {
   ResponsiveContainer,
   BarChart,
