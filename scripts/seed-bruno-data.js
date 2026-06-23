@@ -1,4 +1,9 @@
 // Seed Bruno's routine: Mon/Wed/Fri, barbell curls + pull-ups + squats, 7 months of data
+// Only runs in development — gate keeps prod/staging from wiping data.
+if (process.env.NODE_ENV !== 'development') {
+  process.exit(0)
+}
+
 const Database = require('better-sqlite3')
 const fs = require('fs')
 const path = require('path')

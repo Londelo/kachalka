@@ -17,6 +17,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Wipe all data before codegen
+echo "Wiping test data..."
+node scripts/cleanup-test-data.js
+
 # Start the app on port 3111
 echo "Starting dev server on port $PORT..."
 npx next dev -p "$PORT" &
