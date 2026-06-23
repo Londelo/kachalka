@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { getHistoryAction, deleteHistoryEntryAction } from '@/features/workout/workout-server-actions'
+import { getHistoryAction } from '@/features/workout/workout-server-actions'
 import { useLoading } from '@/components/loading-context'
 
 type HistoryEntry = {
@@ -20,14 +20,11 @@ export default function HistoryPageClient() {
   const router = useRouter()
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [loading, setLoading] = useState(true)
-  const [deleting, setDeleting] = useState<number | null>(null)
   const [selectedLog, setSelectedLog] = useState<{
     log: HistoryEntry['logs'][number]
     date: string
     sessionNum: number
   } | null>(null)
-  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const { start, end } = useLoading()
 
@@ -54,25 +51,6 @@ export default function HistoryPageClient() {
   function getStoredUserId(): number | null {
     const match = document.cookie.match(/kachalka\.userId=(\d+)/)
     return match ? Number(match[1]) : null
-  }
-
-  async function handleDelete(logId: number) {
-    setDeleting(logId)
-    setDeleteError(null)
-    const res = await deleteHistoryEntryAction(logId, getStoredUserId() ?? 0)
-    if (!res.success) {
-      setDeleteError(res.error ?? 'Failed to delete')
-    }
-    setDeleting(null)
-    setDeleteConfirm(null)
-    // Refresh history
-    const userId = getStoredUserId()
-    if (userId) {
-      const fresh = await getHistoryAction(userId)
-      if (fresh.success && fresh.history) {
-        setHistory(fresh.history)
-      }
-    }
   }
 
   function formatDate(dateStr: string): string {
@@ -239,40 +217,6 @@ export default function HistoryPageClient() {
         )
       })}
 
-      {/* Delete confirmation dialog */}
-      {deleteConfirm !== null && (
-        <div id="history-delete-confirm" className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm border-4 border-on-surface bg-background p-6 neo-shadow-lg">
-            <p className="mb-4 font-headline-md text-headline-md uppercase text-on-surface">
-              CONFIRM DELETION
-            </p>
-            <p className="mb-6 font-body-lg text-body-lg text-on-surface">
-              Destroy this war log entry? This action cannot be undone.
-            </p>
-            {deleteError && (
-              <p className="mb-4 font-label-bold text-label-bold text-error">{deleteError}</p>
-            )}
-            <div className="flex gap-4">
-              <button
-                type="button"
-                onClick={() => setDeleteConfirm(null)}
-                className="flex-1 border-4 border-on-surface bg-surface-container p-3 font-label-bold text-label-bold uppercase text-on-surface neo-shadow transition-all active-press"
-              >
-                CANCEL
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDelete(deleteConfirm)}
-                disabled={deleting !== null}
-                className="flex-1 border-4 border-on-surface bg-error p-3 font-label-bold text-label-bold uppercase text-on-primary neo-shadow transition-all active-press disabled:opacity-50"
-              >
-                {deleting === deleteConfirm ? 'DELETING...' : 'CONFIRM'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Set detail modal */}
       {selectedLog && (
         <div
@@ -286,24 +230,15 @@ export default function HistoryPageClient() {
         >
           <div className="w-full max-w-lg border-4 border-on-surface bg-background p-6 neo-shadow-lg">
             {/* Modal header */}
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="font-headline-md text-headline-md uppercase text-on-surface">
-                  {selectedLog.log.exerciseName}
-                </h3>
-                <div className="mt-1 border-4 border-on-surface bg-primary px-2 py-0.5 neo-shadow-sm inline-block">
-                  <span className="font-label-bold text-label-bold uppercase text-on-primary">
-                    {formatDate(selectedLog.date)}
-                  </span>
-                </div>
+            <div className="mb-4">
+              <h3 className="font-headline-md text-headline-md uppercase text-on-surface">
+                {selectedLog.log.exerciseName}
+              </h3>
+              <div className="mt-1 border-4 border-on-surface bg-primary px-2 py-0.5 neo-shadow-sm inline-block">
+                <span className="font-label-bold text-label-bold uppercase text-on-primary">
+                  {formatDate(selectedLog.date)}
+                </span>
               </div>
-              <button
-                type="button"
-                onClick={() => setSelectedLog(null)}
-                className="border-4 border-on-surface bg-surface-container p-2 neo-shadow-sm transition-all active-press"
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
             </div>
 
             {/* Set rows */}

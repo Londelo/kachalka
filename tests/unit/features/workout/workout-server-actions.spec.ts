@@ -34,10 +34,6 @@ const mockUpdateWorkout = {
   execute: vi.fn(),
 }
 
-const mockDeleteWorkout = {
-  execute: vi.fn(),
-}
-
 const mockGetTodayExercises = {
   execute: vi.fn(),
 }
@@ -84,10 +80,6 @@ vi.mock('@/features/workout/update-workout', () => ({
   updateWorkoutUseCase: vi.fn(() => mockUpdateWorkout),
 }))
 
-vi.mock('@/features/workout/delete-workout', () => ({
-  deleteWorkoutUseCase: vi.fn(() => mockDeleteWorkout),
-}))
-
 vi.mock('@/features/workout/get-today-exercises', () => ({
   getTodayExercisesUseCase: vi.fn(() => mockGetTodayExercises),
 }))
@@ -104,7 +96,6 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockLogWorkout.execute.mockReset()
   mockUpdateWorkout.execute.mockReset()
-  mockDeleteWorkout.execute.mockReset()
   mockGetTodayExercises.execute.mockReset()
   mockGetWorkoutHistory.execute.mockReset()
   mockGetUserVolume.execute.mockReset()
@@ -221,54 +212,6 @@ describe('updateWorkoutAction', () => {
   })
 })
 
-describe('deleteWorkoutAction', () => {
-  it('returns success on valid delete', async () => {
-    mockDeleteWorkout.execute.mockReturnValue(undefined)
-
-    const { deleteWorkoutAction } = await import('@/features/workout/workout-server-actions')
-    const result = await deleteWorkoutAction(1, 1)
-
-    expect(result.success).toBe(true)
-    expect(result.error).toBeUndefined()
-  })
-
-  it('returns failure when log not found', async () => {
-    mockDeleteWorkout.execute.mockImplementation(() => {
-      throw new Error('Workout log not found')
-    })
-
-    const { deleteWorkoutAction } = await import('@/features/workout/workout-server-actions')
-    const result = await deleteWorkoutAction(999, 1)
-
-    expect(result.success).toBe(false)
-    expect(result.error).toBe('Workout log not found')
-  })
-
-  it('returns failure when not the owner', async () => {
-    mockDeleteWorkout.execute.mockImplementation(() => {
-      throw new Error('Only the owner can delete this workout log')
-    })
-
-    const { deleteWorkoutAction } = await import('@/features/workout/workout-server-actions')
-    const result = await deleteWorkoutAction(1, 1)
-
-    expect(result.success).toBe(false)
-    expect(result.error).toBe('Only the owner can delete this workout log')
-  })
-
-  it('returns failure for database errors', async () => {
-    mockDeleteWorkout.execute.mockImplementation(() => {
-      throw new Error('Connection refused')
-    })
-
-    const { deleteWorkoutAction } = await import('@/features/workout/workout-server-actions')
-    const result = await deleteWorkoutAction(1, 1)
-
-    expect(result.success).toBe(false)
-    expect(result.error).toBe('Connection refused')
-  })
-})
-
 describe('getTodayExercisesAction', () => {
   it('returns exercises on success', async () => {
     mockGetTodayExercises.execute.mockReturnValue(mockExercises)
@@ -380,62 +323,3 @@ describe('getHistoryAction', () => {
   })
 })
 
-describe('deleteHistoryEntryAction', () => {
-  it('succeeds and deletes the log', async () => {
-    mockDeleteWorkout.execute.mockReturnValue(undefined)
-
-    const { deleteHistoryEntryAction } = await import('@/features/workout/workout-server-actions')
-    const result = await deleteHistoryEntryAction(1, 1)
-
-    expect(result.success).toBe(true)
-    expect(result.error).toBeUndefined()
-  })
-
-  it('returns error when log not found', async () => {
-    mockDeleteWorkout.execute.mockImplementation(() => {
-      throw new Error('Workout log not found')
-    })
-
-    const { deleteHistoryEntryAction } = await import('@/features/workout/workout-server-actions')
-    const result = await deleteHistoryEntryAction(999, 1)
-
-    expect(result.success).toBe(false)
-    expect(result.error).toBe('Workout log not found')
-  })
-
-  it('returns error when not the owner', async () => {
-    mockDeleteWorkout.execute.mockImplementation(() => {
-      throw new Error('Only the owner can delete this workout log')
-    })
-
-    const { deleteHistoryEntryAction } = await import('@/features/workout/workout-server-actions')
-    const result = await deleteHistoryEntryAction(1, 1)
-
-    expect(result.success).toBe(false)
-    expect(result.error).toBe('Only the owner can delete this workout log')
-  })
-
-  it('returns error for database errors', async () => {
-    mockDeleteWorkout.execute.mockImplementation(() => {
-      throw new Error('Connection refused')
-    })
-
-    const { deleteHistoryEntryAction } = await import('@/features/workout/workout-server-actions')
-    const result = await deleteHistoryEntryAction(1, 1)
-
-    expect(result.success).toBe(false)
-    expect(result.error).toBe('Connection refused')
-  })
-
-  it('returns Unknown error for non-Error exceptions', async () => {
-    mockDeleteWorkout.execute.mockImplementation(() => {
-      throw 'string error'
-    })
-
-    const { deleteHistoryEntryAction } = await import('@/features/workout/workout-server-actions')
-    const result = await deleteHistoryEntryAction(1, 1)
-
-    expect(result.success).toBe(false)
-    expect(result.error).toBe('Unknown error')
-  })
-})
