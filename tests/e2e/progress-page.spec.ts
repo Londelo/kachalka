@@ -78,7 +78,7 @@ test('progress page loads with header and controls', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
   // Exercise selector visible
-  await expect(page.getByLabel('SELECT EXERCISE')).toBeVisible()
+  await expect(page.locator('[id="progress-exercise-selector"]')).toBeVisible()
   await expect(page.locator('[id="progress-exercise-selector"] select')).toBeVisible()
 
   // Range pills visible
@@ -299,16 +299,11 @@ test('tooltip shows workout details on hover', async ({ page }) => {
   const chart = page.locator('[id="progress-bar-chart"]')
   await chart.hover()
 
-  // Wait for tooltip to appear (Recharts tooltip has a specific class)
-  await expect(page.locator('[class*="border-on-surface"][class*="bg-background"]')).toBeVisible({ timeout: 5000 })
-
-  // Tooltip should contain exercise name and volume info
-  const tooltipVisible = await page.locator('[class*="border-on-surface"][class*="bg-background"]').isVisible().catch(() => false)
-  if (tooltipVisible) {
-    await expect(page.getByText('Bench Press')).toBeVisible()
-    await expect(page.getByText('TOTAL: 810')).toBeVisible() // 5*135 + 3*155 = 675 + 465 = 1140... let me recalculate
-    // Actually: 5*135=675, 3*155=465, total=1140
-  }
+  // Wait for tooltip to appear — Recharts tooltip contains exercise name + volume info
+  // Scope to chart area to avoid strict mode violation with dropdown option
+  await expect(chart.getByText('Bench Press')).toBeVisible({ timeout: 5000 })
+  // Volume = 5*135 + 3*155 = 675 + 465 = 1140 (formatted with comma)
+  await expect(page.getByText('TOTAL: 1,140')).toBeVisible()
 })
 
 test('redirects to home when no user cookie', async ({ page }) => {
@@ -324,7 +319,8 @@ test('redirects to home when no user cookie', async ({ page }) => {
 test('volume calculation is correct', async ({ page }) => {
   const exerciseId = createExercises(['Squat'])[0]
 
-  // 3x5 @ 225 = 3*5*225 = 3375 volume
+  // Single log with 3 sets of 3x225 = 2025 volume
+  // (3 separate logs on same date get merged by Recharts into one bar)
   createWorkoutLog(exerciseId, '2026-05-01', [
     { id: 's1', reps: 3, weight: 225 },
     { id: 's2', reps: 3, weight: 225 },
@@ -342,10 +338,9 @@ test('volume calculation is correct', async ({ page }) => {
   const chart = page.locator('[id="progress-bar-chart"]')
   await chart.hover()
 
-  const tooltipVisible = await page.locator('[class*="border-on-surface"][class*="bg-background"]').isVisible().catch(() => false)
-  if (tooltipVisible) {
-    await expect(page.getByText('TOTAL: 3375')).toBeVisible()
-  }
+  // 3 sets of 3x225 = 2,025 (upsert on same date replaces sets)
+  await expect(chart.getByText('Squat')).toBeVisible({ timeout: 5000 })
+  await expect(page.getByText('TOTAL: 2,025')).toBeVisible()
 })
 
 test('dropdown is empty when no exercises have logs', async ({ page }) => {
@@ -373,10 +368,10 @@ test('nav drawer links to progress page', async ({ page }) => {
 
   // Open side drawer
   await page.getByRole('button', { name: 'menu' }).click()
-  await expect(page.getByRole('tab', { name: 'PROGRESS', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'PROGRESS' })).toBeVisible()
 
-  // Click PROGRESS tab
-  await page.getByRole('tab', { name: 'PROGRESS', exact: true }).click()
+  // Click PROGRESS link
+  await page.getByRole('link', { name: 'PROGRESS' }).click()
 
   // Should navigate to progress page
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
@@ -426,10 +421,8 @@ test('multiple exercises in ALL mode shows all in chart', async ({ page }) => {
   const chart = page.locator('[id="progress-bar-chart"]')
   await chart.hover()
 
-  const tooltipVisible = await page.locator('[class*="border-on-surface"][class*="bg-background"]').isVisible().catch(() => false)
-  if (tooltipVisible) {
-    await expect(page.getByText('Bench Press')).toBeVisible()
-    await expect(page.getByText('Squat')).toBeVisible()
-    await expect(page.getByText('Deadlift')).toBeVisible()
-  }
+  // Scope to chart area to avoid strict mode violation with dropdown options
+  await expect(chart.getByText('Bench Press')).toBeVisible({ timeout: 5000 })
+  await expect(chart.getByText('Squat')).toBeVisible()
+  await expect(chart.getByText('Deadlift')).toBeVisible()
 })
