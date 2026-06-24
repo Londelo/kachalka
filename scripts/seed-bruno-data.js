@@ -1,4 +1,4 @@
-// Seed Bruno's routine: Mon/Wed/Fri, barbell curls + pull-ups + squats, 7 months of data
+// Seed Bruno's routine: Mon/Wed/Fri, bench press + squat + deadlift, 3 months of progressive data
 // Only runs in development — gate keeps prod/staging from wiping data.
 if (process.env.NODE_ENV !== 'development') {
   process.exit(0)
@@ -43,25 +43,25 @@ for (const file of sqlFiles) {
 }
 console.log('  Schema ready.')
 
-// ---- Phase 0: CREATE BRUNO (user) ----
+// ---- Phase 0: CREATE BRUNO (user_id=1) ----
 console.log('\n=== CREATING BRUNO ===')
-const insertUser = db.prepare('INSERT INTO users (name, is_active) VALUES (?, ?)')
-const insertResult = insertUser.run('Bruno', 1)
-const userId = insertResult.lastInsertRowid
+db.prepare('DELETE FROM workout_logs WHERE user_id = ?').run(1)
+db.prepare('DELETE FROM user_routines WHERE user_id = ?').run(1)
+db.prepare('DELETE FROM exercises WHERE user_id = ?').run(1)
+db.prepare('DELETE FROM users WHERE id = ?').run(1)
+db.exec("DELETE FROM sqlite_sequence WHERE name IN ('users', 'exercises', 'workout_logs', 'user_routines')")
 
-// ---- Phase 1: DELETE existing data for Bruno ----
-console.log('=== CLEARING BRUNO DATA ===')
-db.prepare('DELETE FROM workout_logs WHERE user_id = ?').run(userId)
-db.prepare('DELETE FROM user_routines WHERE user_id = ?').run(userId)
-db.prepare('DELETE FROM exercises WHERE user_id = ?').run(userId)
-db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('users', 'exercises', 'workout_logs', 'user_routines') AND name != 'users'").run()
+const insertUser = db.prepare('INSERT INTO users (id, name, is_active) VALUES (?, ?, ?)')
+insertUser.run(1, 'Bruno', 1)
+const userId = 1
+console.log(`  Bruno -> id=${userId}`)
 
-// ---- Phase 2: CREATE EXERCISES ----
+// ---- Phase 1: CREATE EXERCISES ----
 console.log('\n=== CREATING EXERCISES ===')
 const insertExercise = db.prepare(
   'INSERT INTO exercises (name, user_id) VALUES (?, ?)',
 )
-const exerciseNames = ['Barbell Curl', 'Pull-Up', 'Squat']
+const exerciseNames = ['Bench Press', 'Squat', 'Deadlift']
 const exerciseIds = {}
 for (const name of exerciseNames) {
   const result = insertExercise.run(name, userId)
@@ -69,18 +69,21 @@ for (const name of exerciseNames) {
   console.log(`  ${name} -> id=${exerciseIds[name]}`)
 }
 
-// ---- Phase 3: GENERATE DATES ----
+// ---- Phase 2: GENERATE DATES ----
 console.log('\n=== GENERATING SESSIONS ===')
 
-// Last 7 months from today (May 2026), going back to Oct 2025
-const today = new Date(2026, 4, 9) // May 9, 2026
-const startDate = new Date(2025, 9, 1) // Oct 1, 2025
+// Last 3 calendar months from today (2026-06-23):
+// Month 1 (oldest): March 2026
+// Month 2 (middle): April 2026
+// Month 3 (newest): May 2026 through mid-June 2026
+const today = new Date(2026, 5, 23) // June 23, 2026
+const startDate = new Date(2026, 2, 1) // March 1, 2026
 
 const sessions = []
 let d = new Date(startDate)
 while (d <= today) {
-  const day = d.getDay() // 1=Mon, 3=Wed, 5=Fri
-  if (day === 1 || day === 3 || day === 5) {
+  const day = d.getDay() // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+  if (day === 1 || day === 3 || day === 5) { // Mon=1, Wed=3, Fri=5
     const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     sessions.push(dateStr)
   }
@@ -89,7 +92,7 @@ while (d <= today) {
 
 console.log(`  Generated ${sessions.length} sessions from ${sessions[0]} to ${sessions[sessions.length - 1]}`)
 
-// ---- Phase 3.5: CREATE ROUTINES ----
+// ---- Phase 2.5: CREATE ROUTINES ----
 console.log('\n=== CREATING ROUTINES ===')
 const insertRoutine = db.prepare(
   'INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)',
@@ -102,25 +105,42 @@ for (const day of workoutDays) {
 }
 console.log(`  Created ${workoutDays.length} workout days × ${exerciseNames.length} exercises = ${workoutDays.length * exerciseNames.length} routines`)
 
-// ---- Phase 4: INSERT WORKOUT LOGS ----
+// ---- Phase 3: INSERT WORKOUT LOGS ----
 console.log('\n=== INSERTING WORKOUT LOGS ===')
 const insertLog = db.prepare(
   'INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)',
 )
 
-// Each session: 3 sets per exercise
-// Set 1: 10 reps @ 100 lbs
-// Set 2: 10 reps @ 100 lbs
-// Set 3: 10 reps @ 125 lbs
-const setsData = [
-  { reps: 10, weight: 100 },
-  { reps: 10, weight: 100 },
-  { reps: 10, weight: 125 },
-]
-const setsJson = JSON.stringify(setsData)
+// Determine which month a date string belongs to
+function getMonthIndex(dateStr) {
+  const year = parseInt(dateStr.substring(0, 4))
+  const month = parseInt(dateStr.substring(5, 7))
+  // Month 1 = March, Month 2 = April, Month 3 = May+
+  if (month === 3) return 1 // March
+  if (month === 4) return 2 // April
+  return 3 // May, June, ...
+}
+
+// Weight per exercise by month tier
+const weightsByMonth = {
+  1: 10,   // Month 1 (March): 10 lbs
+  2: 50,   // Month 2 (April): 50 lbs
+  3: 100,  // Month 3 (May-Jun): 100 lbs
+}
 
 let totalLogs = 0
 for (const date of sessions) {
+  const monthIdx = getMonthIndex(date)
+  const weight = weightsByMonth[monthIdx]
+
+  // Each exercise gets 3 sets: { id, reps: 10, weight }
+  const setsData = [
+    { id: 's1', reps: 10, weight },
+    { id: 's2', reps: 10, weight },
+    { id: 's3', reps: 10, weight },
+  ]
+  const setsJson = JSON.stringify(setsData)
+
   for (const name of exerciseNames) {
     insertLog.run(userId, exerciseIds[name], date, setsJson)
     totalLogs++
@@ -129,7 +149,7 @@ for (const date of sessions) {
 
 console.log(`  Inserted ${totalLogs} workout logs`)
 
-// ---- Phase 5: VERIFY ----
+// ---- Phase 4: VERIFY ----
 console.log('\n=== VERIFICATION ===')
 const rows = db.prepare(`
   SELECT wl.date, e.name AS exercise, wl.sets
@@ -141,8 +161,14 @@ const rows = db.prepare(`
 
 let currentDate = ''
 let sessionCount = 0
+let currentMonth = 0
+let monthVolumes = {}
 for (const row of rows) {
   if (row.date !== currentDate) {
+    if (currentDate) {
+      const m = getMonthIndex(currentDate)
+      monthVolumes[m] = (monthVolumes[m] || 0) + 1
+    }
     currentDate = row.date
     sessionCount++
     const d = new Date(row.date + 'T00:00:00')
@@ -154,8 +180,16 @@ for (const row of rows) {
   console.log(`    - ${row.exercise}: 3 sets, vol ${vol} lb`)
 }
 
+// Tally month volumes
+const m = getMonthIndex(currentDate)
+monthVolumes[m] = (monthVolumes[m] || 0) + 1
+
 console.log(`\n  Total sessions: ${sessionCount}`)
 console.log(`  Total logs: ${rows.length}`)
+const monthLabels = { 1: 'Month 1 (March)', 2: 'Month 2 (April)', 3: 'Month 3 (May-Jun)' }
+for (const [key, count] of Object.entries(monthVolumes)) {
+  console.log(`  ${monthLabels[key]}: ${count} sessions`)
+}
 
 db.close()
 console.log('\nDone.')

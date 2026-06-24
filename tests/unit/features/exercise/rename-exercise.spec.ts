@@ -2,18 +2,18 @@ import { describe, it, expect, vi } from 'vitest'
 import { renameExerciseUseCase } from '@/features/exercise/rename-exercise'
 import type { ExerciseRepository } from '@/features/exercise/exercise-repository'
 
-function makeRepo(overrides: Partial<ExerciseRepository> = {}): ExerciseRepository {
+function makeRepo(overrides: Partial<ExerciseRepository> = {}): any {
   return {
-    findById: vi.fn() as any,
-    findByName: vi.fn() as any,
-    findAll: vi.fn() as any,
-    create: vi.fn() as any,
-    updateName: vi.fn() as any,
-    delete: vi.fn() as any,
-    findByOwner: vi.fn() as any,
-    inAnyRoutine: vi.fn() as any,
+    findById: vi.fn(),
+    findByName: vi.fn(),
+    findAll: vi.fn(),
+    create: vi.fn(),
+    updateName: vi.fn(),
+    delete: vi.fn(),
+    findByOwner: vi.fn(),
+    inAnyRoutine: vi.fn(),
     ...overrides,
-  }
+  } as unknown as any
 }
 
 describe('renameExerciseUseCase', () => {

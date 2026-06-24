@@ -118,7 +118,7 @@ test('shows empty state on a day with no exercises', async ({ page }) => {
     await expect(page.getByRole('button', { name: 'close' })).not.toBeVisible()
   } else {
     await expect(page.getByRole('heading', { name: 'CURRENT ASSETS' })).toBeVisible()
-    await expect(page.locator('[id^="assignment-card-"]')).toHaveCountGreaterThan(0)
+    await expect(page.locator('[id^="assignment-card-"]').first()).toBeVisible()
   }
 })
 

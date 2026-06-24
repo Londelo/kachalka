@@ -91,7 +91,7 @@ describe('createSqliteRoutineRepository', () => {
       const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Bench Press', user.lastInsertRowid!)
       db!.prepare('INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)').run(user.lastInsertRowid!, exercise.lastInsertRowid!, 0)
 
-      const found = repo.findByUserAndDay(user.lastInsertRowid!, 0)
+      const found = repo.findByUserAndDay(Number(user.lastInsertRowid), 0)
       expect(found).toBeDefined()
       expect(found!.userId).toBe(Number(user.lastInsertRowid))
       expect(found!.dayOfWeek).toBe('Monday')

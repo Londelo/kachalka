@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { getUserRoutineUseCase } from '@/features/routine/get-user-routine'
 import type { RoutineRepository } from '@/features/routine/routine-repository'
 
-function makeRepo(overrides: Partial<RoutineRepository> = {}): RoutineRepository {
+function makeRepo(overrides: Partial<RoutineRepository> = {}) {
   return {
     exerciseExists: vi.fn(),
     exists: vi.fn(),
@@ -14,7 +14,7 @@ function makeRepo(overrides: Partial<RoutineRepository> = {}): RoutineRepository
     findAllByUserGroupedByDay: vi.fn(),
     delete: vi.fn(),
     ...overrides,
-  }
+  } as unknown as any
 }
 
 beforeEach(() => {
@@ -65,7 +65,7 @@ describe('getUserRoutineUseCase', () => {
     const result = useCase.execute(1)
 
     expect(result).toEqual(grouped)
-    expect(result.Monday).toHaveLength(2)
+    expect((result as Record<string, typeof grouped['Monday']>)['Monday']).toHaveLength(2)
   })
 
   it('returns grouped assignments across all days', () => {

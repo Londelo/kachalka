@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import {
   getAssignmentsForDay,
   getDayLabel,
-  resolveDaySelection,
   isDaySelected,
 } from '@/app/plan/utils'
 import type { RoutineAssignment } from '@/features/routine/routine-entity'
@@ -93,63 +92,22 @@ describe('getDayLabel', () => {
   })
 })
 
-describe('resolveDaySelection', () => {
-  it('toggles to adding mode when clicking the selected day', () => {
-    const result = resolveDaySelection(0, null, 0)
-    expect(result.nextSelectedDay).toBe(0)
-    expect(result.nextAddingDay).toBe(0)
-  })
-
-  it('clears adding mode when clicking a different day', () => {
-    const result = resolveDaySelection(0, 0, 1)
-    expect(result.nextSelectedDay).toBe(1)
-    expect(result.nextAddingDay).toBeNull()
-  })
-
-  it('keeps adding mode when clicking the same day already in adding mode', () => {
-    const result = resolveDaySelection(0, 0, 0)
-    expect(result.nextSelectedDay).toBe(0)
-    expect(result.nextAddingDay).toBe(0)
-  })
-
-  it('clears adding mode when clicking a different day while in adding mode', () => {
-    const result = resolveDaySelection(2, 2, 5)
-    expect(result.nextSelectedDay).toBe(5)
-    expect(result.nextAddingDay).toBeNull()
-  })
-
-  it('clears adding mode when clicking a day not currently selected', () => {
-    const result = resolveDaySelection(-1, null, 3)
-    expect(result.nextSelectedDay).toBe(3)
-    expect(result.nextAddingDay).toBeNull()
-  })
-
-  it('clears adding mode when clicking a different day than selected', () => {
-    const result = resolveDaySelection(-1, null, 0)
-    expect(result.nextSelectedDay).toBe(0)
-    expect(result.nextAddingDay).toBeNull()
-  })
-})
-
 describe('isDaySelected', () => {
-  it('returns true when day matches selected but not adding', () => {
-    expect(isDaySelected(2, null, 2)).toBe(true)
-    expect(isDaySelected(3, 0, 3)).toBe(true)
-  })
-
-  it('returns false when day matches adding day', () => {
-    expect(isDaySelected(2, 2, 2)).toBe(false)
+  it('returns true when day matches selected', () => {
+    expect(isDaySelected(2, 2)).toBe(true)
+    expect(isDaySelected(0, 0)).toBe(true)
   })
 
   it('returns false when day does not match selected', () => {
-    expect(isDaySelected(0, null, 1)).toBe(false)
+    expect(isDaySelected(0, 1)).toBe(false)
+    expect(isDaySelected(3, 5)).toBe(false)
   })
 
-  it('returns true for addingDay=null with matching selected', () => {
-    expect(isDaySelected(5, null, 5)).toBe(true)
+  it('returns true for matching selected day', () => {
+    expect(isDaySelected(5, 5)).toBe(true)
   })
 
-  it('returns false for non-matching selected with null adding', () => {
-    expect(isDaySelected(0, null, 6)).toBe(false)
+  it('returns false for non-matching selected', () => {
+    expect(isDaySelected(0, 6)).toBe(false)
   })
 })

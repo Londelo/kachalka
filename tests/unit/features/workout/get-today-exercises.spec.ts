@@ -4,48 +4,48 @@ import type { WorkoutRepository } from '@/features/workout/workout-repository'
 import type { RoutineRepository } from '@/features/routine/routine-repository'
 import type { ExerciseRepository } from '@/features/exercise/exercise-repository'
 
-function makeWorkoutRepo(overrides: Partial<WorkoutRepository> = {}): WorkoutRepository {
+function makeWorkoutRepo(overrides?: Partial<WorkoutRepository>) {
   return {
-    findById: vi.fn() as any,
-    create: vi.fn() as any,
-    findByDateAndExercise: vi.fn() as any,
-    findByDate: vi.fn() as any,
-    findAllByUser: vi.fn() as any,
-    update: vi.fn() as any,
-    delete: vi.fn() as any,
-    findByDayOfWeek: vi.fn() as any,
-    findLatestForExercise: vi.fn() as any,
+    findById: vi.fn(),
+    create: vi.fn(),
+    findByDateAndExercise: vi.fn(),
+    findByDate: vi.fn(),
+    findAllByUser: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    findByDayOfWeek: vi.fn(),
+    findLatestForExercise: vi.fn(),
     ...overrides,
-  }
+  } as unknown as any
 }
 
-function makeRoutineRepo(overrides: Partial<RoutineRepository> = {}): RoutineRepository {
+function makeRoutineRepo(overrides?: Partial<RoutineRepository>) {
   return {
-    findById: vi.fn() as any,
-    findByUserAndDay: vi.fn() as any,
-    findByUserExerciseAndDay: vi.fn() as any,
-    findAllByUser: vi.fn() as any,
-    findAllByUserGroupedByDay: vi.fn() as any,
-    create: vi.fn() as any,
-    delete: vi.fn() as any,
-    exists: vi.fn() as any,
-    exerciseExists: vi.fn() as any,
+    findById: vi.fn(),
+    findByUserAndDay: vi.fn(),
+    findByUserExerciseAndDay: vi.fn(),
+    findAllByUser: vi.fn(),
+    findAllByUserGroupedByDay: vi.fn(),
+    create: vi.fn(),
+    delete: vi.fn(),
+    exists: vi.fn(),
+    exerciseExists: vi.fn(),
     ...overrides,
-  }
+  } as unknown as any
 }
 
-function makeExerciseRepo(overrides: Partial<ExerciseRepository> = {}): ExerciseRepository {
+function makeExerciseRepo(overrides?: Partial<ExerciseRepository>) {
   return {
-    findById: vi.fn() as any,
-    findByName: vi.fn() as any,
-    findAll: vi.fn() as any,
-    create: vi.fn() as any,
-    updateName: vi.fn() as any,
-    delete: vi.fn() as any,
-    findByOwner: vi.fn() as any,
-    inAnyRoutine: vi.fn() as any,
+    findById: vi.fn(),
+    findByName: vi.fn(),
+    findAll: vi.fn(),
+    create: vi.fn(),
+    updateName: vi.fn(),
+    delete: vi.fn(),
+    findByOwner: vi.fn(),
+    inAnyRoutine: vi.fn(),
     ...overrides,
-  }
+  } as unknown as any
 }
 
 beforeEach(() => {

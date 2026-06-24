@@ -2,19 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { deleteWorkoutUseCase } from '@/features/workout/delete-workout'
 import type { WorkoutRepository } from '@/features/workout/workout-repository'
 
-function makeRepo(overrides: Partial<WorkoutRepository> = {}): WorkoutRepository {
+function makeRepo(overrides?: Partial<WorkoutRepository>) {
   return {
-    findById: vi.fn() as any,
-    create: vi.fn() as any,
-    findByDateAndExercise: vi.fn() as any,
-    findByDate: vi.fn() as any,
-    findAllByUser: vi.fn() as any,
-    update: vi.fn() as any,
-    delete: vi.fn() as any,
-    findByDayOfWeek: vi.fn() as any,
-    findHistoryByDate: vi.fn() as any,
+    findById: vi.fn(),
+    create: vi.fn(),
+    findByDateAndExercise: vi.fn(),
+    findByDate: vi.fn(),
+    findAllByUser: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    findByDayOfWeek: vi.fn(),
+    findHistoryByDate: vi.fn(),
     ...overrides,
-  }
+  } as unknown as any
 }
 
 beforeEach(() => {

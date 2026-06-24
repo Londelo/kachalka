@@ -11,9 +11,6 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-echo "Seeding Bruno data..."
-node scripts/seed-bruno-data.js
-
 echo "Starting dev server on port $PORT..."
 npx next dev -p "$PORT" &
 SERVER_PID=$!

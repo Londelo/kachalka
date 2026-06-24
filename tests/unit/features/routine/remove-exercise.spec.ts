@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { removeExerciseUseCase } from '@/features/routine/remove-exercise'
 import type { RoutineRepository } from '@/features/routine/routine-repository'
 
-function makeRepo(overrides: Partial<RoutineRepository> = {}): RoutineRepository {
+function makeRepo(overrides: Partial<RoutineRepository> = {}) {
   return {
     exerciseExists: vi.fn(),
     exists: vi.fn(),
@@ -14,7 +14,7 @@ function makeRepo(overrides: Partial<RoutineRepository> = {}): RoutineRepository
     findAllByUserGroupedByDay: vi.fn(),
     delete: vi.fn(),
     ...overrides,
-  }
+  } as unknown as any
 }
 
 beforeEach(() => {

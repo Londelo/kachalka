@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import '@testing-library/jest-dom/vitest'
 import AddUserModal from '@/components/add-user-modal'
 
 vi.mock('@/features/user/user-server-actions', () => ({
@@ -10,8 +11,7 @@ function getMock() {
   return require('@/features/user/user-server-actions')
 }
 
-function renderModal({ open = true, onClose = vi.fn() } = {}) {
-  const onCreated = vi.fn()
+function renderModal({ open = true, onClose = vi.fn(), onCreated = vi.fn() } = {}) {
   const { container } = render(
     <AddUserModal open={open} onClose={onClose} onCreated={onCreated} />,
   )

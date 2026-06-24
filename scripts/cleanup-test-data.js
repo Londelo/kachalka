@@ -8,11 +8,18 @@ const dbPath = path.join(__dirname, '..', 'data', 'kachalka.db')
 const db = new Database(dbPath)
 db.pragma('foreign_keys = ON')
 
-db.exec('DELETE FROM workout_logs')
-db.exec('DELETE FROM user_routines')
-db.exec('DELETE FROM exercises')
-db.exec('DELETE FROM users')
-db.exec("DELETE FROM sqlite_sequence WHERE name IN ('users', 'exercises', 'workout_logs', 'user_routines')")
+const tables = db
+  .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('workout_logs','user_routines','exercises','users')")
+  .all()
+  .map((r) => r.name)
+
+if (tables.length > 0) {
+  db.exec("DELETE FROM workout_logs")
+  db.exec("DELETE FROM user_routines")
+  db.exec("DELETE FROM exercises")
+  db.exec("DELETE FROM users")
+  db.exec("DELETE FROM sqlite_sequence WHERE name IN ('users', 'exercises', 'workout_logs', 'user_routines')")
+}
 
 db.close()
 console.log('All test data wiped.')

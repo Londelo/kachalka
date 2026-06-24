@@ -5,8 +5,8 @@ import type { ChartDataPoint, ChartBarData } from '@/features/chart/chart-entity
 describe('groupByGranularity — session', () => {
   it('groups session data as-is: single date, summed volume', () => {
     const input: ChartDataPoint[] = [
-      { date: '2025-01-01', volume: 100, sets: [{ id: 's1', reps: 10, weight: 50 }] },
-      { date: '2025-01-01', volume: 50, sets: [{ id: 's2', reps: 5, weight: 40 }] },
+      { date: '2025-01-01', volume: 100, sets: [{ id: 's1', reps: 10, weight: 50 }], exercises: [] },
+      { date: '2025-01-01', volume: 50, sets: [{ id: 's2', reps: 5, weight: 40 }], exercises: [] },
     ]
 
     const result = groupByGranularity(input, 'session')
@@ -20,8 +20,8 @@ describe('groupByGranularity — session', () => {
 
   it('returns multiple entries for different dates', () => {
     const input: ChartDataPoint[] = [
-      { date: '2025-01-01', volume: 100, sets: [{ id: 's1', reps: 10, weight: 50 }] },
-      { date: '2025-01-02', volume: 200, sets: [{ id: 's2', reps: 8, weight: 60 }] },
+      { date: '2025-01-01', volume: 100, sets: [{ id: 's1', reps: 10, weight: 50 }], exercises: [] },
+      { date: '2025-01-02', volume: 200, sets: [{ id: 's2', reps: 8, weight: 60 }], exercises: [] },
     ]
 
     const result = groupByGranularity(input, 'session')
@@ -42,9 +42,9 @@ describe('groupByGranularity — session', () => {
 describe('groupByGranularity — week', () => {
   it('groups dates in the same ISO week under YYYY-Www with summed volume', () => {
     const input: ChartDataPoint[] = [
-      { date: '2025-01-06', volume: 100, sets: [{ id: 's1', reps: 10, weight: 50 }] },
-      { date: '2025-01-08', volume: 200, sets: [{ id: 's2', reps: 8, weight: 60 }] },
-      { date: '2025-01-12', volume: 50, sets: [{ id: 's3', reps: 5, weight: 40 }] },
+      { date: '2025-01-06', volume: 100, sets: [{ id: 's1', reps: 10, weight: 50 }], exercises: [] },
+      { date: '2025-01-08', volume: 200, sets: [{ id: 's2', reps: 8, weight: 60 }], exercises: [] },
+      { date: '2025-01-12', volume: 50, sets: [{ id: 's3', reps: 5, weight: 40 }], exercises: [] },
     ]
 
     const result = groupByGranularity(input, 'week')
@@ -58,8 +58,8 @@ describe('groupByGranularity — week', () => {
 
   it('separates dates across different ISO weeks', () => {
     const input: ChartDataPoint[] = [
-      { date: '2025-01-06', volume: 100, sets: [{ id: 's1', reps: 10, weight: 50 }] },
-      { date: '2025-01-13', volume: 200, sets: [{ id: 's2', reps: 8, weight: 60 }] },
+      { date: '2025-01-06', volume: 100, sets: [{ id: 's1', reps: 10, weight: 50 }], exercises: [] },
+      { date: '2025-01-13', volume: 200, sets: [{ id: 's2', reps: 8, weight: 60 }], exercises: [] },
     ]
 
     const result = groupByGranularity(input, 'week')
@@ -75,9 +75,9 @@ describe('groupByGranularity — week', () => {
 describe('groupByGranularity — month', () => {
   it('groups dates in the same calendar month under YYYY-MM with summed volume', () => {
     const input: ChartDataPoint[] = [
-      { date: '2025-01-05', volume: 100, sets: [{ id: 's1', reps: 10, weight: 50 }] },
-      { date: '2025-01-15', volume: 200, sets: [{ id: 's2', reps: 8, weight: 60 }] },
-      { date: '2025-01-25', volume: 50, sets: [{ id: 's3', reps: 5, weight: 40 }] },
+      { date: '2025-01-05', volume: 100, sets: [{ id: 's1', reps: 10, weight: 50 }], exercises: [] },
+      { date: '2025-01-15', volume: 200, sets: [{ id: 's2', reps: 8, weight: 60 }], exercises: [] },
+      { date: '2025-01-25', volume: 50, sets: [{ id: 's3', reps: 5, weight: 40 }], exercises: [] },
     ]
 
     const result = groupByGranularity(input, 'month')
@@ -91,8 +91,8 @@ describe('groupByGranularity — month', () => {
 
   it('separates dates across different months', () => {
     const input: ChartDataPoint[] = [
-      { date: '2025-01-20', volume: 100, sets: [{ id: 's1', reps: 10, weight: 50 }] },
-      { date: '2025-02-10', volume: 200, sets: [{ id: 's2', reps: 8, weight: 60 }] },
+      { date: '2025-01-20', volume: 100, sets: [{ id: 's1', reps: 10, weight: 50 }], exercises: [] },
+      { date: '2025-02-10', volume: 200, sets: [{ id: 's2', reps: 8, weight: 60 }], exercises: [] },
     ]
 
     const result = groupByGranularity(input, 'month')
@@ -108,9 +108,9 @@ describe('groupByGranularity — month', () => {
 describe('groupByGranularity — volume summation', () => {
   it('sums volume correctly within session group', () => {
     const input: ChartDataPoint[] = [
-      { date: '2025-03-01', volume: 45, sets: [{ id: 's1', reps: 5, weight: 90 }] },
-      { date: '2025-03-01', volume: 64, sets: [{ id: 's2', reps: 8, weight: 80 }] },
-      { date: '2025-03-01', volume: 80, sets: [{ id: 's3', reps: 10, weight: 80 }] },
+      { date: '2025-03-01', volume: 45, sets: [{ id: 's1', reps: 5, weight: 90 }], exercises: [] },
+      { date: '2025-03-01', volume: 64, sets: [{ id: 's2', reps: 8, weight: 80 }], exercises: [] },
+      { date: '2025-03-01', volume: 80, sets: [{ id: 's3', reps: 10, weight: 80 }], exercises: [] },
     ]
 
     const result = groupByGranularity(input, 'session')
@@ -122,9 +122,9 @@ describe('groupByGranularity — volume summation', () => {
 
   it('sums volume correctly within week group', () => {
     const input: ChartDataPoint[] = [
-      { date: '2025-01-06', volume: 100, sets: [{ id: 's1', reps: 10, weight: 50 }] },
-      { date: '2025-01-09', volume: 150, sets: [{ id: 's2', reps: 12, weight: 50 }] },
-      { date: '2025-01-11', volume: 75, sets: [{ id: 's3', reps: 5, weight: 30 }] },
+      { date: '2025-01-06', volume: 100, sets: [{ id: 's1', reps: 10, weight: 50 }], exercises: [] },
+      { date: '2025-01-09', volume: 150, sets: [{ id: 's2', reps: 12, weight: 50 }], exercises: [] },
+      { date: '2025-01-11', volume: 75, sets: [{ id: 's3', reps: 5, weight: 30 }], exercises: [] },
     ]
 
     const result = groupByGranularity(input, 'week')
@@ -136,9 +136,9 @@ describe('groupByGranularity — volume summation', () => {
 
   it('sums volume correctly within month group', () => {
     const input: ChartDataPoint[] = [
-      { date: '2025-06-01', volume: 200, sets: [{ id: 's1', reps: 10, weight: 100 }] },
-      { date: '2025-06-15', volume: 300, sets: [{ id: 's2', reps: 12, weight: 100 }] },
-      { date: '2025-06-28', volume: 150, sets: [{ id: 's3', reps: 8, weight: 75 }] },
+      { date: '2025-06-01', volume: 200, sets: [{ id: 's1', reps: 10, weight: 100 }], exercises: [] },
+      { date: '2025-06-15', volume: 300, sets: [{ id: 's2', reps: 12, weight: 100 }], exercises: [] },
+      { date: '2025-06-28', volume: 150, sets: [{ id: 's3', reps: 8, weight: 75 }], exercises: [] },
     ]
 
     const result = groupByGranularity(input, 'month')
@@ -180,9 +180,9 @@ describe('groupByGranularity — exercises merging', () => {
 describe('groupByGranularity — sorted output', () => {
   it('returns data sorted ascending by date', () => {
     const input: ChartDataPoint[] = [
-      { date: '2025-03-10', volume: 100, sets: [{ id: 's1', reps: 10, weight: 50 }] },
-      { date: '2025-01-05', volume: 200, sets: [{ id: 's2', reps: 8, weight: 60 }] },
-      { date: '2025-06-15', volume: 150, sets: [{ id: 's3', reps: 5, weight: 40 }] },
+      { date: '2025-03-10', volume: 100, sets: [{ id: 's1', reps: 10, weight: 50 }], exercises: [] },
+      { date: '2025-01-05', volume: 200, sets: [{ id: 's2', reps: 8, weight: 60 }], exercises: [] },
+      { date: '2025-06-15', volume: 150, sets: [{ id: 's3', reps: 5, weight: 40 }], exercises: [] },
     ]
 
     const result = groupByGranularity(input, 'session')
@@ -195,9 +195,9 @@ describe('groupByGranularity — sorted output', () => {
 
   it('returns data sorted ascending by month key', () => {
     const input: ChartDataPoint[] = [
-      { date: '2025-06-01', volume: 100, sets: [{ id: 's1', reps: 10, weight: 50 }] },
-      { date: '2025-01-15', volume: 200, sets: [{ id: 's2', reps: 8, weight: 60 }] },
-      { date: '2025-03-20', volume: 150, sets: [{ id: 's3', reps: 5, weight: 40 }] },
+      { date: '2025-06-01', volume: 100, sets: [{ id: 's1', reps: 10, weight: 50 }], exercises: [] },
+      { date: '2025-01-15', volume: 200, sets: [{ id: 's2', reps: 8, weight: 60 }], exercises: [] },
+      { date: '2025-03-20', volume: 150, sets: [{ id: 's3', reps: 5, weight: 40 }], exercises: [] },
     ]
 
     const result = groupByGranularity(input, 'month')
