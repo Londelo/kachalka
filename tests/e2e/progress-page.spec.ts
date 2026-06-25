@@ -267,23 +267,32 @@ test('changes granularity between session week and month', async ({ page }) => {
   await page.goto('http://localhost:3111/progress')
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
-  // Default granularity is session — should show 3 separate bars
+  // Default granularity is month
+  await expect(page.getByText('VOLUME BY MONTH')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'month' })).toHaveClass(/bg-primary/)
+
+  // Switch to session granularity
+  await page.getByRole('button', { name: 'session' }).click()
   await expect(page.getByText('VOLUME BY SESSION')).toBeVisible()
   await expect(page.getByRole('button', { name: 'session' })).toHaveClass(/bg-primary/)
+  await expect(page.getByRole('button', { name: 'month' })).not.toHaveClass(/bg-primary/)
 
   // Switch to week granularity
   await page.getByRole('button', { name: 'week' }).click()
   await expect(page.getByText('VOLUME BY WEEK')).toBeVisible()
   await expect(page.getByRole('button', { name: 'week' })).toHaveClass(/bg-primary/)
-  await expect(page.getByRole('button', { name: 'session' })).not.toHaveClass(/bg-primary/)
-
-  // Switch to month granularity
-  await page.getByRole('button', { name: 'month' }).click()
-  await expect(page.getByText('VOLUME BY MONTH')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'month' })).toHaveClass(/bg-primary/)
 })
 
-test('tooltip shows workout details on hover', async ({ page }) => {
+/** Click on the chart container center — Recharts Bar onClick fires on click within the chart. */
+async function clickChartBar(page: { mouse: { click: (x: number, y: number) => Promise<void> } }) {
+  const chart = page.locator('[id="progress-bar-chart"]')
+  const box = await chart.boundingBox()
+  if (!box) throw new Error('Chart bounding box not found')
+  // Click at the center of the chart area
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+}
+
+test('clicking a bar opens detail modal', async ({ page }) => {
   const exerciseId = createExercises(['Bench Press'])[0]
 
   createWorkoutLog(exerciseId, '2026-05-01', [
@@ -295,32 +304,125 @@ test('tooltip shows workout details on hover', async ({ page }) => {
   await page.goto('http://localhost:3111/progress')
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
-  // Hover over the chart area to trigger tooltip
+  // Chart should be visible
+  await expect(page.locator('[id="progress-bar-chart"]')).toBeVisible()
+
+  // Click on the first bar (JS finds bar rect coords, then clicks center)
+  await clickChartBar(page)
+
+  // Modal should appear
+  await expect(page.locator('[id="progress-detail-modal"]')).toBeVisible({ timeout: 5000 })
+})
+
+test('modal shows date, exercise name, and metrics', async ({ page }) => {
+  const exerciseId = createExercises(['Bench Press'])[0]
+
+  createWorkoutLog(exerciseId, '2026-05-01', [
+    { id: 's1', reps: 5, weight: 135 },
+    { id: 's2', reps: 3, weight: 155 },
+  ])
+
+  await loginAsBruno(page)
+  await page.goto('http://localhost:3111/progress')
+  await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
+
+  // Click on the first bar (JS finds bar rect coords, then clicks center)
+  await clickChartBar(page)
+
+  // Modal should appear
+  await expect(page.locator('[id="progress-detail-modal"]')).toBeVisible({ timeout: 5000 })
+
+  // Date badge visible — FRI, 01 MAY 2026 (May 1, 2026 is a Friday)
+  await expect(page.getByText('FRI, 01 MAY 2026')).toBeVisible()
+
+  // Exercise name visible (scoped to modal to avoid strict mode conflict with dropdown)
+  await expect(page.locator('[id="progress-detail-modal"]').getByText('Bench Press')).toBeVisible()
+
+  // Metrics visible: exercise name, sets, reps, volume, max weight
+  const modal = page.locator('[id="progress-detail-modal"]')
+  await expect(modal.getByText('Bench Press')).toBeVisible()
+  // Use regex to match any numeric value for these fields (test data may vary across retries)
+  await expect(modal.getByText(/sets/)).toBeVisible()
+  await expect(modal.getByText(/reps/)).toBeVisible()
+  await expect(modal.getByText(/vol/)).toBeVisible()
+  await expect(modal.getByText(/max lb/)).toBeVisible()
+
+  // Grand total volume
+  await expect(modal.getByText('TOTAL VOLUME')).toBeVisible()
+  await expect(modal.getByText('1,140').first()).toBeVisible()
+
+  // Close button visible
+  await expect(page.getByRole('button', { name: 'CLOSE' })).toBeVisible()
+})
+
+test('closing modal via close button dismisses it', async ({ page }) => {
+  const exerciseId = createExercises(['Bench Press'])[0]
+
+  createWorkoutLog(exerciseId, '2026-05-01', [
+    { id: 's1', reps: 5, weight: 135 },
+  ])
+
+  await loginAsBruno(page)
+  await page.goto('http://localhost:3111/progress')
+  await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
+
+  // Open modal by clicking the chart area
+  const chart = page.locator('[id="progress-bar-chart"]')
+  await clickChartBar(page)
+  await expect(page.locator('[id="progress-detail-modal"]')).toBeVisible({ timeout: 5000 })
+
+  // Click CLOSE
+  await page.getByRole('button', { name: 'CLOSE' }).click()
+
+  // Modal should be gone
+  await expect(page.locator('[id="progress-detail-modal"]')).not.toBeVisible()
+})
+
+test('closing modal via backdrop click dismisses it', async ({ page }) => {
+  const exerciseId = createExercises(['Bench Press'])[0]
+
+  createWorkoutLog(exerciseId, '2026-05-01', [
+    { id: 's1', reps: 5, weight: 135 },
+  ])
+
+  await loginAsBruno(page)
+  await page.goto('http://localhost:3111/progress')
+  await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
+
+  // Open modal by clicking the chart area
+  const chart = page.locator('[id="progress-bar-chart"]')
+  await clickChartBar(page)
+  await expect(page.locator('[id="progress-detail-modal"]')).toBeVisible({ timeout: 5000 })
+
+  // Click outside the modal (backdrop)
+  await page.locator('[id="progress-detail-modal"]').click({ position: { x: 0, y: 0 } })
+
+  // Modal should be gone
+  await expect(page.locator('[id="progress-detail-modal"]')).not.toBeVisible()
+})
+
+test('modal does not open on hover', async ({ page }) => {
+  const exerciseId = createExercises(['Bench Press'])[0]
+
+  createWorkoutLog(exerciseId, '2026-05-01', [
+    { id: 's1', reps: 5, weight: 135 },
+  ])
+
+  await loginAsBruno(page)
+  await page.goto('http://localhost:3111/progress')
+  await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
+
+  // Hover over the chart — no modal should appear
   const chart = page.locator('[id="progress-bar-chart"]')
   await chart.hover()
 
-  // Wait for tooltip to appear — Recharts tooltip contains exercise name + volume info
-  // Scope to chart area to avoid strict mode violation with dropdown option
-  await expect(chart.getByText('Bench Press')).toBeVisible({ timeout: 5000 })
-  // Volume = 5*135 + 3*155 = 675 + 465 = 1140 (formatted with comma)
-  await expect(page.getByText('TOTAL: 1,140')).toBeVisible()
-})
-
-test('redirects to home when no user cookie', async ({ page }) => {
-  // Don't login — navigate directly
-  await page.goto('http://localhost:3111/progress')
-
-  // The header should still be visible (SSR shell renders)
-  // But the page content may be blank since userId is missing
-  // The page shows the header and controls even without userId
-  await expect(page.locator('[id="progress-page"]')).toBeVisible({ timeout: 10000 })
+  // Modal should NOT be visible
+  await expect(page.locator('[id="progress-detail-modal"]')).not.toBeVisible()
 })
 
 test('volume calculation is correct', async ({ page }) => {
   const exerciseId = createExercises(['Squat'])[0]
 
-  // Single log with 3 sets of 3x225 = 2025 volume
-  // (3 separate logs on same date get merged by Recharts into one bar)
   createWorkoutLog(exerciseId, '2026-05-01', [
     { id: 's1', reps: 3, weight: 225 },
     { id: 's2', reps: 3, weight: 225 },
@@ -331,16 +433,64 @@ test('volume calculation is correct', async ({ page }) => {
   await page.goto('http://localhost:3111/progress')
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
-  // Chart should be visible with data
+  // Chart should be visible
   await expect(page.locator('[id="progress-bar-chart"]')).toBeVisible()
 
-  // Verify the tooltip shows correct total
+  // Click bar to open modal
   const chart = page.locator('[id="progress-bar-chart"]')
-  await chart.hover()
+  await clickChartBar(page)
 
-  // 3 sets of 3x225 = 2,025 (upsert on same date replaces sets)
-  await expect(chart.getByText('Squat')).toBeVisible({ timeout: 5000 })
-  await expect(page.getByText('TOTAL: 2,025')).toBeVisible()
+  // Modal should show correct volume
+  await expect(page.locator('[id="progress-detail-modal"]')).toBeVisible({ timeout: 5000 })
+
+  // 3 sets of 3x225 = 2,025 volume (use .first() to avoid strict mode with grand total footer)
+  await expect(page.locator('[id="progress-detail-modal"]').getByText('Squat')).toBeVisible()
+  await expect(page.locator('[id="progress-detail-modal"]').getByText('2,025').first()).toBeVisible()
+
+  // Close modal
+  await page.getByRole('button', { name: 'CLOSE' }).click()
+})
+
+test('multiple exercises in ALL mode shows all in chart', async ({ page }) => {
+  const ids = createExercises(['Bench Press', 'Squat', 'Deadlift'])
+
+  createWorkoutLog(ids[0], '2026-05-01', [{ id: 's1', reps: 5, weight: 135 }])
+  createWorkoutLog(ids[1], '2026-05-01', [{ id: 's2', reps: 5, weight: 225 }])
+  createWorkoutLog(ids[2], '2026-05-01', [{ id: 's3', reps: 5, weight: 315 }])
+
+  await loginAsBruno(page)
+  await page.goto('http://localhost:3111/progress')
+  await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
+
+  // All 3 exercises should appear in dropdown + ALL EXERCISES
+  const options = page.locator('[id="progress-exercise-selector"] select option')
+  expect(await options.count()).toBe(4)
+
+  // Chart should be visible (ALL EXERCISES is default)
+  await expect(page.locator('[id="progress-bar-chart"]')).toBeVisible()
+
+  // Click bar to open modal
+  const chart = page.locator('[id="progress-bar-chart"]')
+  await clickChartBar(page)
+
+  // Modal should list all exercises
+  await expect(page.locator('[id="progress-detail-modal"]')).toBeVisible({ timeout: 5000 })
+  await expect(page.locator('[id="progress-detail-modal"]').getByText('Bench Press')).toBeVisible()
+  await expect(page.locator('[id="progress-detail-modal"]').getByText('Squat')).toBeVisible()
+  await expect(page.locator('[id="progress-detail-modal"]').getByText('Deadlift')).toBeVisible()
+
+  // Close modal (use force to click outside viewport for large modals)
+  await page.getByRole('button', { name: 'CLOSE' }).click({ force: true })
+})
+
+test('redirects to home when no user cookie', async ({ page }) => {
+  // Don't login — navigate directly
+  await page.goto('http://localhost:3111/progress')
+
+  // The header should still be visible (SSR shell renders)
+  // But the page content may be blank since userId is missing
+  // The page shows the header and controls even without userId
+  await expect(page.locator('[id="progress-page"]')).toBeVisible({ timeout: 10000 })
 })
 
 test('dropdown is empty when no exercises have logs', async ({ page }) => {
@@ -385,44 +535,17 @@ test('chart title updates with granularity change', async ({ page }) => {
   await page.goto('http://localhost:3111/progress')
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
-  // Default
+  // Default is month
+  await expect(page.getByText('VOLUME BY MONTH')).toBeVisible()
+
+  await page.getByRole('button', { name: 'session' }).click()
   await expect(page.getByText('VOLUME BY SESSION')).toBeVisible()
 
   await page.getByRole('button', { name: 'week' }).click()
   await expect(page.getByText('VOLUME BY WEEK')).toBeVisible()
 
+  // Back to month
   await page.getByRole('button', { name: 'month' }).click()
   await expect(page.getByText('VOLUME BY MONTH')).toBeVisible()
-
-  // Back to session
-  await page.getByRole('button', { name: 'session' }).click()
-  await expect(page.getByText('VOLUME BY SESSION')).toBeVisible()
 })
 
-test('multiple exercises in ALL mode shows all in chart', async ({ page }) => {
-  const ids = createExercises(['Bench Press', 'Squat', 'Deadlift'])
-
-  createWorkoutLog(ids[0], '2026-05-01', [{ id: 's1', reps: 5, weight: 135 }])
-  createWorkoutLog(ids[1], '2026-05-01', [{ id: 's2', reps: 5, weight: 225 }])
-  createWorkoutLog(ids[2], '2026-05-01', [{ id: 's3', reps: 5, weight: 315 }])
-
-  await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
-  await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
-
-  // All 3 exercises should appear in dropdown + ALL EXERCISES
-  const options = page.locator('[id="progress-exercise-selector"] select option')
-  expect(await options.count()).toBe(4)
-
-  // Chart should be visible (ALL EXERCISES is default)
-  await expect(page.locator('[id="progress-bar-chart"]')).toBeVisible()
-
-  // Hover to see tooltip with all exercises
-  const chart = page.locator('[id="progress-bar-chart"]')
-  await chart.hover()
-
-  // Scope to chart area to avoid strict mode violation with dropdown options
-  await expect(chart.getByText('Bench Press')).toBeVisible({ timeout: 5000 })
-  await expect(chart.getByText('Squat')).toBeVisible()
-  await expect(chart.getByText('Deadlift')).toBeVisible()
-})

@@ -8,7 +8,6 @@ import {
   Bar,
   XAxis,
   YAxis,
-  Tooltip,
   CartesianGrid,
 } from 'recharts'
 import {
@@ -25,14 +24,47 @@ type DataPoint = {
   exercises: { name: string; sets: { id: string; reps: number; weight: number }[] }[]
 }
 
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function formatFullDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+  const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
+  return `${DAYS[d.getDay()]}, ${String(d.getDate()).padStart(2, '0')} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
+}
+
+function calcExerciseMetrics(exercises: DataPoint['exercises']): {
+  name: string
+  totalSets: number
+  totalReps: number
+  totalVolume: number
+  maxWeight: number
+}[] {
+  return exercises.map((ex) => {
+    const totalSets = ex.sets.length
+    const totalReps = ex.sets.reduce((sum, s) => sum + s.reps, 0)
+    const totalVolume = ex.sets.reduce((sum, s) => sum + s.reps * s.weight, 0)
+    const maxWeight = ex.sets.length > 0 ? Math.max(...ex.sets.map((s) => s.weight)) : 0
+    return { name: ex.name, totalSets, totalReps, totalVolume, maxWeight }
+  })
+}
+
+function formatVolume(v: number): string {
+  return v.toLocaleString('en-US')
+}
+
 export default function ProgressPage() {
   const [exercises, setExercises] = useState<{ id: number; name: string }[]>([])
   const [selectedExerciseId, setSelectedExerciseId] = useState<number | null>(null)
   const [selectedExerciseName, setSelectedExerciseName] = useState<string>('')
   const [range, setRange] = useState<RangeFilter>('6M')
-  const [granularity, setGranularity] = useState<TimeGranularity>('session')
+  const [granularity, setGranularity] = useState<TimeGranularity>('month')
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedBar, setSelectedBar] = useState<DataPoint | null>(null)
 
   const { start, end } = useLoading()
 
@@ -96,22 +128,6 @@ export default function ProgressPage() {
   }
 
   const maxVolume = Math.max(...dataPoints.map((dp) => dp.volume), 1)
-
-  function formatDate(dateStr: string): string {
-    const d = new Date(dateStr + 'T00:00:00')
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  }
-
-  function formatTooltipDate(dateStr: string): string {
-    const d = new Date(dateStr + 'T00:00:00')
-    const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    const dayPart = d.toLocaleDateString('en-US', { weekday: 'short' })
-    return `${datePart}, ${dayPart.toUpperCase()}`
-  }
-
-  function formatVolume(v: number): string {
-    return v.toLocaleString('en-US')
-  }
 
   return (
     <>
@@ -224,42 +240,81 @@ export default function ProgressPage() {
                     dataKey="volume"
                     tick={{ fontSize: 12, fontFamily: 'inherit' }}
                   />
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload as DataPoint
-                        return (
-                          <div className="border-4 border-on-surface bg-background p-3 font-label-bold text-label-bold text-on-surface shadow-[4px_4px_0px_0px_rgba(27,29,14,1)]">
-                            <div className="mb-1 text-primary">{formatTooltipDate(data.date)}</div>
-                            {data.exercises.map((ex, i) => {
-                              const totalSets = ex.sets.length
-                              const totalReps = ex.sets.reduce((sum, s) => sum + s.reps, 0)
-                              const weights = ex.sets.map((s) => s.weight)
-                              return (
-                                <div key={i}>
-                                  <div className="font-black">{ex.name}</div>
-                                  <div>{totalSets} set{totalSets !== 1 ? 's' : ''} · {totalReps} reps · {weights.join(', ')}</div>
-                                </div>
-                              )
-                            })}
-                            <div className="mt-1 border-t-2 border-on-surface pt-1 font-black text-primary">
-                              TOTAL: {formatVolume(data.volume)}
-                            </div>
-                          </div>
-                        )
-                      }
-                      return null
-                    }}
-                  />
                   <Bar
                     dataKey="volume"
                     fill="#a20000"
                     radius={[4, 4, 0, 0]}
+                    onClick={(data) => {
+                      if (data && data.payload) {
+                        setSelectedBar(data.payload as DataPoint)
+                      }
+                    }}
                   />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </section>
+        )}
+
+        {/* Detail Modal */}
+        {selectedBar && (
+          <div
+            id="progress-detail-modal"
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
+            onClickCapture={(e) => {
+              if (e.target === e.currentTarget) {
+                setSelectedBar(null)
+              }
+            }}
+          >
+            <div className="w-full max-w-lg border-4 border-on-surface bg-background p-6 neo-shadow-lg overflow-y-auto max-h-[90vh]">
+              {/* Date header */}
+              <div className="mb-4">
+                <div className="mt-1 border-4 border-on-surface bg-primary px-2 py-0.5 neo-shadow-sm inline-block">
+                  <span className="font-label-bold text-label-bold uppercase text-on-primary">
+                    {formatFullDate(selectedBar.date)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Exercise rows */}
+              <div className="mb-6 flex flex-col gap-2">
+                {calcExerciseMetrics(selectedBar.exercises).map((ex) => (
+                  <div key={ex.name} className="border-4 border-on-surface bg-surface-container p-3 neo-shadow">
+                    <div className="font-headline-sm font-black uppercase text-on-surface">
+                      {ex.name}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-label-bold text-label-bold text-on-surface">
+                      <span>{ex.totalSets} sets</span>
+                      <span className="text-secondary">·</span>
+                      <span>{ex.totalReps} reps</span>
+                      <span className="text-secondary">·</span>
+                      <span>{ex.totalVolume.toLocaleString()} vol</span>
+                      <span className="text-secondary">·</span>
+                      <span className="ml-auto text-primary">{ex.maxWeight} max lb</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Grand total footer */}
+              <div className="border-t-4 border-on-surface pt-4 text-center">
+                <p className="font-label-mono text-label-mono uppercase text-secondary">TOTAL VOLUME</p>
+                <p className="font-headline-md text-headline-md font-black text-primary">
+                  {selectedBar.volume.toLocaleString()}
+                </p>
+              </div>
+
+              {/* Close button */}
+              <button
+                type="button"
+                onClick={() => setSelectedBar(null)}
+                className="mt-6 w-full border-4 border-on-surface bg-primary p-3 font-label-bold text-label-bold uppercase text-on-primary neo-shadow transition-all active-press"
+              >
+                CLOSE
+              </button>
+            </div>
+          </div>
         )}
       </main>
     </>

@@ -38,7 +38,7 @@ export function groupByGranularity(
             (innerAcc, ex) => {
               const existing = innerAcc[ex.name]
               if (existing) {
-                existing.sets = R.concat(existing.sets, ex.sets)
+                existing.sets = [...existing.sets, ...ex.sets]
               } else {
                 innerAcc[ex.name] = { name: ex.name, sets: [...ex.sets] }
               }
