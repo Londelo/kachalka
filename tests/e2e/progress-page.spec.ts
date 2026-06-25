@@ -267,20 +267,20 @@ test('changes granularity between session week and month', async ({ page }) => {
   await page.goto('http://localhost:3111/progress')
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
-  // Default granularity is session — should show 3 separate bars
+  // Default granularity is month
+  await expect(page.getByText('VOLUME BY MONTH')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'month' })).toHaveClass(/bg-primary/)
+
+  // Switch to session granularity
+  await page.getByRole('button', { name: 'session' }).click()
   await expect(page.getByText('VOLUME BY SESSION')).toBeVisible()
   await expect(page.getByRole('button', { name: 'session' })).toHaveClass(/bg-primary/)
+  await expect(page.getByRole('button', { name: 'month' })).not.toHaveClass(/bg-primary/)
 
   // Switch to week granularity
   await page.getByRole('button', { name: 'week' }).click()
   await expect(page.getByText('VOLUME BY WEEK')).toBeVisible()
   await expect(page.getByRole('button', { name: 'week' })).toHaveClass(/bg-primary/)
-  await expect(page.getByRole('button', { name: 'session' })).not.toHaveClass(/bg-primary/)
-
-  // Switch to month granularity
-  await page.getByRole('button', { name: 'month' }).click()
-  await expect(page.getByText('VOLUME BY MONTH')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'month' })).toHaveClass(/bg-primary/)
 })
 
 /** Click on the chart container center — Recharts Bar onClick fires on click within the chart. */
@@ -535,17 +535,17 @@ test('chart title updates with granularity change', async ({ page }) => {
   await page.goto('http://localhost:3111/progress')
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
-  // Default
+  // Default is month
+  await expect(page.getByText('VOLUME BY MONTH')).toBeVisible()
+
+  await page.getByRole('button', { name: 'session' }).click()
   await expect(page.getByText('VOLUME BY SESSION')).toBeVisible()
 
   await page.getByRole('button', { name: 'week' }).click()
   await expect(page.getByText('VOLUME BY WEEK')).toBeVisible()
 
+  // Back to month
   await page.getByRole('button', { name: 'month' }).click()
   await expect(page.getByText('VOLUME BY MONTH')).toBeVisible()
-
-  // Back to session
-  await page.getByRole('button', { name: 'session' }).click()
-  await expect(page.getByText('VOLUME BY SESSION')).toBeVisible()
 })
 

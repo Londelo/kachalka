@@ -61,7 +61,7 @@ export default function ProgressPage() {
   const [selectedExerciseId, setSelectedExerciseId] = useState<number | null>(null)
   const [selectedExerciseName, setSelectedExerciseName] = useState<string>('')
   const [range, setRange] = useState<RangeFilter>('6M')
-  const [granularity, setGranularity] = useState<TimeGranularity>('session')
+  const [granularity, setGranularity] = useState<TimeGranularity>('month')
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedBar, setSelectedBar] = useState<DataPoint | null>(null)
