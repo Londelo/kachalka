@@ -277,41 +277,21 @@ export default function ProgressPage() {
                 </div>
               </div>
 
-              {/* Exercise cards */}
-              <div className="mb-6 flex flex-col gap-3">
+              {/* Exercise rows */}
+              <div className="mb-6 flex flex-col gap-2">
                 {calcExerciseMetrics(selectedBar.exercises).map((ex) => (
-                  <div key={ex.name} className="border-4 border-on-surface bg-surface-container p-4 neo-shadow">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-headline-md font-black uppercase text-on-surface">
-                        {ex.name}
-                      </span>
+                  <div key={ex.name} className="border-4 border-on-surface bg-surface-container p-3 neo-shadow">
+                    <div className="font-headline-sm font-black uppercase text-on-surface">
+                      {ex.name}
                     </div>
-                    {/* Metrics grid — 2×2 */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="border-4 border-on-surface bg-on-surface p-2 text-center">
-                        <p className="font-label-mono text-label-mono uppercase text-background">SETS</p>
-                        <p className="font-headline-sm text-headline-sm font-black text-tertiary-fixed">
-                          {ex.totalSets}
-                        </p>
-                      </div>
-                      <div className="border-4 border-on-surface bg-on-surface p-2 text-center">
-                        <p className="font-label-mono text-label-mono uppercase text-background">REPS</p>
-                        <p className="font-headline-sm text-headline-sm font-black text-tertiary-fixed">
-                          {ex.totalReps}
-                        </p>
-                      </div>
-                      <div className="border-4 border-on-surface bg-on-surface p-2 text-center">
-                        <p className="font-label-mono text-label-mono uppercase text-background">VOLUME</p>
-                        <p className="font-headline-sm text-headline-sm font-black text-tertiary-fixed">
-                          {ex.totalVolume.toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="border-4 border-on-surface bg-on-surface p-2 text-center">
-                        <p className="font-label-mono text-label-mono uppercase text-background">MAX LB</p>
-                        <p className="font-headline-sm text-headline-sm font-black text-tertiary-fixed">
-                          {ex.maxWeight}
-                        </p>
-                      </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-label-bold text-label-bold text-on-surface">
+                      <span>{ex.totalSets} sets</span>
+                      <span className="text-secondary">·</span>
+                      <span>{ex.totalReps} reps</span>
+                      <span className="text-secondary">·</span>
+                      <span>{ex.totalVolume.toLocaleString()} vol</span>
+                      <span className="text-secondary">·</span>
+                      <span className="ml-auto text-primary">{ex.maxWeight} max lb</span>
                     </div>
                   </div>
                 ))}
