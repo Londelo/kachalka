@@ -10,7 +10,8 @@
     "test:e2e": "bash scripts/run-playwright-tests.sh",
     "test:e2e:headed": "bash scripts/run-playwright-tests.sh --headed",
     "test:e2e:ui": "bash scripts/run-playwright-tests.sh --ui",
-    "test:e2e:codegen": "bash scripts/codegen.sh"
+    "test:e2e:codegen": "bash scripts/codegen.sh",
+    "prod": "bash scripts/start-prod.sh"
   },
   "dependencies": {
     "autoprefixer": "^10.5.0",

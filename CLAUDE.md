@@ -20,7 +20,7 @@ A Next.js weightlifting workout tracker called **Kachalka** (code name: **IRON C
 kachalka/
 ├── src/
 │   ├── app/                          # Next.js App Router (flat routes, no route groups)
-│   │   ├── layout.tsx                # Root layout — runs migrations + seeds, wraps AppShell
+│   │   ├── layout.tsx                # Root layout — runs migrations, validates env, wraps AppShell
 │   │   ├── page.tsx                  # User selection page (login) — SSR, calls getUsersAction
 │   │   ├── globals.css               # Tailwind directives + neo-brutalism CSS vars
 │   │   ├── history/                  # War Logs
@@ -49,7 +49,6 @@ kachalka/
 │   ├── db/
 │   │   ├── schema.ts                 # Drizzle table definitions (4 tables)
 │   │   ├── migrate.ts                # Migration runner — checks required tables, runs all .sql files
-│   │   ├── seed.ts                   # Bruno seed + progress data (runs on module load)
 │   │   └── migrations/               # Drizzle migration SQL files
 │   │       ├── 0000_square_shadowcat.sql
 │   │       ├── 0001_init.sql          # Full schema with constraints
@@ -100,7 +99,7 @@ kachalka/
 │   │       ├── chart-entity.ts       # ChartDataPoint, ChartBarData, RangeFilter, TimeGranularity, IntensitySplit
 │   │       ├── chart-repository.ts   # Interface (getVolumeByDate, getPeakVolume, getIntensitySplit, getExercisesWithLogs)
 │   │       ├── chart-repo-impl.ts    # SQLite implementation (factory function, native JS)
-│   │       ├── chart-utils.ts        # groupByGranularity, toISOWeekKey, toMonthKey
+│   │       ├── chart-utils.ts        # groupByGranularity (toISOWeekKey, toMonthKey are private helpers)
 │   │       └── chart-server-actions.ts # getExerciseChartData, getAllExerciseChartData, getExercisesWithLogsAction, getPeakVolumeAction, getIntensitySplitAction
 │   │
 │   └── shared/
@@ -169,13 +168,13 @@ Each feature follows Clean Architecture with inward dependency flow:
 ```
 server-actions.ts  (interface adapter — Next.js specific, 'use server')
        ↓
-use-cases/*.ts    (business logic — factory functions returning { execute() })
+*-use-case.ts      (business logic — flat files, factory functions returning { execute() })
        ↓
-*-repository.ts   (interface — TypeScript interfaces, contracts only)
+*-repository.ts    (interface — TypeScript interfaces, contracts only)
        ↓
-*-entity.ts       (domain types — value objects + validation, zero dependencies)
+*-entity.ts        (domain types — value objects + validation, zero dependencies)
 
-*-repo-impl.ts    (implementation — Drizzle + SQLite, factory functions)
+*-repo-impl.ts     (implementation — Drizzle + SQLite, factory functions)
 ```
 
 ### Feature Details
@@ -184,9 +183,9 @@ use-cases/*.ts    (business logic — factory functions returning { execute() })
 |---------|--------|---------------------|-----------|----------------|
 | **user** | `UserId` value object, `createUser()` validation | `findById`, `findByName`, `findAll`, `create`, `delete` | `createUserUseCase`, `getUsersUseCase` | `createUserAction`, `getUsersAction`, `deleteUserAction` |
 | **exercise** | `ExerciseId` value object, `createExercise()` validation | `findById`, `findByName`, `findAll`, `create`, `updateName`, `delete`, `findByOwner`, `inAnyRoutine` | `createExerciseUseCase`, `listExercisesUseCase`, `renameExerciseUseCase`, `deleteExerciseUseCase` | `createExerciseAction`, `renameExerciseAction`, `deleteExerciseAction`, `listExercisesAction` |
-| **routine** | `DayOfWeek` type, `RoutineId` value object, `createRoutineAssignment()`, `DAY_NAMES`, `DAY_LABELS` | `findById`, `findByUserAndDay`, `findAllByUserGroupedByDay`, `create`, `delete`, `exerciseExists` | `assignExerciseUseCase`, `removeExerciseUseCase`, `getUserRoutineUseCase` | `assignExerciseAction`, `removeExerciseAction`, `getUserRoutineAction` |
-| **workout** | `WorkoutSet` type, `WorkoutLog` type, `validateSet()`, `calculateVolume()`, `createEmptyLog()` | `findById`, `findByDateAndExercise`, `findByDate`, `findAllByUser`, `create`, `update`, `delete`, `findByDayOfWeek`, `findLatestForExercise`, `findHistoryByDate` | `logWorkoutUseCase` (upsert), `updateWorkoutUseCase`, `deleteWorkoutUseCase`, `getTodayExercisesUseCase`, `getUserVolumeUseCase`, `getWorkoutHistoryUseCase` | `logWorkoutAction`, `updateWorkoutAction`, `deleteWorkoutAction`, `getTodayExercisesAction`, `getHistoryAction`, `deleteHistoryEntryAction` |
-| **chart** | `ChartDataPoint`, `ChartBarData`, `RangeFilter`, `TimeGranularity`, `IntensitySplit` | `getVolumeByDate`, `getPeakVolume`, `getIntensitySplit`, `getExercisesWithLogs` | N/A (direct repo calls from server actions) | `getExerciseChartData`, `getAllExerciseChartData`, `getExercisesWithLogsAction`, `getPeakVolumeAction`, `getIntensitySplitAction` |
+| **routine** | `DayOfWeek` type, `RoutineId` value object, `createRoutineAssignment()`, `DAY_NAMES`, `DAY_LABELS` | `findById`, `findByUserAndDay`, `findByUserExerciseAndDay`, `exists`, `findAllByUserGroupedByDay`, `create`, `delete`, `exerciseExists` | `assignExerciseUseCase`, `removeExerciseUseCase`, `getUserRoutineUseCase` | `assignExerciseAction`, `removeExerciseAction`, `getUserRoutineAction` |
+| **workout** | `WorkoutSet` type, `WorkoutLog` type, `validateSet()`, `calculateVolume()`, `createEmptyLog()` | `findById`, `findByDateAndExercise`, `findByDate`, `findAllByUser`, `create`, `update`, `findByDayOfWeek`, `findLatestForExercise`, `findHistoryByDate` | `logWorkoutUseCase` (upsert), `updateWorkoutUseCase`, `deleteWorkoutUseCase`, `getTodayExercisesUseCase`, `getUserVolumeUseCase`, `getWorkoutHistoryUseCase` | `logWorkoutAction`, `updateWorkoutAction`, `getTodayExercisesAction`, `getHistoryAction` |
+| **chart** | `ChartDataPoint`, `ChartBarData`, `ExerciseInfo`, `RangeFilter`, `TimeGranularity`, `IntensitySplit` | `getVolumeByDate`, `getPeakVolume`, `getIntensitySplit`, `getExercisesWithLogs` | N/A (direct repo calls from server actions) | `getExerciseChartData`, `getAllExerciseChartData`, `getExercisesWithLogsAction`, `getPeakVolumeAction`, `getIntensitySplitAction` |
 
 ### Key Business Rules
 
@@ -257,10 +256,8 @@ Import from `@/features/routine/routine-entity`. Do not define your own day arra
 ## Build & Run
 
 ```bash
-npm run dev          # Start dev server (auto-runs migrations + seed)
-npm run build        # Production build
-npm start            # Start production server
-npm run seed         # Run seed script (deletes DB, recreates Bruno data)
+npm run dev          # Start dev server (runs migrations only)
+npm run prod         # Start production server with caffeinate (localhost only)
 npm run typecheck    # TypeScript check
 npm test             # Run all Vitest tests
 npm run test:watch   # Watch mode
@@ -272,16 +269,12 @@ npm run test:e2e:codegen     # Playwright codegen
 
 ### Seed Data
 
-- **`seedDatabase()`** (in `src/db/seed.ts`): Creates "Bruno" user, "Pull Up" exercise, Mon-Sun routine, 7 workout logs (Jan 2025)
-- **`seedProgressData()`** (in `src/db/seed.ts`): Creates 6 exercises (Bench Press, Squat, Deadlift, Overhead Press, Barbell Row, Barbell Curl) + 6+ months of workout logs for progress chart testing
-- **`scripts/seed-bruno-data.js`**: Full seed script — deletes DB, runs migrations, creates Bruno with 3 exercises (Barbell Curl, Pull-Up, Squat), Mon/Wed/Fri routines, ~7 months of workout logs. Used by E2E test startup.
+- **`scripts/seed-bruno-data.js`**: Full seed script — deletes DB, runs migrations, creates Bruno with 3 exercises (Bench Press, Squat, Deadlift), Mon/Wed/Fri routines, ~7 months of workout logs. Used by E2E test startup.
+- **`scripts/cleanup-test-data.js`**: Deletes all rows from the four database tables. Called by Playwright test runner.
 
 ### Dev Server Startup
 
-The root layout (`src/app/layout.tsx`) calls `runMigrations()` + `seedDatabase()` + `seedProgressData()` on every request. This means:
-- Migrations run on every request (idempotent — skips if tables exist)
-- Bruno user + progress data seeded on every request (idempotent — skips if data exists)
-- E2E tests use `scripts/seed-bruno-data.js` instead (full DB reset)
+The root layout (`src/app/layout.tsx`) calls `runMigrations()` on every request (idempotent — skips if tables exist). E2E tests use `scripts/seed-bruno-data.js` instead (full DB reset).
 
 ## Coding Style
 
@@ -297,7 +290,7 @@ The root layout (`src/app/layout.tsx`) calls `runMigrations()` + `seedDatabase()
 
 ### Error Handling
 
-- **`AppError`** class with `message`, `status`, `cause`, and `toJSON()` — but mostly plain `Error` strings are used directly
+- **`AppError`** class with `message`, `status`, `cause`, and `toJSON()` (serializes `name`, `message`, `status` — not `cause`) — but mostly plain `Error` strings are used directly
 - **Server actions** use try/catch with `instanceof Error` check, return `{ success, data?, error? }` pattern
 - **Use cases** throw errors; server actions catch and return failure response
 - **No centralized error boundary** — errors surface to user via inline error messages in components
@@ -331,7 +324,7 @@ The root layout (`src/app/layout.tsx`) calls `runMigrations()` + `seedDatabase()
 - **DB singleton** pattern — single `Database` instance per process via `getDatabase()`
 - **`@/*` path alias** maps to `./src/*` in both tsconfig and vitest config
 - **`dynamic = 'force-dynamic'`** on pages that need per-request data (today, history)
-- **`seed.ts` has top-level side effects** — `seedDatabase()` and `seedProgressData()` run on module load, not just when called
+- **`seed.ts` does not exist** — seeding is done only via `scripts/seed-bruno-data.js`
 - **No route groups** — the `(main)` route group was removed; all routes are flat under `src/app/`
 
 ## Known Quirks

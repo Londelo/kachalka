@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import './globals.css'
+import { validateEnv } from '@/config/env'
 import { runMigrations } from '@/db/migrate'
 import AppShell from '@/components/app-shell.client'
 import LoadingProviderClient from '@/components/loading-provider.client'
@@ -11,6 +12,7 @@ export const metadata = {
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  const env = validateEnv()
   runMigrations()
 
   return (
