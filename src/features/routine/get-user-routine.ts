@@ -3,7 +3,7 @@ import type { RoutineAssignment } from '@/features/routine/routine-entity'
 
 export function getUserRoutineUseCase(repo: RoutineRepository) {
   return {
-    execute(userId: number): Record<number, RoutineAssignment[]> {
+    execute(userId: number): Record<string, RoutineAssignment[]> {
       return repo.findAllByUserGroupedByDay(userId)
     },
   }

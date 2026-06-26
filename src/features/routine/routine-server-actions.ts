@@ -25,7 +25,7 @@ export async function assignExerciseAction(
   }
 }
 
-export async function removeExerciseAction(
+export async function removeAssignmentAction(
   userId: number,
   assignmentId: number,
 ): Promise<{ success: boolean; error?: string }> {

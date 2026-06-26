@@ -12,7 +12,7 @@ export const metadata = {
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {
-  const env = validateEnv()
+  validateEnv()
   runMigrations()
 
   return (

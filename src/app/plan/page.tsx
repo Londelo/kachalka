@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   assignExerciseAction,
-  removeExerciseAction,
+  removeAssignmentAction,
   getUserRoutineAction,
 } from "@/features/routine/routine-server-actions";
 import {
@@ -188,7 +188,7 @@ export default function PlanPage() {
   async function handleRemoveExercise(assignmentId: number) {
     const userId = getUserId();
     if (!userId) return;
-    const result = await removeExerciseAction(userId, assignmentId);
+    const result = await removeAssignmentAction(userId, assignmentId);
     if (result.success) {
       await loadData();
     } else {

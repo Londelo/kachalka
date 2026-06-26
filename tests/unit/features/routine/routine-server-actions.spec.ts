@@ -131,12 +131,12 @@ describe('assignExerciseAction', () => {
   })
 })
 
-describe('removeExerciseAction', () => {
+describe('removeAssignmentAction', () => {
   it('returns success on valid deletion', async () => {
     mockRemoveExercise.execute.mockReturnValue(undefined)
 
-    const { removeExerciseAction } = await import('@/features/routine/routine-server-actions')
-    const result = await removeExerciseAction(1, 42)
+    const { removeAssignmentAction } = await import('@/features/routine/routine-server-actions')
+    const result = await removeAssignmentAction(1, 42)
 
     expect(result.success).toBe(true)
     expect(result.error).toBeUndefined()
@@ -147,8 +147,8 @@ describe('removeExerciseAction', () => {
       throw new Error('Routine assignment not found')
     })
 
-    const { removeExerciseAction } = await import('@/features/routine/routine-server-actions')
-    const result = await removeExerciseAction(1, 999)
+    const { removeAssignmentAction } = await import('@/features/routine/routine-server-actions')
+    const result = await removeAssignmentAction(1, 999)
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Routine assignment not found')
@@ -159,8 +159,8 @@ describe('removeExerciseAction', () => {
       throw new Error('Routine assignment not found')
     })
 
-    const { removeExerciseAction } = await import('@/features/routine/routine-server-actions')
-    const result = await removeExerciseAction(1, 42)
+    const { removeAssignmentAction } = await import('@/features/routine/routine-server-actions')
+    const result = await removeAssignmentAction(1, 42)
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Routine assignment not found')
@@ -171,8 +171,8 @@ describe('removeExerciseAction', () => {
       throw new Error('Routine assignment not found')
     })
 
-    const { removeExerciseAction } = await import('@/features/routine/routine-server-actions')
-    const result = await removeExerciseAction(1, -1)
+    const { removeAssignmentAction } = await import('@/features/routine/routine-server-actions')
+    const result = await removeAssignmentAction(1, -1)
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Routine assignment not found')

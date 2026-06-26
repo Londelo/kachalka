@@ -3,23 +3,16 @@ import path from 'path'
 import fs from 'fs'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import * as schema from '@/db/schema'
+import { getDbPath } from './env'
 
 let dbInstance: ReturnType<typeof Database> | null = null
-let dbPathValue: string | undefined
 
-function getDbPath(): string {
-  if (dbPathValue === undefined) {
-    dbPathValue = process.env.DATABASE_PATH ?? path.join(process.cwd(), 'data', 'kachalka.db')
-  }
-  return dbPathValue
-}
 
 export function resetDatabase(): void {
   if (dbInstance) {
     dbInstance.close()
     dbInstance = null
   }
-  dbPathValue = undefined
 }
 
 export function getDatabase(): ReturnType<typeof Database> {

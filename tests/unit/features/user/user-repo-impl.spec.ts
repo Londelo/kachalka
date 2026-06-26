@@ -147,4 +147,30 @@ describe('createSqliteUserRepository', () => {
 
     expect(() => repo.create({ id: { value: 0 }, name: 'Eve' })).toThrow()
   })
+
+  describe('delete', () => {
+    it('deleting a user does not affect another user\'s exercises', () => {
+      const db = setupDb()
+      runMigration(db)
+      const repo = createSqliteUserRepository(db)
+
+      const bruno = repo.create({ id: { value: 0 }, name: 'Bruno' })
+      const carlos = repo.create({ id: { value: 0 }, name: 'Carlos' })
+
+      // Create exercises via direct DB insert (exercises are not owned by users in the repo, but user_id links them)
+      db.exec(`
+        INSERT INTO exercises (user_id, name, created_at, updated_at)
+        VALUES (${bruno.id.value}, 'Bench Press', strftime('%s', 'now'), strftime('%s', 'now'))
+      `)
+      db.exec(`
+        INSERT INTO exercises (user_id, name, created_at, updated_at)
+        VALUES (${carlos.id.value}, 'Squat', strftime('%s', 'now'), strftime('%s', 'now'))
+      `)
+
+      repo.delete(bruno.id.value)
+
+      const carlosExercise = db.prepare('SELECT * FROM exercises WHERE user_id = ?').get(carlos.id.value)
+      expect(carlosExercise).toBeDefined()
+    })
+  })
 })
