@@ -32,6 +32,6 @@ trap cleanup EXIT INT TERM
 
 # Start production server
 echo "Starting production server on port $PORT..."
-npx next start -H 127.0.0.1 -p "$PORT" &
+npx next start -H 0.0.0.0 -p "$PORT" &
 SERVER_PID=$!
 wait "$SERVER_PID"
