@@ -10,11 +10,11 @@ PORT="${PORT:-3016}"
 # Ensure database directory exists
 mkdir -p "$DB_DIR"
 
-# Build if not already built
-if [ ! -d ".next" ]; then
-  echo "Building production bundle..."
-  npx next build
-fi
+# Always rebuild to ensure fresh code and no stale caches
+echo "Cleaning old build..."
+rm -rf .next
+echo "Building production bundle..."
+npx next build
 
 # Prevent sleep while server is running
 echo "Preventing system sleep (caffeinate)..."

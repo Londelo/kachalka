@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import './globals.css'
+
+export const dynamic = 'force-dynamic'
 import { validateEnv } from '@/config/env'
 import { runMigrations } from '@/db/migrate'
 import AppShell from '@/components/app-shell.client'

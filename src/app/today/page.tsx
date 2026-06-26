@@ -7,8 +7,6 @@ import { useLoading } from '@/components/loading-context'
 import type { WorkoutSet } from '@/features/workout/types'
 import { jsDayToAppIndex } from '@/shared/utils/date'
 
-export const dynamic = 'force-dynamic'
-
 type ExerciseItem = {
   exerciseId: number
   exerciseName: string
