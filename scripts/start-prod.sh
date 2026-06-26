@@ -5,7 +5,7 @@ DB_DIR="$HOME/.kachalka"
 DB_FILE="$DB_DIR/prod.db"
 export NODE_ENV="${NODE_ENV:-production}"
 export DATABASE_PATH="$DB_FILE"
-PORT="${PORT:-3000}"
+PORT="${PORT:-3016}"
 
 # Ensure database directory exists
 mkdir -p "$DB_DIR"
@@ -25,6 +25,7 @@ cleanup() {
   echo "Shutting down..."
   kill "$CAFFEINATE_PID" 2>/dev/null || true
   wait "$CAFFEINATE_PID" 2>/dev/null || true
+  lsof -ti:$PORT | xargs kill -9 2>/dev/null || true
   echo "Done."
 }
 trap cleanup EXIT INT TERM

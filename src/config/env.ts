@@ -1,5 +1,4 @@
 import { AppError } from '@/shared/errors/app-error'
-import path from 'path'
 
 const VALID_NODE_ENVS = ['development', 'production', 'test'] as const
 type ValidNodeEnv = (typeof VALID_NODE_ENVS)[number]
@@ -10,12 +9,16 @@ interface EnvConfig {
 }
 
 export function getDbPath(): string {
-  return process.env.DATABASE_PATH || path.join(process.cwd(), 'data', 'kachalka.db')
+  const databasePath = process.env.DATABASE_PATH
+  console.log(databasePath)
+  if (!databasePath || databasePath === '') {
+    throw new AppError('DATABASE_PATH is required')
+  }
+  return databasePath
 }
 
 export function validateEnv(): EnvConfig {
   const nodeEnv = process.env.NODE_ENV as string
-  const databasePath = getDbPath()
 
   if (!nodeEnv || nodeEnv === '') {
     throw new AppError('NODE_ENV is required')
@@ -27,6 +30,6 @@ export function validateEnv(): EnvConfig {
 
   return {
     nodeEnv: nodeEnv as ValidNodeEnv,
-    databasePath,
+    databasePath: getDbPath(),
   }
 }

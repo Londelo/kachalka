@@ -8,7 +8,7 @@ const Database = require('better-sqlite3')
 const fs = require('fs')
 const path = require('path')
 
-const dbPath = path.join(__dirname, '..', 'data', 'kachalka.db')
+const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '..', 'data', 'kachalka.db')
 
 // Delete the entire DB to start fresh (including WAL/SHM files)
 const walPath = dbPath + '-wal'

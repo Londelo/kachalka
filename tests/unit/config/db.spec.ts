@@ -97,13 +97,11 @@ describe('getDatabase', () => {
       expect(info[0].file).toContain('test-db.sqlite')
     })
 
-    it('falls back to default when DATABASE_PATH is not set', () => {
+    it('throws when DATABASE_PATH is not set', () => {
       delete process.env.DATABASE_PATH
       resetDatabase()
 
-      const db = getDatabase()
-      const info = db.prepare('PRAGMA database_list').all() as { file: string | null }[]
-      expect(info[0].file).toContain('kachalka.db')
+      expect(() => getDatabase()).toThrow('DATABASE_PATH is required')
     })
   })
 })

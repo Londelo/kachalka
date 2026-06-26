@@ -62,22 +62,18 @@ describe('validateEnv', () => {
     })
   })
 
-  describe('defaults DATABASE_PATH', () => {
+  describe('throws for missing DATABASE_PATH', () => {
     it('when not set', () => {
       setEnv('NODE_ENV', 'development')
 
-      const result = validateEnv()
-
-      expect(result.databasePath).toContain('data/kachalka.db')
+      expect(() => validateEnv()).toThrow('DATABASE_PATH')
     })
 
     it('when empty string', () => {
       setEnv('NODE_ENV', 'development')
       setEnv('DATABASE_PATH', '')
 
-      const result = validateEnv()
-
-      expect(result.databasePath).toContain('data/kachalka.db')
+      expect(() => validateEnv()).toThrow('DATABASE_PATH')
     })
   })
 
