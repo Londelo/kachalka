@@ -5,12 +5,18 @@ import * as schema from '@/db/schema'
 import type { UserRepository } from '@/features/user/user-repository'
 import type { User } from '@/features/user/user-entity'
 import { UserId } from '@/features/user/user-entity'
-import * as R from 'ramda'
-
-function mapRowToUser(row: Record<string, unknown>): User {
+function mapRowToUser(row: Record<string, unknown>): User | null {
+  const id = row.id
+  if (typeof id !== 'number' || !Number.isInteger(id) || id < 0) {
+    return null
+  }
+  const name = row.name
+  if (typeof name !== 'string' || name.length === 0) {
+    return null
+  }
   return {
-    id: UserId.make(row.id as number),
-    name: row.name as string,
+    id: UserId.make(id),
+    name,
   }
 }
 
@@ -27,7 +33,7 @@ export function createSqliteUserRepository(db: ReturnType<typeof Database>): Use
         .get()
 
       if (!row) return undefined
-      return mapRowToUser(row)
+      return mapRowToUser(row) ?? undefined
     },
 
     findByName(name: string): User | undefined {
@@ -39,7 +45,7 @@ export function createSqliteUserRepository(db: ReturnType<typeof Database>): Use
         .get()
 
       if (!row) return undefined
-      return mapRowToUser(row)
+      return mapRowToUser(row) ?? undefined
     },
 
     findAll(): User[] {
@@ -49,7 +55,7 @@ export function createSqliteUserRepository(db: ReturnType<typeof Database>): Use
         .orderBy(schema.users.name)
         .all()
 
-      return R.map(mapRowToUser, rows)
+      return rows.map(mapRowToUser).filter((u): u is User => u !== null)
     },
 
     create(user: User): User {

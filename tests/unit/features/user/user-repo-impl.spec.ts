@@ -148,6 +148,35 @@ describe('createSqliteUserRepository', () => {
     expect(() => repo.create({ id: { value: 0 }, name: 'Eve' })).toThrow()
   })
 
+  it('findAll skips rows with invalid data instead of crashing', () => {
+    const db = setupDb()
+    runMigration(db)
+    const repo = createSqliteUserRepository(db)
+
+    repo.create({ id: { value: 0 }, name: 'ValidUser' })
+
+    // Insert a raw row with an invalid (negative) id directly into the DB
+    db.exec("INSERT INTO users (id, name, created_at, is_active) VALUES (-1, 'BadRow', strftime('%s', 'now'), 1)")
+
+    // findAll should skip the bad row and return only the valid one
+    const all = repo.findAll()
+
+    expect(all).toHaveLength(1)
+    expect(all[0].name).toBe('ValidUser')
+  })
+
+  it('findById returns undefined for rows with invalid data', () => {
+    const db = setupDb()
+    runMigration(db)
+    const repo = createSqliteUserRepository(db)
+
+    // Insert a row with a null name directly into the DB
+    db.exec("INSERT INTO users (id, name, created_at, is_active) VALUES (999, '', strftime('%s', 'now'), 1)")
+
+    const found = repo.findById(999)
+    expect(found).toBeUndefined()
+  })
+
   describe('delete', () => {
     it('deleting a user does not affect another user\'s exercises', () => {
       const db = setupDb()

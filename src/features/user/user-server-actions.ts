@@ -27,10 +27,15 @@ export async function createUserAction(
 }
 
 export async function getUsersAction(): Promise<User[]> {
-  const db = getDatabase()
-  const repo = createSqliteUserRepository(db)
-  const useCase = getUsersUseCase(repo)
-  return useCase.execute()
+  try {
+    const db = getDatabase()
+    const repo = createSqliteUserRepository(db)
+    const useCase = getUsersUseCase(repo)
+    return useCase.execute()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to fetch users'
+    throw new Error(message)
+  }
 }
 
 export async function deleteUserAction(
