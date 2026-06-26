@@ -10,7 +10,6 @@ interface EnvConfig {
 
 export function getDbPath(): string {
   const databasePath = process.env.DATABASE_PATH
-  console.log(databasePath)
   if (!databasePath || databasePath === '') {
     throw new AppError('DATABASE_PATH is required')
   }
