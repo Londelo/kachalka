@@ -11,6 +11,7 @@ const mockWorkoutRepo = {
   update: vi.fn(),
   delete: vi.fn(),
   findByDayOfWeek: vi.fn(),
+  findLatestForExercise: vi.fn(),
   findHistoryByDate: vi.fn(),
 }
 
@@ -317,6 +318,67 @@ describe('getHistoryAction', () => {
 
     const { getHistoryAction } = await import('@/features/workout/workout-server-actions')
     const result = await getHistoryAction(1)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Unknown error')
+  })
+})
+
+describe('getTodayWorkoutsAction', () => {
+  it('returns workouts on success', async () => {
+    mockWorkoutRepo.findByDate.mockReturnValue([
+      {
+        id: 1,
+        userId: 1,
+        exerciseId: 5,
+        date: '2025-01-01',
+        sets: [{ id: 's1', reps: 5, weight: 100 }, { id: 's2', reps: 3, weight: 135 }],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.success).toBe(true)
+    expect(result.workouts).toEqual({
+      5: [{ weight: 100, reps: 5 }, { weight: 135, reps: 3 }],
+    })
+    expect(result.error).toBeUndefined()
+  })
+
+  it('returns empty object when no workouts today', async () => {
+    mockWorkoutRepo.findByDate.mockReturnValue([])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.success).toBe(true)
+    expect(result.workouts).toEqual({})
+    expect(result.error).toBeUndefined()
+  })
+
+  it('returns error on failure', async () => {
+    mockWorkoutRepo.findByDate.mockImplementation(() => {
+      throw new Error('Database error')
+    })
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Database error')
+    expect(result.workouts).toBeNull()
+  })
+
+  it('returns Unknown error for non-Error exceptions', async () => {
+    mockWorkoutRepo.findByDate.mockImplementation(() => {
+      throw 'string error'
+    })
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Unknown error')

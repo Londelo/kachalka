@@ -52,6 +52,8 @@ type ExerciseInfo = {
   lastLog: { weight: number; reps: number }[] | null
 }
 
+export type TodayWorkouts = Record<number, { weight: number; reps: number }[]>
+
 export async function getTodayExercisesAction(
   userId: number,
   dayOfWeek: number,
@@ -79,6 +81,25 @@ type HistoryEntry = {
     sets: WorkoutSet[]
     volume: number
   }[]
+}
+
+export async function getTodayWorkoutsAction(
+  userId: number,
+): Promise<{ success: boolean; workouts?: TodayWorkouts | null; error?: string }> {
+  try {
+    const db = getDatabase()
+    const repo = createSqliteWorkoutRepository(db)
+    const today = new Date().toISOString().split('T')[0]
+    const logs = repo.findByDate(userId, today)
+    const workouts: TodayWorkouts = {}
+    for (const log of logs) {
+      workouts[log.exerciseId] = log.sets.map(s => ({ weight: s.weight, reps: s.reps }))
+    }
+    return { success: true, workouts }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error'
+    return { success: false, error: message, workouts: null }
+  }
 }
 
 export async function getHistoryAction(

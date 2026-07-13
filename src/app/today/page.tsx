@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { logWorkoutAction, getTodayExercisesAction } from '@/features/workout/workout-server-actions'
+import { logWorkoutAction, getTodayWorkoutsAction, getTodayExercisesAction } from '@/features/workout/workout-server-actions'
 import { useLoading } from '@/components/loading-context'
 import type { WorkoutSet } from '@/features/workout/types'
 import { jsDayToAppIndex } from '@/shared/utils/date'
@@ -220,6 +220,30 @@ export default function TodayPage() {
     getTodayExercisesAction(userId, dayOfWeek).then((res) => {
       if (res.success && res.exercises) {
         setExercises(res.exercises)
+
+        // Pre-fill current session from today's saved data
+        getTodayWorkoutsAction(userId).then((workoutsRes) => {
+          if (workoutsRes.success && workoutsRes.workouts) {
+            const nextSets = new Map<number, WorkoutSet[]>()
+            const nextModes = new Map<number, ViewMode>()
+            for (const exercise of res.exercises ?? []) {
+              const sets = workoutsRes.workouts[exercise.exerciseId]
+              if (sets) {
+                nextSets.set(exercise.exerciseId, sets.map(s => ({ id: generateId(), ...s })))
+              }
+              nextModes.set(exercise.exerciseId, 'current')
+            }
+            setExerciseSets(nextSets)
+            setViewModes(nextModes)
+          } else {
+            // No workouts today — set view modes to 'current'
+            const nextModes = new Map<number, ViewMode>()
+            for (const exercise of res.exercises ?? []) {
+              nextModes.set(exercise.exerciseId, 'current')
+            }
+            setViewModes(nextModes)
+          }
+        })
       }
       setLoading(false)
       end('today')
