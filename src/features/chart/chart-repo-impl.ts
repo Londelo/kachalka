@@ -7,11 +7,30 @@ import type { ChartDataPoint, IntensitySplit, RangeFilter, TimeGranularity } fro
 import { groupByGranularity } from '@/features/chart/chart-utils'
 import type { WorkoutSet } from '@/features/workout/types'
 
+// Unwraps Drizzle { value: ... } wrapper objects from JSON columns.
+// In production, Drizzle .select() queries return JSON columns as { value: T }
+// rather than plain values. This mirrors the pattern in workout-repo-impl.ts.
+function unwrapJson<T>(value: unknown): T {
+  if (typeof value === 'object' && value !== null && 'value' in value) {
+    return (value as { value: T }).value
+  }
+  return value as T
+}
+
+function parseSets(value: unknown): WorkoutSet[] {
+  const unwrapped = unwrapJson<unknown>(value)
+  if (Array.isArray(unwrapped)) {
+    return unwrapped as WorkoutSet[]
+  }
+  return JSON.parse(unwrapped as string) as WorkoutSet[]
+}
+
 export function mapRowToDataPoint(row: Record<string, unknown>): ChartDataPoint {
-  const sets = row.sets as WorkoutSet[]
-  const exerciseName = row.exerciseName as string
+  const sets = parseSets(row.sets)
+  const exerciseName = unwrapJson<string>(row.exerciseName)
+  const date = unwrapJson<string>(row.date)
   return {
-    date: row.date as string,
+    date,
     volume: sets.reduce((t, s) => t + s.reps * s.weight, 0),
     sets,
     exercises: [{ name: exerciseName, sets }],
@@ -99,10 +118,10 @@ export function createSqliteChartRepository(db: ReturnType<typeof Database>): Ch
       return 0
     }
 
-    const volumes = rows.map(
-      (row: Record<string, unknown>) =>
-        (row.sets as WorkoutSet[]).reduce((t, s) => t + s.reps * s.weight, 0),
-    )
+    const volumes = rows.map((row: Record<string, unknown>) => {
+      const sets = parseSets(row.sets)
+      return sets.reduce((t, s) => t + s.reps * s.weight, 0)
+    })
 
     return volumes.length > 0 ? Math.max(...volumes) : 0
   }

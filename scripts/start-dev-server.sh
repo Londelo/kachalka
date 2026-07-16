@@ -15,6 +15,9 @@ trap cleanup EXIT INT TERM
 # Kill any existing process on the port
 lsof -ti:$PORT | xargs kill -9 2>/dev/null || true
 
+echo "Ensuring data directory exists..."
+mkdir -p "$(pwd)/data"
+
 echo "Seeding database..."
 node scripts/seed-bruno-data.js
 

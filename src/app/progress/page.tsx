@@ -70,48 +70,70 @@ export default function ProgressPage() {
 
   useEffect(() => {
     start('progress')
+    let cancelled = false
     async function loadData() {
       const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
       const userId = cookieMatch ? parseInt(cookieMatch[1], 10) : 0
       if (!userId) {
-        setLoading(false)
-        end('progress')
+        if (!cancelled) {
+          setLoading(false)
+          end('progress')
+        }
         return
       }
 
-      setLoading(true)
-
-      if (!selectedExerciseId) {
-        const chartData = await getAllExerciseChartData(userId, range, granularity)
-        setDataPoints(chartData ?? [])
-        setLoading(false)
-        end('progress')
-        return
+      try {
+        if (!selectedExerciseId) {
+          const chartData = await getAllExerciseChartData(userId, range, granularity)
+          if (!cancelled) {
+            setDataPoints(chartData ?? [])
+            setLoading(false)
+            end('progress')
+          }
+        } else {
+          const chartData = await getExerciseChartData(userId, selectedExerciseId, range, granularity)
+          if (!cancelled) {
+            setDataPoints(chartData ?? [])
+            setLoading(false)
+            end('progress')
+          }
+        }
+      } catch (error) {
+        console.error('[progress] failed to load chart data:', error)
+        if (!cancelled) {
+          setDataPoints([])
+          setLoading(false)
+          end('progress')
+        }
       }
-
-      const chartData = await getExerciseChartData(userId, selectedExerciseId, range, granularity)
-      setDataPoints(chartData ?? [])
-      setLoading(false)
-      end('progress')
     }
     loadData()
     return () => {
+      cancelled = true
       end('progress')
     }
-  }, [selectedExerciseId, range, granularity])
+  }, [selectedExerciseId, range, granularity, start, end])
 
   useEffect(() => {
+    let cancelled = false
     async function loadExercises() {
       const cookieMatch = document.cookie.match(/kachalka\.userId=(\d+)/)
       const userId = cookieMatch ? parseInt(cookieMatch[1], 10) : 0
       if (!userId) return
 
-      const result = await getExercisesWithLogsAction(userId)
-      if (result && Array.isArray(result)) {
-        setExercises(result)
+      try {
+        const result = await getExercisesWithLogsAction(userId)
+        if (!cancelled && result && Array.isArray(result)) {
+          setExercises(result)
+        }
+      } catch (e) {
+        console.error('[progress] failed to load exercises:', e)
       }
     }
     loadExercises()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   function handleExerciseChange(e: React.ChangeEvent<HTMLSelectElement>) {
