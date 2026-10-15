@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "kachalka",
+  "project_id": "085a6ed0-8d1c-450b-8b79-efbd8a9934fb"
+}
