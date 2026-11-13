@@ -343,7 +343,10 @@ describe('getTodayWorkoutsAction', () => {
 
     expect(result.success).toBe(true)
     expect(result.workouts).toEqual({
-      5: [{ weight: 100, reps: 5 }, { weight: 135, reps: 3 }],
+      5: [
+        { weight: 100, reps: 5, count: 1 },
+        { weight: 135, reps: 3, count: 1 },
+      ],
     })
     expect(result.error).toBeUndefined()
   })
@@ -382,6 +385,154 @@ describe('getTodayWorkoutsAction', () => {
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Unknown error')
+  })
+
+  it('projects a stored count unchanged', async () => {
+    mockWorkoutRepo.findByDate.mockReturnValue([
+      {
+        id: 1,
+        userId: 1,
+        exerciseId: 7,
+        date: '2025-01-01',
+        sets: [{ id: 's1', reps: 5, weight: 135, count: 3 }],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.success).toBe(true)
+    expect(result.workouts).toEqual({ 7: [{ weight: 135, reps: 5, count: 3 }] })
+    expect(result.error).toBeUndefined()
+  })
+
+  it.each([
+    { label: 'a missing count key', stored: { id: 's1', reps: 5, weight: 100 } },
+    { label: 'an undefined count', stored: { id: 's1', reps: 5, weight: 100, count: undefined } },
+    { label: 'a zero count', stored: { id: 's1', reps: 5, weight: 100, count: 0 } },
+  ])('projects $label as a count of 1', async ({ stored }) => {
+    mockWorkoutRepo.findByDate.mockReturnValue([
+      {
+        id: 1,
+        userId: 1,
+        exerciseId: 7,
+        date: '2025-01-01',
+        sets: [stored],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.success).toBe(true)
+    expect(result.workouts).toEqual({ 7: [{ weight: 100, reps: 5, count: 1 }] })
+    expect(result.error).toBeUndefined()
+  })
+
+  it('gives each exercise its own key with its own counts', async () => {
+    mockWorkoutRepo.findByDate.mockReturnValue([
+      {
+        id: 1,
+        userId: 1,
+        exerciseId: 7,
+        date: '2025-01-01',
+        sets: [{ id: 's1', reps: 5, weight: 135, count: 2 }],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+      {
+        id: 2,
+        userId: 1,
+        exerciseId: 9,
+        date: '2025-01-01',
+        sets: [{ id: 's2', reps: 8, weight: 95 }],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.success).toBe(true)
+    expect(result.workouts).toEqual({
+      7: [{ weight: 135, reps: 5, count: 2 }],
+      9: [{ weight: 95, reps: 8, count: 1 }],
+    })
+    expect(result.error).toBeUndefined()
+  })
+
+  it('preserves order and length across a multi-line exercise', async () => {
+    mockWorkoutRepo.findByDate.mockReturnValue([
+      {
+        id: 1,
+        userId: 1,
+        exerciseId: 7,
+        date: '2025-01-01',
+        sets: [
+          { id: 's1', reps: 5, weight: 135, count: 3 },
+          { id: 's2', reps: 3, weight: 95 },
+        ],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.workouts?.[7]).toHaveLength(2)
+    expect(result.workouts).toEqual({
+      7: [
+        { weight: 135, reps: 5, count: 3 },
+        { weight: 95, reps: 3, count: 1 },
+      ],
+    })
+  })
+
+  it('projects an empty sets array to an empty array', async () => {
+    mockWorkoutRepo.findByDate.mockReturnValue([
+      {
+        id: 1,
+        userId: 1,
+        exerciseId: 7,
+        date: '2025-01-01',
+        sets: [],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.success).toBe(true)
+    expect(result.workouts).toEqual({ 7: [] })
+    expect(result.error).toBeUndefined()
+  })
+
+  it('projects only weight, reps and count — never the id or any other stored field', async () => {
+    mockWorkoutRepo.findByDate.mockReturnValue([
+      {
+        id: 1,
+        userId: 1,
+        exerciseId: 7,
+        date: '2025-01-01',
+        sets: [{ id: 's1', reps: 5, weight: 135, count: 3, note: 'tight bar' }],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.workouts).toEqual({ 7: [{ weight: 135, reps: 5, count: 3 }] })
+    expect(Object.keys(result.workouts![7][0]).sort()).toEqual(['count', 'reps', 'weight'])
   })
 })
 
