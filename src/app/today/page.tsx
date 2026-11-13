@@ -25,7 +25,13 @@ function generateId(): string {
 }
 
 function defaultSet(): WorkoutSet {
-  return { id: generateId(), reps: 1, weight: 0 }
+  return { id: generateId(), count: 1, reps: 1, weight: 0 }
+}
+
+function parseCount(value: string): number | undefined {
+  if (value === '') return undefined
+  const parsed = Number(value)
+  return Number.isNaN(parsed) ? undefined : parsed
 }
 
 function getStoredUserId(): number | null {
@@ -122,16 +128,23 @@ function ExerciseCard({
             <div className="mb-4 flex flex-col gap-4">
               {sets.map((set, index) => (
                 <div key={set.id} className="flex items-center gap-3">
-                  {/* Set number box */}
-                  <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background p-2 gap-2">
+                  <div className="flex min-w-0 flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
                     <span className="font-label-mono text-label-mono text-secondary">SET:</span>
-                    <span className="font-body-md text-body-md text-on-surface">
-                      {String(index + 1).padStart(2, '0')}
-                    </span>
+                    <input
+                      type="number"
+                      value={set.count ?? ''}
+                      onChange={(e) => onSetChange(index, 'count', e.target.value)}
+                      placeholder="1"
+                      min="1"
+                      step="1"
+                      inputMode="numeric"
+                      data-id={`set-count-input-${exercise.exerciseId}-${index}`}
+                      aria-label={`Set count for set ${index + 1}`}
+                      className="w-full bg-transparent [-moz-appearance:textfield] appearance-none font-body-md text-body-md text-on-surface outline-none [-webkit-appearance:none]"
+                    />
                   </div>
 
-                  {/* Weight input */}
-                  <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
+                  <div className="flex min-w-0 flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
                     <span className="font-label-mono text-label-mono text-secondary">LB:</span>
                     <input
                       type="number"
@@ -142,8 +155,7 @@ function ExerciseCard({
                     />
                   </div>
 
-                  {/* Reps input */}
-                  <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
+                  <div className="flex min-w-0 flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
                     <span className="font-label-mono text-label-mono text-secondary">REPS:</span>
                     <input
                       type="number"
@@ -154,7 +166,6 @@ function ExerciseCard({
                     />
                   </div>
 
-                  {/* Delete button */}
                   <button
                     type="button"
                     onClick={() => onRemoveSet(index)}
@@ -371,7 +382,10 @@ export default function TodayPage() {
     updateSets(exerciseId, (prev) => {
       const updated = [...prev]
       const current = updated[index]
-      updated[index] = { ...current, [field]: parseFloat(value) || 0 }
+      updated[index] = {
+        ...current,
+        [field]: field === 'count' ? parseCount(value) : parseFloat(value) || 0,
+      }
       return updated
     })
     triggerSave(exerciseId)
