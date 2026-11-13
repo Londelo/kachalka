@@ -9,6 +9,7 @@ import { getTodayExercisesUseCase } from '@/features/workout/get-today-exercises
 import { getWorkoutHistoryUseCase } from '@/features/workout/get-workout-history'
 import { getUserVolumeUseCase } from '@/features/workout/get-user-volume'
 import { createSqliteExerciseRepository } from '@/features/exercise/exercise-repo-impl'
+import { normalizeSetCount } from '@/features/workout/workout-entity'
 import type { WorkoutLog, WorkoutSet } from '@/features/workout/types'
 
 export async function logWorkoutAction(
@@ -52,7 +53,7 @@ type ExerciseInfo = {
   lastLog: { weight: number; reps: number }[] | null
 }
 
-export type TodayWorkouts = Record<number, { weight: number; reps: number }[]>
+export type TodayWorkouts = Record<number, { weight: number; reps: number; count: number }[]>
 
 export async function getTodayExercisesAction(
   userId: number,
@@ -93,7 +94,11 @@ export async function getTodayWorkoutsAction(
     const logs = repo.findByDate(userId, today)
     const workouts: TodayWorkouts = {}
     for (const log of logs) {
-      workouts[log.exerciseId] = log.sets.map(s => ({ weight: s.weight, reps: s.reps }))
+      workouts[log.exerciseId] = log.sets.map(s => ({
+        weight: s.weight,
+        reps: s.reps,
+        count: normalizeSetCount(s.count),
+      }))
     }
     return { success: true, workouts }
   } catch (e) {
