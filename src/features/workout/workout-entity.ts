@@ -2,6 +2,20 @@ import type { WorkoutSet, WorkoutLog } from '@/features/workout/types'
 
 export { WorkoutLog }
 
+export function normalizeSetCount(raw: unknown): number {
+  if (raw === undefined || raw === null || raw === '') {
+    return 1
+  }
+
+  const value = typeof raw === 'number' || typeof raw === 'string' ? Number(raw) : NaN
+
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error('Set count must be at least 1')
+  }
+
+  return Math.max(1, Math.floor(value))
+}
+
 export function validateSet(set: WorkoutSet): void {
   if (set.weight < 0) {
     throw new Error('Weight must be non-negative')
@@ -10,6 +24,8 @@ export function validateSet(set: WorkoutSet): void {
   if (set.reps < 1) {
     throw new Error('Reps must be at least 1')
   }
+
+  normalizeSetCount(set.count)
 }
 
 export function calculateVolume(sets: { reps: number; weight: number }[]): number {
