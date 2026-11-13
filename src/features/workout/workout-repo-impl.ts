@@ -6,7 +6,7 @@ import type { WorkoutRepository } from '@/features/workout/workout-repository'
 import type { WorkoutLog, WorkoutSet } from '@/features/workout/types'
 import { and } from 'drizzle-orm'
 import * as R from 'ramda'
-import { calculateVolume } from '@/features/workout/workout-entity'
+import { calculateVolume, normalizeSetCount } from '@/features/workout/workout-entity'
 
 function mapRowToWorkoutLog(row: Record<string, unknown>): WorkoutLog {
   // Drizzle JSON mode auto-parses JSON columns in .select() queries,
@@ -16,12 +16,14 @@ function mapRowToWorkoutLog(row: Record<string, unknown>): WorkoutLog {
     ? (setsValue as WorkoutSet[])
     : JSON.parse(setsValue as string) as WorkoutSet[]
 
+  const setsWithCount = parsedSets.map((line) => ({ ...line, count: normalizeSetCount(line.count) }))
+
   return {
     id: Number(row.id),
     userId: Number(row.userId),
     exerciseId: Number(row.exerciseId),
     date: row.date as string,
-    sets: parsedSets,
+    sets: setsWithCount,
     createdAt: row.created_at instanceof Date ? (row.created_at as Date).toISOString() : String(row.created_at),
     updatedAt: row.updated_at instanceof Date ? (row.updated_at as Date).toISOString() : String(row.updated_at),
   }
@@ -258,6 +260,8 @@ export function createSqliteWorkoutRepository(db: ReturnType<typeof Database>): 
           ? (unwrappedSets as WorkoutSet[])
           : JSON.parse(unwrappedSets as string) as WorkoutSet[]
 
+        const setsWithCount = parsedSets.map((line) => ({ ...line, count: normalizeSetCount(line.count) }))
+
         return {
           date: row.date as string,
           id: unwrappedLogId,
@@ -265,7 +269,7 @@ export function createSqliteWorkoutRepository(db: ReturnType<typeof Database>): 
           exerciseName: typeof row.exerciseName === 'object' && row.exerciseName !== null && 'value' in row.exerciseName
             ? (row.exerciseName as { value: string }).value
             : (row.exerciseName as string),
-          sets: parsedSets,
+          sets: setsWithCount,
           volume: calculateVolume(parsedSets),
         }
       }, rows)
