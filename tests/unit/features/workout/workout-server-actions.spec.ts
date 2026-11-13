@@ -515,6 +515,17 @@ describe('getTodayWorkoutsAction', () => {
     expect(result.error).toBeUndefined()
   })
 
+  it('returns the full failure envelope for a non-Error throw', async () => {
+    mockWorkoutRepo.findByDate.mockImplementation(() => {
+      throw 'string error'
+    })
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result).toEqual({ success: false, error: 'Unknown error', workouts: null })
+  })
+
   it('projects only weight, reps and count — never the id or any other stored field', async () => {
     mockWorkoutRepo.findByDate.mockReturnValue([
       {
