@@ -408,3 +408,252 @@ describe('createSqliteWorkoutRepository', () => {
     expect(serialized[0].logs[0].volume).toBe(500)
   })
 })
+
+describe('createSqliteWorkoutRepository — set count on the read path', () => {
+  beforeEach(() => {
+    resetDb()
+  })
+
+  afterEach(() => {
+    if (db) db.close()
+  })
+
+  describe('a row stored before the count field existed', () => {
+    it('findById defaults a missing count to 1', () => {
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
+      const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+      const userId = Number(user.lastInsertRowid)
+      const exerciseId = Number(exercise.lastInsertRowid)
+
+      const inserted = db!.prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)')
+        .run(userId, exerciseId, '2025-01-01', '[{"id":"a","reps":5,"weight":135}]')
+
+      const found = repo.findById(Number(inserted.lastInsertRowid))
+
+      expect(found!.sets[0].count).toBe(1)
+    })
+
+    it('findByDateAndExercise defaults a missing count to 1', () => {
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
+      const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+      const userId = Number(user.lastInsertRowid)
+      const exerciseId = Number(exercise.lastInsertRowid)
+
+      db!.prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)')
+        .run(userId, exerciseId, '2025-01-01', '[{"id":"a","reps":5,"weight":135}]')
+
+      const found = repo.findByDateAndExercise(userId, '2025-01-01', exerciseId)
+
+      expect(found!.sets[0].count).toBe(1)
+    })
+
+    it('findByDate defaults a missing count to 1', () => {
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
+      const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+      const userId = Number(user.lastInsertRowid)
+      const exerciseId = Number(exercise.lastInsertRowid)
+
+      db!.prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)')
+        .run(userId, exerciseId, '2025-01-01', '[{"id":"a","reps":5,"weight":135}]')
+
+      const logs = repo.findByDate(userId, '2025-01-01')
+
+      expect(logs[0].sets[0].count).toBe(1)
+    })
+
+    it('findAllByUser defaults a missing count to 1', () => {
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
+      const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+      const userId = Number(user.lastInsertRowid)
+      const exerciseId = Number(exercise.lastInsertRowid)
+
+      db!.prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)')
+        .run(userId, exerciseId, '2025-01-01', '[{"id":"a","reps":5,"weight":135}]')
+
+      const all = repo.findAllByUser(userId)
+
+      expect(all[0].sets[0].count).toBe(1)
+    })
+
+    it('findLatestForExercise defaults a missing count to 1', () => {
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
+      const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+      const userId = Number(user.lastInsertRowid)
+      const exerciseId = Number(exercise.lastInsertRowid)
+
+      db!.prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)')
+        .run(userId, exerciseId, '2025-01-01', '[{"id":"a","reps":5,"weight":135}]')
+
+      const latest = repo.findLatestForExercise(userId, exerciseId)
+
+      expect(latest!.sets[0].count).toBe(1)
+    })
+
+    it('findByDayOfWeek defaults a missing count on lastLog to 1', () => {
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
+      const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+      const userId = Number(user.lastInsertRowid)
+      const exerciseId = Number(exercise.lastInsertRowid)
+
+      db!.prepare('INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (?, ?, ?)').run(userId, exerciseId, 2)
+      db!.prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)')
+        .run(userId, exerciseId, '2025-01-01', '[{"id":"a","reps":5,"weight":135}]')
+
+      const entries = repo.findByDayOfWeek(userId, 2)
+
+      expect(entries[0].lastLog!.sets[0].count).toBe(1)
+    })
+
+    it('findHistoryByDate defaults a missing count to 1 through its own mapper', () => {
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
+      const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+      const userId = Number(user.lastInsertRowid)
+      const exerciseId = Number(exercise.lastInsertRowid)
+
+      db!.prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)')
+        .run(userId, exerciseId, '2025-01-01', '[{"id":"a","reps":5,"weight":135}]')
+
+      const history = repo.findHistoryByDate(userId)
+
+      expect(history[0].logs[0].sets[0].count).toBe(1)
+    })
+  })
+
+  describe('a row stored with a usable count', () => {
+    it('findById preserves the stored count and the rest of the line', () => {
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
+      const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+      const userId = Number(user.lastInsertRowid)
+      const exerciseId = Number(exercise.lastInsertRowid)
+
+      const inserted = db!.prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)')
+        .run(userId, exerciseId, '2025-01-01', '[{"id":"a","reps":5,"weight":135,"count":3}]')
+
+      const found = repo.findById(Number(inserted.lastInsertRowid))
+
+      expect(found!.sets[0].count).toBe(3)
+      expect(found!.sets[0].id).toBe('a')
+      expect(found!.sets[0].reps).toBe(5)
+      expect(found!.sets[0].weight).toBe(135)
+    })
+
+    it('findHistoryByDate preserves the stored count through its own mapper', () => {
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
+      const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+      const userId = Number(user.lastInsertRowid)
+      const exerciseId = Number(exercise.lastInsertRowid)
+
+      db!.prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)')
+        .run(userId, exerciseId, '2025-01-01', '[{"id":"a","reps":5,"weight":135,"count":3}]')
+
+      const history = repo.findHistoryByDate(userId)
+
+      expect(history[0].logs[0].sets[0].count).toBe(3)
+    })
+  })
+
+  describe('a row stored with a corrupt count', () => {
+    it('findById corrects a stored count of 0 to 1', () => {
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
+      const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+      const userId = Number(user.lastInsertRowid)
+      const exerciseId = Number(exercise.lastInsertRowid)
+
+      const inserted = db!.prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)')
+        .run(userId, exerciseId, '2025-01-01', '[{"id":"a","reps":5,"weight":135,"count":0}]')
+
+      const found = repo.findById(Number(inserted.lastInsertRowid))
+
+      expect(found!.sets[0].count).toBe(1)
+    })
+  })
+
+  describe('a multi-line row', () => {
+    it('findById normalises each line while keeping length, order and ids', () => {
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
+      const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+      const userId = Number(user.lastInsertRowid)
+      const exerciseId = Number(exercise.lastInsertRowid)
+
+      const inserted = db!.prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)')
+        .run(userId, exerciseId, '2025-01-01', '[{"id":"a","reps":5,"weight":135},{"id":"b","reps":3,"weight":95,"count":2}]')
+
+      const found = repo.findById(Number(inserted.lastInsertRowid))
+
+      expect(found!.sets).toHaveLength(2)
+      expect(found!.sets.map((set) => set.id)).toEqual(['a', 'b'])
+      expect(found!.sets[0].count).toBe(1)
+      expect(found!.sets[1].count).toBe(2)
+    })
+  })
+
+  describe('a row stored with no lines', () => {
+    it('findById returns an empty sets array', () => {
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
+      const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+      const userId = Number(user.lastInsertRowid)
+      const exerciseId = Number(exercise.lastInsertRowid)
+
+      const inserted = db!.prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)')
+        .run(userId, exerciseId, '2025-01-01', '[]')
+
+      const found = repo.findById(Number(inserted.lastInsertRowid))
+
+      expect(Array.isArray(found!.sets)).toBe(true)
+      expect(found!.sets).toEqual([])
+    })
+  })
+
+  describe('a row written through the repository rather than raw SQL', () => {
+    it('create returns the defaulted count for a line without one', () => {
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
+      const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+      const userId = Number(user.lastInsertRowid)
+      const exerciseId = Number(exercise.lastInsertRowid)
+
+      const log = repo.create({
+        userId,
+        exerciseId,
+        date: '2025-01-01',
+        sets: [{ id: 's1', reps: 5, weight: 100 }],
+      })
+
+      expect(log.sets[0].count).toBe(1)
+    })
+
+    it('update returns the written count and findById reads it back', () => {
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
+      const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+      const userId = Number(user.lastInsertRowid)
+      const exerciseId = Number(exercise.lastInsertRowid)
+
+      const inserted = repo.create({
+        userId,
+        exerciseId,
+        date: '2025-01-01',
+        sets: [{ id: 's1', reps: 5, weight: 100 }],
+      })
+
+      const updated = repo.update(inserted.id, [{ id: 's1', reps: 5, weight: 100, count: 4 }])
+
+      expect(updated!.sets[0].count).toBe(4)
+      expect(repo.findById(inserted.id)!.sets[0].count).toBe(4)
+    })
+  })
+
+  describe('volume at the repository layer', () => {
+    it('findHistoryByDate keeps volume at reps * weight when a count is stored', () => {
+      const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
+      const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
+      const userId = Number(user.lastInsertRowid)
+      const exerciseId = Number(exercise.lastInsertRowid)
+
+      db!.prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)')
+        .run(userId, exerciseId, '2025-01-01', '[{"id":"a","reps":5,"weight":135,"count":3}]')
+
+      const history = repo.findHistoryByDate(userId)
+
+      expect(history[0].logs[0].volume).toBe(675)
+    })
+  })
+})
