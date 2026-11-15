@@ -44,7 +44,9 @@ describe('updateWorkoutUseCase', () => {
     const result = useCase.execute(1, 1, [{ id: 's1', reps: 5, weight: 110 }])
 
     expect(result).toEqual(updatedLog)
-    expect(repo.update).toHaveBeenCalledWith(1, [{ id: 's1', reps: 5, weight: 110 }])
+    // The use case writes the canonical line the domain handed back, not the raw
+    // bytes it was given — a line with no count is stored as one set.
+    expect(repo.update).toHaveBeenCalledWith(1, [{ id: 's1', reps: 5, weight: 110, count: 1 }])
   })
 
   it('validates each set before updating', () => {

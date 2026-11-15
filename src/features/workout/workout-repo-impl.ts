@@ -6,7 +6,7 @@ import type { WorkoutRepository } from '@/features/workout/workout-repository'
 import type { WorkoutLog, WorkoutSet } from '@/features/workout/types'
 import { and } from 'drizzle-orm'
 import * as R from 'ramda'
-import { calculateVolume, normalizeSetCount } from '@/features/workout/workout-entity'
+import { calculateVolume, decodeSetCount } from '@/features/workout/workout-entity'
 
 function mapRowToWorkoutLog(row: Record<string, unknown>): WorkoutLog {
   // Drizzle JSON mode auto-parses JSON columns in .select() queries,
@@ -16,7 +16,7 @@ function mapRowToWorkoutLog(row: Record<string, unknown>): WorkoutLog {
     ? (setsValue as WorkoutSet[])
     : JSON.parse(setsValue as string) as WorkoutSet[]
 
-  const setsWithCount = parsedSets.map((line) => ({ ...line, count: normalizeSetCount(line.count) }))
+  const setsWithCount = parsedSets.map((line) => ({ ...line, count: decodeSetCount(line.count) }))
 
   return {
     id: Number(row.id),
@@ -260,7 +260,7 @@ export function createSqliteWorkoutRepository(db: ReturnType<typeof Database>): 
           ? (unwrappedSets as WorkoutSet[])
           : JSON.parse(unwrappedSets as string) as WorkoutSet[]
 
-        const setsWithCount = parsedSets.map((line) => ({ ...line, count: normalizeSetCount(line.count) }))
+        const setsWithCount = parsedSets.map((line) => ({ ...line, count: decodeSetCount(line.count) }))
 
         return {
           date: row.date as string,

@@ -1,6 +1,6 @@
 import type { WorkoutRepository } from '@/features/workout/workout-repository'
 import type { WorkoutLog, WorkoutSet } from '@/features/workout/types'
-import { normalizeSetCount, validateSet, createEmptyLog } from '@/features/workout/workout-entity'
+import { validateSet, createEmptyLog } from '@/features/workout/workout-entity'
 
 export function logWorkoutUseCase(repo: WorkoutRepository) {
   return {
@@ -9,20 +9,16 @@ export function logWorkoutUseCase(repo: WorkoutRepository) {
         throw new Error('Must log at least one set')
       }
 
-      for (const set of sets) {
-        validateSet(set)
-      }
-
-      const normalizedSets = sets.map((set) => ({ ...set, count: normalizeSetCount(set.count) }))
+      const canonicalSets = sets.map((set) => validateSet(set))
 
       const existing = repo.findByDateAndExercise(userId, date, exerciseId)
 
       if (existing) {
-        return repo.update(existing.id, normalizedSets)!
+        return repo.update(existing.id, canonicalSets)!
       }
 
       const unsaved = createEmptyLog(userId, exerciseId, date)
-      return repo.create({ ...unsaved, sets: normalizedSets })
+      return repo.create({ ...unsaved, sets: canonicalSets })
     },
   }
 }

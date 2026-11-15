@@ -9,7 +9,6 @@ import { getTodayExercisesUseCase } from '@/features/workout/get-today-exercises
 import { getWorkoutHistoryUseCase } from '@/features/workout/get-workout-history'
 import { getUserVolumeUseCase } from '@/features/workout/get-user-volume'
 import { createSqliteExerciseRepository } from '@/features/exercise/exercise-repo-impl'
-import { normalizeSetCount } from '@/features/workout/workout-entity'
 import type { WorkoutLog, WorkoutSet } from '@/features/workout/types'
 
 export async function logWorkoutAction(
@@ -97,7 +96,10 @@ export async function getTodayWorkoutsAction(
       workouts[log.exerciseId] = log.sets.map(s => ({
         weight: s.weight,
         reps: s.reps,
-        count: normalizeSetCount(s.count),
+        // Field selection only. The repository read path is the single owner of
+        // the set-count rule and has already decoded every line to a number >= 1;
+        // this adapter re-enforces nothing, so it cannot be the thing that throws.
+        count: s.count!,
       }))
     }
     return { success: true, workouts }

@@ -332,7 +332,10 @@ describe('getTodayWorkoutsAction', () => {
         userId: 1,
         exerciseId: 5,
         date: '2025-01-01',
-        sets: [{ id: 's1', reps: 5, weight: 100 }, { id: 's2', reps: 3, weight: 135 }],
+        sets: [
+          { id: 's1', reps: 5, weight: 100, count: 1 },
+          { id: 's2', reps: 3, weight: 135, count: 1 },
+        ],
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z',
       },
@@ -408,18 +411,23 @@ describe('getTodayWorkoutsAction', () => {
     expect(result.error).toBeUndefined()
   })
 
+  // The adapter enforces nothing: the count it emits is the count the read path
+  // decoded. These three stored-byte classes are owned by the repository's
+  // decoder (see workout-repo-impl.spec.ts); here the mock stands in for a
+  // repository that has already decoded them, and the assertion is that the
+  // adapter hands the page exactly that count, unchanged, and never fails.
   it.each([
-    { label: 'a missing count key', stored: { id: 's1', reps: 5, weight: 100 } },
-    { label: 'an undefined count', stored: { id: 's1', reps: 5, weight: 100, count: undefined } },
-    { label: 'a zero count', stored: { id: 's1', reps: 5, weight: 100, count: 0 } },
-  ])('projects $label as a count of 1', async ({ stored }) => {
+    { label: 'a missing count key', decoded: { id: 's1', reps: 5, weight: 100, count: 1 } },
+    { label: 'an undefined count', decoded: { id: 's1', reps: 5, weight: 100, count: 1 } },
+    { label: 'a zero count', decoded: { id: 's1', reps: 5, weight: 100, count: 1 } },
+  ])('projects the count the read path decoded from $label as 1', async ({ decoded }) => {
     mockWorkoutRepo.findByDate.mockReturnValue([
       {
         id: 1,
         userId: 1,
         exerciseId: 7,
         date: '2025-01-01',
-        sets: [stored],
+        sets: [decoded],
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z',
       },
@@ -449,7 +457,7 @@ describe('getTodayWorkoutsAction', () => {
         userId: 1,
         exerciseId: 9,
         date: '2025-01-01',
-        sets: [{ id: 's2', reps: 8, weight: 95 }],
+        sets: [{ id: 's2', reps: 8, weight: 95, count: 1 }],
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z',
       },
@@ -475,7 +483,7 @@ describe('getTodayWorkoutsAction', () => {
         date: '2025-01-01',
         sets: [
           { id: 's1', reps: 5, weight: 135, count: 3 },
-          { id: 's2', reps: 3, weight: 95 },
+          { id: 's2', reps: 3, weight: 95, count: 1 },
         ],
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z',

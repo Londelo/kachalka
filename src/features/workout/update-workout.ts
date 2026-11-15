@@ -15,11 +15,9 @@ export function updateWorkoutUseCase(repo: WorkoutRepository) {
         throw new Error('Only the owner can update this workout log')
       }
 
-      for (const set of sets) {
-        validateSet(set)
-      }
+      const canonicalSets = sets.map((set) => validateSet(set))
 
-      const updated = repo.update(logId, sets)
+      const updated = repo.update(logId, canonicalSets)
 
       if (!updated) {
         throw new Error('Workout log not found')
