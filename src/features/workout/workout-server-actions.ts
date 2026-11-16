@@ -6,10 +6,17 @@ import { createSqliteRoutineRepository } from '@/features/routine/routine-repo-i
 import { logWorkoutUseCase } from '@/features/workout/log-workout'
 import { updateWorkoutUseCase } from '@/features/workout/update-workout'
 import { getTodayExercisesUseCase } from '@/features/workout/get-today-exercises'
+import { getTodayWorkoutsUseCase } from '@/features/workout/get-today-workouts'
 import { getWorkoutHistoryUseCase } from '@/features/workout/get-workout-history'
 import { getUserVolumeUseCase } from '@/features/workout/get-user-volume'
 import { createSqliteExerciseRepository } from '@/features/exercise/exercise-repo-impl'
+import { getTodayISO } from '@/shared/utils/date'
 import type { WorkoutLog, WorkoutSet } from '@/features/workout/types'
+import type { TodayWorkouts } from '@/features/workout/get-today-workouts'
+
+// The wire shape is owned by the read that produces it, not by this adapter.
+// Re-exported so callers keep importing it from the interface layer.
+export type { TodayWorkouts }
 
 export async function logWorkoutAction(
   userId: number,
@@ -52,8 +59,6 @@ type ExerciseInfo = {
   lastLog: { weight: number; reps: number }[] | null
 }
 
-export type TodayWorkouts = Record<number, { weight: number; reps: number; count: number }[]>
-
 export async function getTodayExercisesAction(
   userId: number,
   dayOfWeek: number,
@@ -89,19 +94,8 @@ export async function getTodayWorkoutsAction(
   try {
     const db = getDatabase()
     const repo = createSqliteWorkoutRepository(db)
-    const today = new Date().toISOString().split('T')[0]
-    const logs = repo.findByDate(userId, today)
-    const workouts: TodayWorkouts = {}
-    for (const log of logs) {
-      workouts[log.exerciseId] = log.sets.map(s => ({
-        weight: s.weight,
-        reps: s.reps,
-        // Field selection only. The repository read path is the single owner of
-        // the set-count rule and has already decoded every line to a number >= 1;
-        // this adapter re-enforces nothing, so it cannot be the thing that throws.
-        count: s.count!,
-      }))
-    }
+    const useCase = getTodayWorkoutsUseCase(repo)
+    const workouts = useCase.execute(userId, getTodayISO())
     return { success: true, workouts }
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error'
