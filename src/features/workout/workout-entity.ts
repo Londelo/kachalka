@@ -82,6 +82,41 @@ export function calculateVolume(sets: { reps: number; weight: number }[]): numbe
   return sets.reduce((total, set) => total + set.reps * set.weight, 0)
 }
 
+/**
+ * The collapse rule — the one implementation in the codebase of "same weight
+ * plus same reps is the same line". Every line carrying an equal pair becomes
+ * a single line whose count is the sum of all their counts, in the order each
+ * pair was first seen.
+ *
+ * Position is not meaningful to the rule, but the output is deterministic all
+ * the same: the surviving line keeps the first matching line's id so React can
+ * key on it, and neither the input array nor any line inside it is touched.
+ *
+ * Count is resolved before it is summed, and deliberately not through
+ * `decodeSetCount`: that one floors, and a line claiming 2.5 sets is not a
+ * fractional group of sets, it is a line nobody meant, so it contributes
+ * exactly 1 like a blank one does rather than a suspect 2.
+ */
+export function collapseDuplicateSets(sets: WorkoutSet[]): WorkoutSet[] {
+  const groups = sets.reduce<Map<string, WorkoutSet>>((byPair, set) => {
+    const key = `${set.weight}|${set.reps}`
+    const claimed = set.count
+    const count = typeof claimed === 'number' && Number.isInteger(claimed) && claimed >= 1 ? claimed : 1
+    const existing = byPair.get(key)
+
+    byPair.set(
+      key,
+      existing
+        ? { ...existing, count: (existing.count ?? 0) + count }
+        : { id: set.id, weight: set.weight, reps: set.reps, count },
+    )
+
+    return byPair
+  }, new Map())
+
+  return [...groups.values()]
+}
+
 export function createEmptyLog(
   userId: number,
   exerciseId: number,
