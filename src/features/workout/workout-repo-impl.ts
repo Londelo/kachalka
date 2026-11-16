@@ -6,7 +6,7 @@ import type { WorkoutRepository } from '@/features/workout/workout-repository'
 import type { WorkoutLog, WorkoutSet } from '@/features/workout/types'
 import { and } from 'drizzle-orm'
 import * as R from 'ramda'
-import { calculateVolume } from '@/features/workout/workout-entity'
+import { calculateVolume, decodeSetCount } from '@/features/workout/workout-entity'
 
 function mapRowToWorkoutLog(row: Record<string, unknown>): WorkoutLog {
   // Drizzle JSON mode auto-parses JSON columns in .select() queries,
@@ -16,14 +16,47 @@ function mapRowToWorkoutLog(row: Record<string, unknown>): WorkoutLog {
     ? (setsValue as WorkoutSet[])
     : JSON.parse(setsValue as string) as WorkoutSet[]
 
+  const setsWithCount = parsedSets.map((line) => ({ ...line, count: decodeSetCount(line.count) }))
+
   return {
     id: Number(row.id),
     userId: Number(row.userId),
     exerciseId: Number(row.exerciseId),
     date: row.date as string,
-    sets: parsedSets,
+    sets: setsWithCount,
     createdAt: row.created_at instanceof Date ? (row.created_at as Date).toISOString() : String(row.created_at),
     updatedAt: row.updated_at instanceof Date ? (row.updated_at as Date).toISOString() : String(row.updated_at),
+  }
+}
+
+type HistoryLogEntry = {
+  date: string
+  id: number
+  exerciseId: number
+  exerciseName: string
+  sets: WorkoutSet[]
+  volume: number
+}
+
+/**
+ * Outbound row → War Logs entry.
+ *
+ * The row→object mapping and the set-count decoding belong to mapRowToWorkoutLog
+ * alone; this adds the two fields the history list needs on top of it — the joined
+ * exercise name and the volume. The mapper is called once and its `sets` array is
+ * the single value both `sets` and `volume` are read from, so an entry can never
+ * display one set of lines while totalling another.
+ */
+function mapRowToHistoryEntry(row: Record<string, unknown>): HistoryLogEntry {
+  const log = mapRowToWorkoutLog(row)
+
+  return {
+    date: log.date,
+    id: log.id,
+    exerciseId: log.exerciseId,
+    exerciseName: row.exerciseName as string,
+    sets: log.sets,
+    volume: calculateVolume(log.sets),
   }
 }
 
@@ -219,7 +252,13 @@ export function createSqliteWorkoutRepository(db: ReturnType<typeof Database>): 
     }[] {
       const rows = queryDb
         .select({
-          logId: schema.workoutLogs.id,
+          // Keyed to match the shape mapRowToWorkoutLog reads, so history shares
+          // that one mapper rather than re-deriving the row→object mapping beside
+          // it. The timestamps are deliberately not selected: a history entry
+          // carries no createdAt/updatedAt, and asking Drizzle to project them
+          // applies mode:'timestamp' to a column whose stored default is an ISO
+          // *string*, which decodes to an Invalid Date and throws on toISOString.
+          id: schema.workoutLogs.id,
           userId: schema.workoutLogs.userId,
           exerciseId: schema.workoutLogs.exerciseId,
           date: schema.workoutLogs.date,
@@ -232,45 +271,7 @@ export function createSqliteWorkoutRepository(db: ReturnType<typeof Database>): 
         .orderBy(desc(schema.workoutLogs.date))
         .all()
 
-      const mapped = R.map((row: Record<string, unknown>) => {
-        // Unwrap Drizzle value objects to ensure plain serializable types
-        const logId = row.logId
-        const unwrappedLogId = typeof logId === 'object' && logId !== null && 'value' in logId
-          ? (logId as { value: number }).value
-          : Number(logId)
-
-        const exerciseId = row.exerciseId
-        const unwrappedExerciseId = typeof exerciseId === 'object' && exerciseId !== null && 'value' in exerciseId
-          ? (exerciseId as { value: number }).value
-          : Number(exerciseId)
-
-        const setsValue = row.sets
-        // Drizzle JSON mode auto-parses JSON columns in .select() queries,
-        // so setsValue may already be an array (not a string).
-        // It may also be a Drizzle {value: ...} wrapper.
-        let unwrappedSets: unknown
-        if (typeof setsValue === 'object' && setsValue !== null && 'value' in setsValue) {
-          unwrappedSets = (setsValue as { value: unknown }).value
-        } else {
-          unwrappedSets = setsValue
-        }
-        const parsedSets = Array.isArray(unwrappedSets)
-          ? (unwrappedSets as WorkoutSet[])
-          : JSON.parse(unwrappedSets as string) as WorkoutSet[]
-
-        return {
-          date: row.date as string,
-          id: unwrappedLogId,
-          exerciseId: unwrappedExerciseId,
-          exerciseName: typeof row.exerciseName === 'object' && row.exerciseName !== null && 'value' in row.exerciseName
-            ? (row.exerciseName as { value: string }).value
-            : (row.exerciseName as string),
-          sets: parsedSets,
-          volume: calculateVolume(parsedSets),
-        }
-      }, rows)
-
-      const grouped = R.groupBy((item: typeof mapped[number]) => item.date, mapped)
+      const grouped = R.groupBy((entry: HistoryLogEntry) => entry.date, R.map(mapRowToHistoryEntry, rows))
 
       return R.values(grouped).map((logItems) => ({
         date: logItems![0].date,

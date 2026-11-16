@@ -2,6 +2,7 @@ export type WorkoutSet = {
   id: string
   reps: number
   weight: number
+  count?: number
 }
 
 export type WorkoutLog = {

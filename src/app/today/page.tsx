@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { logWorkoutAction, getTodayWorkoutsAction, getTodayExercisesAction } from '@/features/workout/workout-server-actions'
 import { useLoading } from '@/components/loading-context'
 import type { WorkoutSet } from '@/features/workout/types'
-import { jsDayToAppIndex } from '@/shared/utils/date'
+import { jsDayToAppIndex, getTodayISO } from '@/shared/utils/date'
 
 type ExerciseItem = {
   exerciseId: number
@@ -24,8 +24,40 @@ function generateId(): string {
     crypto.getRandomValues(new Uint32Array(4))[0].toString(16)
 }
 
+/**
+ * EMPTY-MEANS-ONE — the one place the SET box's blank rule is written down.
+ * Everything below, and the count input in the editable row, obeys this; nothing
+ * else restates it.
+ *
+ * A blank SET box means ONE set.
+ *
+ * The box is controlled (`value={set.count ?? ''}`) and `parseCount` maps `''` and
+ * `NaN` to `undefined`, so clearing it puts `undefined` in state and `undefined` in
+ * the save payload. `normalizeSetCount` (src/features/workout/workout-entity.ts) is
+ * the write-side rule that turns `undefined` — and `0` — into the stored `1`.
+ *
+ * Consequence, and it is deliberate: screen and store disagree while the user is
+ * mid-edit. The commander sees an empty box while the saved record says one set.
+ * A reload re-reads the line through the today-workouts projection, which decodes
+ * the stored `1`, and the box then shows `1`.
+ *
+ * Do NOT "fix" the disagreement by rendering `set.count ?? 1`. That makes the box
+ * impossible to clear, which is the behaviour the feature gate's acceptance criteria
+ * and tests/e2e/today-set-count.spec.ts both pin. Keep the display empty and keep
+ * `placeholder` showing the number the blank stands for.
+ */
+const EMPTY_COUNT_MEANS = 1
+const EMPTY_COUNT_PLACEHOLDER = String(EMPTY_COUNT_MEANS)
+
 function defaultSet(): WorkoutSet {
-  return { id: generateId(), reps: 1, weight: 0 }
+  return { id: generateId(), count: EMPTY_COUNT_MEANS, reps: 1, weight: 0 }
+}
+
+/** Blank and junk both read as "no number typed" — see EMPTY_COUNT_MEANS for what that means. */
+function parseCount(value: string): number | undefined {
+  if (value === '') return undefined
+  const parsed = Number(value)
+  return Number.isNaN(parsed) ? undefined : parsed
 }
 
 function getStoredUserId(): number | null {
@@ -122,39 +154,48 @@ function ExerciseCard({
             <div className="mb-4 flex flex-col gap-4">
               {sets.map((set, index) => (
                 <div key={set.id} className="flex items-center gap-3">
-                  {/* Set number box */}
-                  <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background p-2 gap-2">
+                  <div className="flex min-w-0 flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
                     <span className="font-label-mono text-label-mono text-secondary">SET:</span>
-                    <span className="font-body-md text-body-md text-on-surface">
-                      {String(index + 1).padStart(2, '0')}
-                    </span>
+                    <input
+                      type="number"
+                      value={set.count ?? ''}
+                      onChange={(e) => onSetChange(index, 'count', e.target.value)}
+                      placeholder={EMPTY_COUNT_PLACEHOLDER}
+                      min="1"
+                      step="1"
+                      inputMode="numeric"
+                      data-id={`set-count-input-${exercise.exerciseId}-${index}`}
+                      aria-label={`Set count for set ${index + 1}`}
+                      className="w-full bg-transparent [-moz-appearance:textfield] appearance-none font-body-md text-body-md text-on-surface outline-none [-webkit-appearance:none]"
+                    />
                   </div>
 
-                  {/* Weight input */}
-                  <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
+                  <div className="flex min-w-0 flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
                     <span className="font-label-mono text-label-mono text-secondary">LB:</span>
                     <input
                       type="number"
                       value={set.weight || ''}
                       onChange={(e) => onSetChange(index, 'weight', e.target.value)}
                       placeholder="0"
+                      data-id={`set-weight-input-${exercise.exerciseId}-${index}`}
+                      aria-label={`Weight in pounds for set ${index + 1}`}
                       className="w-full bg-transparent [-moz-appearance:textfield] appearance-none font-body-md text-body-md text-on-surface outline-none [-webkit-appearance:none]"
                     />
                   </div>
 
-                  {/* Reps input */}
-                  <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
+                  <div className="flex min-w-0 flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
                     <span className="font-label-mono text-label-mono text-secondary">REPS:</span>
                     <input
                       type="number"
                       value={set.reps || ''}
                       onChange={(e) => onSetChange(index, 'reps', e.target.value)}
                       placeholder="0"
+                      data-id={`set-reps-input-${exercise.exerciseId}-${index}`}
+                      aria-label={`Reps for set ${index + 1}`}
                       className="w-full bg-transparent [-moz-appearance:textfield] appearance-none font-body-md text-body-md text-on-surface outline-none [-webkit-appearance:none]"
                     />
                   </div>
 
-                  {/* Delete button */}
                   <button
                     type="button"
                     onClick={() => onRemoveSet(index)}
@@ -316,7 +357,7 @@ export default function TodayPage() {
       return next
     })
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = getTodayISO()
     const res = await logWorkoutAction(userId, exerciseId, today, validSets)
 
     setSavingExercises((prev) => {
@@ -371,7 +412,10 @@ export default function TodayPage() {
     updateSets(exerciseId, (prev) => {
       const updated = [...prev]
       const current = updated[index]
-      updated[index] = { ...current, [field]: parseFloat(value) || 0 }
+      updated[index] = {
+        ...current,
+        [field]: field === 'count' ? parseCount(value) : parseFloat(value) || 0,
+      }
       return updated
     })
     triggerSave(exerciseId)
