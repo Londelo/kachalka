@@ -38,9 +38,16 @@ export function decodeSetCount(raw: unknown): number {
 }
 
 /**
- * Domain check for one incoming set line. Returns the canonical line — weight
- * and reps as given, count normalised to the floor — so a writer can store what
- * the domain handed back instead of re-deriving the rule a second time.
+ * Domain check for one incoming set line. Returns the canonical line — a
+ * projection onto exactly the fields the type claims, count normalised to the
+ * floor — so a writer can store what the domain handed back instead of
+ * re-deriving the rule a second time.
+ *
+ * This is a projection, not a spread. `sets` arrives from a `'use server'`
+ * entry point, so the incoming object may carry keys nobody in this codebase
+ * invented. Spreading would persist them verbatim into the `sets` column and
+ * hand them back out through every read path; picking the four known fields is
+ * what makes "the stored shape is the shape the type claims" actually true.
  */
 export function validateSet(set: WorkoutSet): WorkoutSet {
   if (set.weight < 0) {
@@ -51,7 +58,24 @@ export function validateSet(set: WorkoutSet): WorkoutSet {
     throw new Error('Reps must be at least 1')
   }
 
-  return { ...set, count: normalizeSetCount(set.count) }
+  return {
+    id: set.id,
+    reps: set.reps,
+    weight: set.weight,
+    count: normalizeSetCount(set.count),
+  }
+}
+
+/**
+ * Inbound projection of a whole set array — the single write-side enforcement
+ * point for what reaches the `sets` column.
+ *
+ * Every writer calls this and stores what it returns, so no writer can apply
+ * the floor rule but forget the projection, or the reverse. One owner per
+ * direction is what keeps two writers from disagreeing on the same logical line.
+ */
+export function normalizeSetLines(sets: WorkoutSet[]): WorkoutSet[] {
+  return sets.map((set) => validateSet(set))
 }
 
 export function calculateVolume(sets: { reps: number; weight: number }[]): number {

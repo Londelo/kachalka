@@ -1,6 +1,6 @@
 import type { WorkoutRepository } from '@/features/workout/workout-repository'
 import type { WorkoutLog, WorkoutSet } from '@/features/workout/types'
-import { validateSet } from '@/features/workout/workout-entity'
+import { normalizeSetLines } from '@/features/workout/workout-entity'
 
 export function updateWorkoutUseCase(repo: WorkoutRepository) {
   return {
@@ -15,7 +15,7 @@ export function updateWorkoutUseCase(repo: WorkoutRepository) {
         throw new Error('Only the owner can update this workout log')
       }
 
-      const canonicalSets = sets.map((set) => validateSet(set))
+      const canonicalSets = normalizeSetLines(sets)
 
       const updated = repo.update(logId, canonicalSets)
 
