@@ -504,7 +504,7 @@ describe('createSqliteWorkoutRepository — set count on the read path', () => {
       expect(entries[0].lastLog!.sets[0].count).toBe(1)
     })
 
-    it('findHistoryByDate defaults a missing count to 1 through its own mapper', () => {
+    it('findHistoryByDate defaults a missing count to 1 through the shared row mapper', () => {
       const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
       const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
       const userId = Number(user.lastInsertRowid)
@@ -537,7 +537,7 @@ describe('createSqliteWorkoutRepository — set count on the read path', () => {
       expect(found!.sets[0].weight).toBe(135)
     })
 
-    it('findHistoryByDate preserves the stored count through its own mapper', () => {
+    it('findHistoryByDate preserves the stored count through the shared row mapper', () => {
       const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run('Alice')
       const exercise = db!.prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)').run('Squat', user.lastInsertRowid!)
       const userId = Number(user.lastInsertRowid)

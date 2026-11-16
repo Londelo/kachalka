@@ -553,5 +553,35 @@ describe('getTodayWorkoutsAction', () => {
     expect(result.workouts).toEqual({ 7: [{ weight: 135, reps: 5, count: 3 }] })
     expect(Object.keys(result.workouts![7][0]).sort()).toEqual(['count', 'reps', 'weight'])
   })
+
+  // Finding 1 (PR #20), the adapter half. The real getTodayWorkoutsUseCase runs
+  // here — only the repository is faked — so this pins what the page branches on.
+  // Before the split the projection threw on a bad stored byte, the catch block
+  // returned {success:false, workouts:null}, and src/app/today/page.tsx took its
+  // normal "no workouts today" branch: the commander's sets vanished from screen
+  // while still in the database. Red if the projection starts policing stored
+  // bytes again — the exercise key would be gone and success would be false.
+  // The count itself is asserted in get-today-workouts.spec.ts against a real
+  // database; a faked repository never passes a byte through the decoder.
+  it('keeps a corrupt stored count out of the failure envelope', async () => {
+    mockWorkoutRepo.findByDate.mockReturnValue([
+      {
+        id: 1,
+        userId: 1,
+        exerciseId: 7,
+        date: '2025-01-01',
+        sets: [{ id: 's1', reps: 5, weight: 135, count: -5 }],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.success).toBe(true)
+    expect(result.error).toBeUndefined()
+    expect(Object.keys(result.workouts ?? {})).toEqual(['7'])
+  })
 })
 

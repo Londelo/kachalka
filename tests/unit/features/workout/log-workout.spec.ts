@@ -211,12 +211,18 @@ describe('logWorkoutUseCase — set count at the write boundary', () => {
       expect(repo.create.mock.calls[0][0].sets).toHaveLength(1)
     })
 
-    it('spreads an unrecognised key through untouched beside the added count', () => {
+    // Guards the projection in validateSet (workout-entity.ts), landed in 2059ade.
+    // `sets` arrives from a 'use server' entry point, so a POSTed body may carry
+    // keys nobody in this codebase invented. Red if validateSet regains a spread
+    // (`{ ...set, count: normalizeSetCount(set.count) }`) instead of picking the
+    // four known fields: the spread hands `note` verbatim into the sets column,
+    // where it round-trips back out through every read path.
+    it('drops an unrecognised POSTed key rather than storing it beside the count', () => {
       const repo = createRepo()
 
       logWorkoutUseCase(repo).execute(1, 5, '2025-01-01', [{ id: 'a', reps: 5, weight: 135, note: 'x' } as WorkoutSet])
 
-      expect(repo.create.mock.calls[0][0].sets).toEqual([{ id: 'a', reps: 5, weight: 135, note: 'x', count: 1 }])
+      expect(repo.create.mock.calls[0][0].sets).toEqual([{ id: 'a', reps: 5, weight: 135, count: 1 }])
     })
   })
 
