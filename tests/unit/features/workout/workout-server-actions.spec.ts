@@ -332,7 +332,10 @@ describe('getTodayWorkoutsAction', () => {
         userId: 1,
         exerciseId: 5,
         date: '2025-01-01',
-        sets: [{ id: 's1', reps: 5, weight: 100 }, { id: 's2', reps: 3, weight: 135 }],
+        sets: [
+          { id: 's1', reps: 5, weight: 100, count: 1 },
+          { id: 's2', reps: 3, weight: 135, count: 1 },
+        ],
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z',
       },
@@ -343,7 +346,10 @@ describe('getTodayWorkoutsAction', () => {
 
     expect(result.success).toBe(true)
     expect(result.workouts).toEqual({
-      5: [{ weight: 100, reps: 5 }, { weight: 135, reps: 3 }],
+      5: [
+        { weight: 100, reps: 5, count: 1 },
+        { weight: 135, reps: 3, count: 1 },
+      ],
     })
     expect(result.error).toBeUndefined()
   })
@@ -382,6 +388,200 @@ describe('getTodayWorkoutsAction', () => {
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Unknown error')
+  })
+
+  it('projects a stored count unchanged', async () => {
+    mockWorkoutRepo.findByDate.mockReturnValue([
+      {
+        id: 1,
+        userId: 1,
+        exerciseId: 7,
+        date: '2025-01-01',
+        sets: [{ id: 's1', reps: 5, weight: 135, count: 3 }],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.success).toBe(true)
+    expect(result.workouts).toEqual({ 7: [{ weight: 135, reps: 5, count: 3 }] })
+    expect(result.error).toBeUndefined()
+  })
+
+  // The adapter enforces nothing: the count it emits is the count the read path
+  // decoded. These three stored-byte classes are owned by the repository's
+  // decoder (see workout-repo-impl.spec.ts); here the mock stands in for a
+  // repository that has already decoded them, and the assertion is that the
+  // adapter hands the page exactly that count, unchanged, and never fails.
+  it.each([
+    { label: 'a missing count key', decoded: { id: 's1', reps: 5, weight: 100, count: 1 } },
+    { label: 'an undefined count', decoded: { id: 's1', reps: 5, weight: 100, count: 1 } },
+    { label: 'a zero count', decoded: { id: 's1', reps: 5, weight: 100, count: 1 } },
+  ])('projects the count the read path decoded from $label as 1', async ({ decoded }) => {
+    mockWorkoutRepo.findByDate.mockReturnValue([
+      {
+        id: 1,
+        userId: 1,
+        exerciseId: 7,
+        date: '2025-01-01',
+        sets: [decoded],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.success).toBe(true)
+    expect(result.workouts).toEqual({ 7: [{ weight: 100, reps: 5, count: 1 }] })
+    expect(result.error).toBeUndefined()
+  })
+
+  it('gives each exercise its own key with its own counts', async () => {
+    mockWorkoutRepo.findByDate.mockReturnValue([
+      {
+        id: 1,
+        userId: 1,
+        exerciseId: 7,
+        date: '2025-01-01',
+        sets: [{ id: 's1', reps: 5, weight: 135, count: 2 }],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+      {
+        id: 2,
+        userId: 1,
+        exerciseId: 9,
+        date: '2025-01-01',
+        sets: [{ id: 's2', reps: 8, weight: 95, count: 1 }],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.success).toBe(true)
+    expect(result.workouts).toEqual({
+      7: [{ weight: 135, reps: 5, count: 2 }],
+      9: [{ weight: 95, reps: 8, count: 1 }],
+    })
+    expect(result.error).toBeUndefined()
+  })
+
+  it('preserves order and length across a multi-line exercise', async () => {
+    mockWorkoutRepo.findByDate.mockReturnValue([
+      {
+        id: 1,
+        userId: 1,
+        exerciseId: 7,
+        date: '2025-01-01',
+        sets: [
+          { id: 's1', reps: 5, weight: 135, count: 3 },
+          { id: 's2', reps: 3, weight: 95, count: 1 },
+        ],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.workouts?.[7]).toHaveLength(2)
+    expect(result.workouts).toEqual({
+      7: [
+        { weight: 135, reps: 5, count: 3 },
+        { weight: 95, reps: 3, count: 1 },
+      ],
+    })
+  })
+
+  it('projects an empty sets array to an empty array', async () => {
+    mockWorkoutRepo.findByDate.mockReturnValue([
+      {
+        id: 1,
+        userId: 1,
+        exerciseId: 7,
+        date: '2025-01-01',
+        sets: [],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.success).toBe(true)
+    expect(result.workouts).toEqual({ 7: [] })
+    expect(result.error).toBeUndefined()
+  })
+
+  it('returns the full failure envelope for a non-Error throw', async () => {
+    mockWorkoutRepo.findByDate.mockImplementation(() => {
+      throw 'string error'
+    })
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result).toEqual({ success: false, error: 'Unknown error', workouts: null })
+  })
+
+  it('projects only weight, reps and count — never the id or any other stored field', async () => {
+    mockWorkoutRepo.findByDate.mockReturnValue([
+      {
+        id: 1,
+        userId: 1,
+        exerciseId: 7,
+        date: '2025-01-01',
+        sets: [{ id: 's1', reps: 5, weight: 135, count: 3, note: 'tight bar' }],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.workouts).toEqual({ 7: [{ weight: 135, reps: 5, count: 3 }] })
+    expect(Object.keys(result.workouts![7][0]).sort()).toEqual(['count', 'reps', 'weight'])
+  })
+
+  // Finding 1 (PR #20), the adapter half. The real getTodayWorkoutsUseCase runs
+  // here — only the repository is faked — so this pins what the page branches on.
+  // Before the split the projection threw on a bad stored byte, the catch block
+  // returned {success:false, workouts:null}, and src/app/today/page.tsx took its
+  // normal "no workouts today" branch: the commander's sets vanished from screen
+  // while still in the database. Red if the projection starts policing stored
+  // bytes again — the exercise key would be gone and success would be false.
+  // The count itself is asserted in get-today-workouts.spec.ts against a real
+  // database; a faked repository never passes a byte through the decoder.
+  it('keeps a corrupt stored count out of the failure envelope', async () => {
+    mockWorkoutRepo.findByDate.mockReturnValue([
+      {
+        id: 1,
+        userId: 1,
+        exerciseId: 7,
+        date: '2025-01-01',
+        sets: [{ id: 's1', reps: 5, weight: 135, count: -5 }],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.success).toBe(true)
+    expect(result.error).toBeUndefined()
+    expect(Object.keys(result.workouts ?? {})).toEqual(['7'])
   })
 })
 
