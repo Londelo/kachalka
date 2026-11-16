@@ -1,6 +1,8 @@
 import Database from 'better-sqlite3'
 import { test, expect } from '@playwright/test'
 import { loginAsBruno } from './helpers'
+import { getTodayISO, jsDayToAppIndex } from '@/shared/utils/date'
+import { logWorkoutAction } from '@/features/workout/workout-server-actions'
 
 // ============================================================================
 // Feature: Typed Set Count — Today's Battle
@@ -9,6 +11,11 @@ import { loginAsBruno } from './helpers'
 // through logWorkoutAction, into the JSON sets column, back out through
 // getTodayWorkoutsAction, and onto the rendered line again — plus every error
 // and success this feature encapsulates surfacing on the commander's card.
+//
+// Two entry points are driven, because the feature has two:
+//   * the browser, for everything a commander can actually do to the box;
+//   * logWorkoutAction itself, for the junk a `type="number"` input can never
+//     deliver but a `'use server'` entry point accepts from any client.
 // ============================================================================
 
 const db = new Database('data/kachalka.db')
@@ -22,23 +29,18 @@ db.exec('DELETE FROM sqlite_sequence')
 
 // ============================================================================
 // Seams
+//
+// The date and the day index come from the same functions the page calls
+// (src/shared/utils/date.ts). A copy of that arithmetic here would let this
+// spec seed and assert under one date while the app wrote another.
 // ============================================================================
 
 type StoredLine = { count: number | null; weight: number; reps: number }
 
-function todayISO(): string {
-  return new Date().toISOString().split('T')[0]
-}
-
-/** The app's own day index (Mon=0..Sun=6) for today — same conversion the page uses. */
-function todayDayIndex(): number {
-  return (new Date().getDay() - 1 + 7) % 7
-}
-
 function readRawSets(exerciseId: number): Record<string, unknown>[] | null {
   const row = db
     .prepare('SELECT sets FROM workout_logs WHERE user_id = 1 AND exercise_id = ? AND date = ?')
-    .get(exerciseId, todayISO()) as { sets: string } | undefined
+    .get(exerciseId, getTodayISO()) as { sets: string } | undefined
   if (!row) return null
   return parseSetsColumn(row.sets)
 }
@@ -66,7 +68,7 @@ function seedExerciseOnToday(name: string): number {
   const exerciseId = Number(info.lastInsertRowid)
   db.prepare('INSERT INTO user_routines (user_id, exercise_id, day_of_week) VALUES (1, ?, ?)').run(
     exerciseId,
-    todayDayIndex(),
+    jsDayToAppIndex(new Date().getDay()),
   )
   return exerciseId
 }
@@ -74,7 +76,7 @@ function seedExerciseOnToday(name: string): number {
 function seedTodayLog(exerciseId: number, lines: Record<string, unknown>[]): void {
   db.prepare(
     'INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (1, ?, ?, ?)',
-  ).run(exerciseId, todayISO(), JSON.stringify(lines))
+  ).run(exerciseId, getTodayISO(), JSON.stringify(lines))
 }
 
 async function expectStoredSets(exerciseId: number, expected: StoredLine[]): Promise<void> {
@@ -84,7 +86,11 @@ async function expectStoredSets(exerciseId: number, expected: StoredLine[]): Pro
 }
 
 // ============================================================================
-// Locators — the card is the seam, the count box is the entry point
+// Locators — every box by its own data-id, the row by the whole named triple
+//
+// The three data-ids are the selector contract (src/app/today/page.tsx):
+//   set-count-input-<E>-<I> / set-weight-input-<E>-<I> / set-reps-input-<E>-<I>
+// No number box is reached by position, and no single box stands in for the row.
 // ============================================================================
 
 function card(page: import('@playwright/test').Page, exerciseId: number) {
@@ -99,9 +105,24 @@ function countBox(page: import('@playwright/test').Page, exerciseId: number, ind
   return page.locator(`[data-id="set-count-input-${exerciseId}-${index}"]`)
 }
 
-/** The row the count box lives in — reached through the count box's own data-id. */
+function weightBox(page: import('@playwright/test').Page, exerciseId: number, index: number) {
+  return page.locator(`[data-id="set-weight-input-${exerciseId}-${index}"]`)
+}
+
+function repsBox(page: import('@playwright/test').Page, exerciseId: number, index: number) {
+  return page.locator(`[data-id="set-reps-input-${exerciseId}-${index}"]`)
+}
+
+/**
+ * The row that owns one line's boxes. Its identity is the whole named triple —
+ * count AND weight AND reps as siblings under one row div — so the count input
+ * is no longer the anchor for the row, and reordering or adding a field inside
+ * the row cannot silently make this point at a different line.
+ */
 function setRow(page: import('@playwright/test').Page, exerciseId: number, index: number) {
-  return countBox(page, exerciseId, index).locator('xpath=../..')
+  const owns = (field: 'count' | 'weight' | 'reps') =>
+    `:has(> div > [data-id="set-${field}-input-${exerciseId}-${index}"])`
+  return card(page, exerciseId).locator(`div${owns('count')}${owns('weight')}${owns('reps')}`)
 }
 
 function cardError(page: import('@playwright/test').Page, exerciseId: number) {
@@ -151,11 +172,12 @@ test('a scheduled set line renders an editable SET box beside LB and REPS', asyn
   // The count the projection carried is what the box holds — not a positional number
   await expect(box).toHaveValue('2')
 
-  // LB and REPS sit in the same row, after the count box
-  const inputs = setRow(page, exerciseId, 0).locator('input[type="number"]')
-  await expect(inputs).toHaveCount(3)
-  await expect(inputs.nth(1)).toHaveValue('135')
-  await expect(inputs.nth(2)).toHaveValue('5')
+  // LB and REPS are the count box's row-mates, each named by its own data-id
+  await expect(weightBox(page, exerciseId, 0)).toHaveValue('135')
+  await expect(weightBox(page, exerciseId, 0)).toHaveAttribute('aria-label', 'Weight in pounds for set 1')
+  await expect(repsBox(page, exerciseId, 0)).toHaveValue('5')
+  await expect(repsBox(page, exerciseId, 0)).toHaveAttribute('aria-label', 'Reps for set 1')
+  await expect(setRow(page, exerciseId, 0).locator('input[type="number"]')).toHaveCount(3)
 })
 
 test('a typed count of 3 survives save and reload as one line at that weight and reps', async ({
@@ -165,9 +187,8 @@ test('a typed count of 3 survives save and reload as one line at that weight and
 
   await openTodayPage(page, exerciseId)
 
-  const row = setRow(page, exerciseId, 0)
-  await row.locator('input[type="number"]').nth(1).fill('135')
-  await row.locator('input[type="number"]').nth(2).fill('5')
+  await weightBox(page, exerciseId, 0).fill('135')
+  await repsBox(page, exerciseId, 0).fill('5')
   await countBox(page, exerciseId, 0).fill('3')
 
   // component -> server action -> JSON column: one line, count 3
@@ -178,9 +199,8 @@ test('a typed count of 3 survives save and reload as one line at that weight and
   await expect(card(page, exerciseId)).toBeVisible()
   await expect(countBoxes(page, exerciseId)).toHaveCount(1)
   await expect(countBox(page, exerciseId, 0)).toHaveValue('3')
-  const reloadedRow = setRow(page, exerciseId, 0)
-  await expect(reloadedRow.locator('input[type="number"]').nth(1)).toHaveValue('135')
-  await expect(reloadedRow.locator('input[type="number"]').nth(2)).toHaveValue('5')
+  await expect(weightBox(page, exerciseId, 0)).toHaveValue('135')
+  await expect(repsBox(page, exerciseId, 0)).toHaveValue('5')
 })
 
 test('a blanked count box stores and redisplays 1', async ({ page }) => {
@@ -191,6 +211,7 @@ test('a blanked count box stores and redisplays 1', async ({ page }) => {
   await expect(countBox(page, exerciseId, 0)).toHaveValue('5')
 
   await countBox(page, exerciseId, 0).fill('')
+  // EMPTY-MEANS-ONE (src/app/today/page.tsx): the box stays blank while the store holds 1
   await expect(countBox(page, exerciseId, 0)).toHaveValue('')
 
   await expectStoredSets(exerciseId, [{ count: 1, weight: 225, reps: 3 }])
@@ -236,9 +257,8 @@ test('adding then deleting a line leaves the surviving lines their own counts', 
   await expect(countBoxes(page, exerciseId)).toHaveCount(3)
   await expect(countBox(page, exerciseId, 2)).toHaveValue('1')
 
-  const addedRow = setRow(page, exerciseId, 2)
-  await addedRow.locator('input[type="number"]').nth(1).fill('60')
-  await addedRow.locator('input[type="number"]').nth(2).fill('10')
+  await weightBox(page, exerciseId, 2).fill('60')
+  await repsBox(page, exerciseId, 2).fill('10')
   await expectStoredSets(exerciseId, [
     { count: 2, weight: 100, reps: 5 },
     { count: 4, weight: 200, reps: 3 },
@@ -246,7 +266,7 @@ test('adding then deleting a line leaves the surviving lines their own counts', 
   ])
 
   // Delete the added line — the survivors keep their own counts
-  await addedRow.getByRole('button').click()
+  await setRow(page, exerciseId, 2).getByRole('button').click()
   await expect(countBoxes(page, exerciseId)).toHaveCount(2)
   await expect(countBox(page, exerciseId, 0)).toHaveValue('2')
   await expect(countBox(page, exerciseId, 1)).toHaveValue('4')
@@ -307,27 +327,82 @@ test('a negative count is refused on the card and the typed value stays in the b
   expect(readStoredSets(exerciseId)).toEqual([{ count: 1, weight: 185, reps: 5 }])
 })
 
-test('garbage typed into the count box never stores a line below 1', async ({ page }) => {
+/**
+ * The rejection half, driven with junk the box's own guards do not stop.
+ *
+ * `-0.5` is a valid HTML floating-point number, so Chromium hands it through
+ * untouched — unlike `1e999`, `0x10` or `abc`, which the number input blanks or
+ * mangles before the page sees them, and unlike anything non-numeric, which
+ * Playwright refuses to type into `input[type=number]` at all. It also clears
+ * the box's own `min="1" step="1"`, which are advisory attributes, not a guard.
+ *
+ * It is chosen because it is the value that separates "told" from "silently
+ * corrected": the floor alone — `Math.max(1, Math.floor(-0.5))` — yields a tidy
+ * 1 and the commander is never told their entry was thrown away. Only the
+ * refusal in `normalizeSetCount` makes this visible.
+ *
+ * The seeded count is 3, so the three candidate outcomes are all distinct bytes:
+ * the seed (3), the silent floor (1) and the junk (-0.5). The moment the floor
+ * rule comes out of src/features/workout/workout-entity.ts the card stops
+ * reporting the refusal and the column stops holding the seed, and both
+ * assertions below go red.
+ */
+test('junk the browser hands straight through is refused aloud on the card and never stored', async ({
+  page,
+}) => {
   const exerciseId = seedExerciseOnToday('Romanian Deadlift')
   seedTodayLog(exerciseId, [{ id: 'seed-1', count: 3, weight: 175, reps: 6 }])
 
   await openTodayPage(page, exerciseId)
   await expect(countBox(page, exerciseId, 0)).toHaveValue('3')
 
-  await countBox(page, exerciseId, 0).pressSequentially('abc')
+  await countBox(page, exerciseId, 0).fill('-0.5')
 
-  const typed = await countBox(page, exerciseId, 0).inputValue()
-  expect(typed).not.toContain('NaN')
-  expect(typed).not.toMatch(/[a-c]/i)
+  // Chromium delivered it — a swallowed entry would have left the box blank
+  await expect(countBox(page, exerciseId, 0)).toHaveValue('-0.5')
 
-  // Whatever the box settled on, the next save still cannot store below 1
-  await setRow(page, exerciseId, 0).locator('input[type="number"]').nth(2).fill('7')
-  await expect
-    .poll(() => readStoredSets(exerciseId), { timeout: 30000 })
-    .toEqual([{ count: 3, weight: 175, reps: 7 }])
+  // The commander is told, not silently corrected
+  await expect(cardError(page, exerciseId)).toHaveText('Set count must be at least 1')
 
-  const stored = readStoredSets(exerciseId)
-  expect(stored?.every((line) => typeof line.count === 'number' && line.count >= 1)).toBe(true)
+  // Read only after the round trip has settled: the refusal above proves the
+  // save was attempted and came back, so this is not a pre-save snapshot.
+  expect(readStoredSets(exerciseId)).toEqual([{ count: 3, weight: 175, reps: 6 }])
+})
+
+/**
+ * The same junk at the feature's other entry point.
+ *
+ * `logWorkoutAction` is a `'use server'` boundary, so `sets` is whatever a client
+ * posts — the number box's filtering is not a defence. Nothing is seeded here:
+ * with the floor rule removed these writes succeed and create a row, so the
+ * `null` assertions below go red, and the accepted write pins the byte that
+ * actually lands in the `sets` column (2, not 2.7).
+ */
+test('junk posted to the feature entry point is refused and never reaches the sets column', async () => {
+  const exerciseId = seedExerciseOnToday('Landmine Press')
+  const date = getTodayISO()
+
+  const nonNumeric = await logWorkoutAction(1, exerciseId, date, [
+    { id: 'junk-abc', weight: 175, reps: 6, count: 'abc' as unknown as number },
+  ])
+  expect(nonNumeric.success).toBe(false)
+  // The exact string the card renders (src/app/today/page.tsx -> res.error)
+  expect(nonNumeric.error).toBe('Set count must be at least 1')
+  expect(readStoredSets(exerciseId)).toBeNull()
+
+  const negative = await logWorkoutAction(1, exerciseId, date, [
+    { id: 'junk-neg', weight: 175, reps: 6, count: -1 },
+  ])
+  expect(negative.success).toBe(false)
+  expect(negative.error).toBe('Set count must be at least 1')
+  expect(readStoredSets(exerciseId)).toBeNull()
+
+  // A legal-but-fractional count is the one junk value that is accepted — floored
+  const fractional = await logWorkoutAction(1, exerciseId, date, [
+    { id: 'junk-frac', weight: 175, reps: 6, count: 2.7 },
+  ])
+  expect(fractional.success).toBe(true)
+  await expectStoredSets(exerciseId, [{ count: 2, weight: 175, reps: 6 }])
 })
 
 test('a failing save surfaces on that exercise card without reverting the typed count', async ({
@@ -337,10 +412,9 @@ test('a failing save surfaces on that exercise card without reverting the typed 
 
   await openTodayPage(page, exerciseId)
 
-  const row = setRow(page, exerciseId, 0)
   await countBox(page, exerciseId, 0).fill('3')
-  await row.locator('input[type="number"]').nth(1).fill('135')
-  await row.locator('input[type="number"]').nth(2).fill('0')
+  await weightBox(page, exerciseId, 0).fill('135')
+  await repsBox(page, exerciseId, 0).fill('0')
 
   await expect(cardError(page, exerciseId)).toHaveText('Reps must be at least 1')
   await expect(countBox(page, exerciseId, 0)).toHaveValue('3')
