@@ -60,6 +60,80 @@ describe('calculateVolume', () => {
     ]
     expect(calculateVolume(sets)).toBe(500 + 440 + 360)
   })
+
+  describe('the count multiplier', () => {
+    it.each(
+      [
+        ['a count of 1 matches a count-less line', { reps: 5, weight: 100, count: 1 }, 500],
+        ['a count of 3 triples one set', { reps: 5, weight: 100, count: 3 }, 1500],
+        ['3 sets of 5 at 135', { reps: 5, weight: 135, count: 3 }, 2025],
+        ['10 sets of 100 at 500', { reps: 100, weight: 500, count: 10 }, 500000],
+      ] as [string, { reps: number; weight: number; count: number }, number][],
+    )('counts %s', (_label, set, expected) => {
+      expect(calculateVolume([set])).toBe(expected)
+    })
+  })
+
+  describe('the count floor — a line never means fewer than one set', () => {
+    it.each(
+      [
+        ['an explicit undefined count', { count: undefined }],
+        ['a count of 0', { count: 0 }],
+        ['a negative count', { count: -2 }],
+        ['a NaN count', { count: NaN }],
+      ] as [string, { count?: number }][],
+    )('reads %s as a single set', (_label, countPart) => {
+      expect(calculateVolume([{ reps: 5, weight: 100, ...countPart }])).toBe(500)
+    })
+  })
+
+  describe('a zero factor', () => {
+    it.each(
+      [
+        ['a weight of 0 zeroes a counted line', { reps: 5, weight: 0, count: 3 }, 0],
+        ['a reps of 0 zeroes a counted line', { reps: 0, weight: 100, count: 3 }, 0],
+      ] as [string, { reps: number; weight: number; count: number }, number][],
+    )('%s', (_label, set, expected) => {
+      expect(calculateVolume([set])).toBe(expected)
+    })
+  })
+
+  it('sums lines carrying different counts', () => {
+    const sets = [
+      { reps: 10, weight: 60, count: 1 },
+      { reps: 5, weight: 100, count: 2 },
+    ]
+    expect(calculateVolume(sets)).toBe(1600)
+  })
+
+  it('defaults the count line by line, not array by array', () => {
+    const sets = [
+      { reps: 5, weight: 100 },
+      { reps: 5, weight: 100, count: 3 },
+    ]
+    expect(calculateVolume(sets)).toBe(2000)
+  })
+
+  it('totals one counted line the same as the same number of count-less lines', () => {
+    const collapsed = [{ reps: 5, weight: 135, count: 3 }]
+    const uncollapsed = [
+      { reps: 5, weight: 135 },
+      { reps: 5, weight: 135 },
+      { reps: 5, weight: 135 },
+    ]
+
+    expect(calculateVolume(collapsed)).toBe(calculateVolume(uncollapsed))
+    expect(calculateVolume(collapsed)).toBe(2025)
+  })
+
+  it('does not care what order the lines arrive in', () => {
+    const sets = [
+      { reps: 5, weight: 100, count: 2 },
+      { reps: 8, weight: 60, count: 3 },
+    ]
+
+    expect(calculateVolume(sets)).toBe(calculateVolume([...sets].reverse()))
+  })
 })
 
 describe('WorkoutLog type structure', () => {
