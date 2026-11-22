@@ -78,8 +78,8 @@ export function normalizeSetLines(sets: WorkoutSet[]): WorkoutSet[] {
   return sets.map((set) => validateSet(set))
 }
 
-export function calculateVolume(sets: { reps: number; weight: number }[]): number {
-  return sets.reduce((total, set) => total + set.reps * set.weight, 0)
+export function calculateVolume(sets: { reps: number; weight: number; count?: number }[]): number {
+  return sets.reduce((total, set) => total + decodeSetCount(set.count) * set.reps * set.weight, 0)
 }
 
 export function createEmptyLog(
