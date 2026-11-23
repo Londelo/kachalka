@@ -82,6 +82,14 @@ export function calculateVolume(sets: { reps: number; weight: number; count?: nu
   return sets.reduce((total, set) => total + decodeSetCount(set.count) * set.reps * set.weight, 0)
 }
 
+export function countSets(sets: { count?: number }[]): number {
+  return sets.reduce((total, set) => total + decodeSetCount(set.count), 0)
+}
+
+export function countReps(sets: { reps: number; count?: number }[]): number {
+  return sets.reduce((total, set) => total + set.reps * decodeSetCount(set.count), 0)
+}
+
 export function createEmptyLog(
   userId: number,
   exerciseId: number,
