@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation'
 import { logWorkoutAction, getTodayWorkoutsAction, getTodayExercisesAction } from '@/features/workout/workout-server-actions'
 import { useLoading } from '@/components/loading-context'
 import type { WorkoutSet } from '@/features/workout/types'
+import {
+  createIdleSaveController,
+  IDLE_SAVE_MS,
+  type IdleSaveController,
+  type SaveState,
+} from '@/features/workout/idle-save-controller'
 import { jsDayToAppIndex, getTodayISO } from '@/shared/utils/date'
 
 type ExerciseItem = {
@@ -14,8 +20,6 @@ type ExerciseItem = {
 }
 
 type ViewMode = 'past' | 'current'
-
-const DEBOUNCE_MS = 500
 
 function generateId(): string {
   return crypto.getRandomValues(new Uint32Array(4))[0].toString(16) +
@@ -65,27 +69,35 @@ function getStoredUserId(): number | null {
   return match ? Number(match[1]) : null
 }
 
-function ExerciseCard({
-  exercise,
-  viewMode,
-  sets,
-  saving,
-  error,
-  onToggleView,
-  onAddSet,
-  onRemoveSet,
-  onSetChange,
-}: {
+type ExerciseCardProps = {
   exercise: ExerciseItem
   viewMode: ViewMode
   sets: WorkoutSet[]
-  saving: boolean
+  saveState: SaveState
   error: string | null
   onToggleView: () => void
   onAddSet: () => void
   onRemoveSet: (index: number) => void
   onSetChange: (index: number, field: keyof WorkoutSet, value: string) => void
-}) {
+}
+
+function saveStateMarkerText(state: SaveState): string {
+  if (state === 'pending') return 'PENDING...'
+  if (state === 'saving') return 'SAVING...'
+  return ''
+}
+
+function ExerciseCard({
+  exercise,
+  viewMode,
+  sets,
+  saveState,
+  error,
+  onToggleView,
+  onAddSet,
+  onRemoveSet,
+  onSetChange,
+}: ExerciseCardProps) {
   return (
     <div
       className="border-4 border-on-surface bg-tertiary-fixed p-6"
@@ -218,14 +230,26 @@ function ExerciseCard({
         </>
       )}
 
-      {/* Saving indicator */}
-      {saving && (
-        <p className="font-label-mono text-label-mono text-secondary">SAVING...</p>
+      {saveState !== 'idle' && (
+        <p
+          className="font-label-mono text-label-mono text-secondary"
+          role="status"
+          aria-live="polite"
+          data-id={`save-state-${exercise.exerciseId}`}
+          data-save-state={saveState}
+        >
+          {saveStateMarkerText(saveState)}
+        </p>
       )}
 
-      {/* Per-card error display */}
       {error && (
-        <p className="mt-2 font-label-bold text-label-bold text-error">{error}</p>
+        <p
+          className="mt-2 font-label-bold text-label-bold text-error"
+          role="alert"
+          data-id={`save-error-${exercise.exerciseId}`}
+        >
+          {error}
+        </p>
       )}
     </div>
   )
@@ -236,17 +260,91 @@ export default function TodayPage() {
   const [exercises, setExercises] = useState<ExerciseItem[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Per-exercise state (Map-based)
   const [viewModes, setViewModes] = useState<Map<number, ViewMode>>(new Map())
   const [exerciseSets, setExerciseSets] = useState<Map<number, WorkoutSet[]>>(new Map())
-  const [savingExercises, setSavingExercises] = useState<Set<number>>(new Set())
+  const [saveStates, setSaveStates] = useState<Map<number, SaveState>>(new Map())
   const [errors, setErrors] = useState<Map<number, string>>(new Map())
-  const debounceTimersRef = useRef<Map<number, NodeJS.Timeout>>(new Map())
   const exerciseSetsRef = useRef<Map<number, WorkoutSet[]>>(new Map())
-  // Keep ref in sync with state so debounced callbacks always read fresh data
   exerciseSetsRef.current = exerciseSets
+  const exercisesRef = useRef<ExerciseItem[]>([])
+  exercisesRef.current = exercises
+  const mountedRef = useRef(true)
+  const controllerRef = useRef<IdleSaveController | null>(null)
 
   const { start, end } = useLoading()
+
+  function syncSaveStates(): void {
+    if (!mountedRef.current) return
+    const controller = controllerRef.current
+    if (!controller) return
+
+    const next = new Map<number, SaveState>()
+    for (const exercise of exercisesRef.current) {
+      next.set(exercise.exerciseId, controller.getState(exercise.exerciseId))
+    }
+    setSaveStates(next)
+  }
+
+  // The controller flips an exercise out of 'saving' in the microtask after the
+  // save promise settles, so the mirror is read back one turn later than now.
+  function syncSaveStatesAfterControllerSettles(): void {
+    Promise.resolve().then(syncSaveStates).then(syncSaveStates).catch(() => {})
+  }
+
+  function setError(exerciseId: number, message: string): void {
+    if (!mountedRef.current) return
+    setErrors((prev) => {
+      const next = new Map(prev)
+      next.set(exerciseId, message)
+      return next
+    })
+  }
+
+  function clearError(exerciseId: number): void {
+    if (!mountedRef.current) return
+    setErrors((prev) => {
+      if (!prev.has(exerciseId)) return prev
+      const next = new Map(prev)
+      next.delete(exerciseId)
+      return next
+    })
+  }
+
+  async function saveExercise(exerciseId: number): Promise<void> {
+    try {
+      const userId = getStoredUserId()
+      if (!userId) return
+
+      const sets = exerciseSetsRef.current.get(exerciseId)
+      if (!sets) return
+
+      const validSets = sets.filter((s) => s.weight !== 0 || s.reps !== 0)
+      if (validSets.length === 0) return
+
+      syncSaveStates()
+
+      const today = getTodayISO()
+      const res = await logWorkoutAction(userId, exerciseId, today, validSets)
+
+      if (!res.success) {
+        const message = res.error ?? 'Failed to save workout'
+        setError(exerciseId, message)
+        throw new Error(message)
+      }
+
+      const dayOfWeek = jsDayToAppIndex(new Date().getDay())
+      const exRes = await getTodayExercisesAction(userId, dayOfWeek)
+      if (mountedRef.current && exRes.success && exRes.exercises) {
+        setExercises(exRes.exercises)
+      }
+    } finally {
+      syncSaveStatesAfterControllerSettles()
+    }
+  }
+
+  if (!controllerRef.current) {
+    controllerRef.current = createIdleSaveController({ save: saveExercise, waitMs: IDLE_SAVE_MS })
+  }
 
   // Load exercises on mount
   useEffect(() => {
@@ -294,21 +392,19 @@ export default function TodayPage() {
     }
   }, [])
 
-  // Cleanup: clear all debounce timers on unmount
   useEffect(() => {
-    const timers = debounceTimersRef.current
+    mountedRef.current = true
     return () => {
-      timers.forEach((timer) => clearTimeout(timer))
+      mountedRef.current = false
+      controllerRef.current?.flushAll()
     }
   }, [])
 
-  // Helper: get sets for an exercise, default to [defaultSet()]
   function getSets(exerciseId: number): WorkoutSet[] {
     const existing = exerciseSets.get(exerciseId)
     return existing ?? [defaultSet()]
   }
 
-  // Helper: update sets in the Map
   function updateSets(exerciseId: number, updater: (prev: WorkoutSet[]) => WorkoutSet[]): void {
     setExerciseSets((prev) => {
       const current = prev.get(exerciseId) ?? [defaultSet()]
@@ -319,71 +415,12 @@ export default function TodayPage() {
     })
   }
 
-  // Helper: trigger debounced save
-  function triggerSave(exerciseId: number): void {
-    const timers = debounceTimersRef.current
-    const existing = timers.get(exerciseId)
-    if (existing) {
-      clearTimeout(existing)
-      timers.delete(exerciseId)
-    }
-    const timer = setTimeout(() => {
-      debouncedSave(exerciseId)
-      timers.delete(exerciseId)
-    }, DEBOUNCE_MS)
-    timers.set(exerciseId, timer)
+  function scheduleSave(exerciseId: number): void {
+    clearError(exerciseId)
+    controllerRef.current?.schedule(exerciseId)
+    syncSaveStates()
   }
 
-  // Debounced save: filter empty sets, call logWorkoutAction
-  async function debouncedSave(exerciseId: number): Promise<void> {
-    const userId = getStoredUserId()
-    if (!userId) return
-
-    const sets = exerciseSetsRef.current.get(exerciseId)
-    if (!sets) return
-
-    // Filter out sets where both weight and reps are 0
-    const validSets = sets.filter((s) => s.weight !== 0 || s.reps !== 0)
-    if (validSets.length === 0) return
-
-    setSavingExercises((prev) => {
-      const next = new Set(prev)
-      next.add(exerciseId)
-      return next
-    })
-    setErrors((prev) => {
-      const next = new Map(prev)
-      next.delete(exerciseId)
-      return next
-    })
-
-    const today = getTodayISO()
-    const res = await logWorkoutAction(userId, exerciseId, today, validSets)
-
-    setSavingExercises((prev) => {
-      const next = new Set(prev)
-      next.delete(exerciseId)
-      return next
-    })
-
-    if (!res.success) {
-      setErrors((prev) => {
-        const next = new Map(prev)
-        next.set(exerciseId, res.error ?? 'Failed to save workout')
-        return next
-      })
-      return
-    }
-
-    // Refresh exercises on success
-    const dayOfWeek = jsDayToAppIndex(new Date().getDay())
-    const exRes = await getTodayExercisesAction(userId, dayOfWeek)
-    if (exRes.success && exRes.exercises) {
-      setExercises(exRes.exercises)
-    }
-  }
-
-  // Toggle view mode: clear exerciseSets so it reinitializes on next view
   function handleToggleView(exerciseId: number): void {
     setViewModes((prev) => {
       const next = new Map(prev)
@@ -400,12 +437,12 @@ export default function TodayPage() {
 
   function handleAddSet(exerciseId: number): void {
     updateSets(exerciseId, (prev) => [...prev, defaultSet()])
-    triggerSave(exerciseId)
+    scheduleSave(exerciseId)
   }
 
   function handleRemoveSet(exerciseId: number, index: number): void {
     updateSets(exerciseId, (prev) => prev.filter((_, i) => i !== index))
-    triggerSave(exerciseId)
+    scheduleSave(exerciseId)
   }
 
   function handleSetChange(exerciseId: number, index: number, field: keyof WorkoutSet, value: string): void {
@@ -418,7 +455,7 @@ export default function TodayPage() {
       }
       return updated
     })
-    triggerSave(exerciseId)
+    scheduleSave(exerciseId)
   }
 
   if (loading) {
@@ -450,7 +487,7 @@ export default function TodayPage() {
             {exercises.map((exercise) => {
               const viewMode = viewModes.get(exercise.exerciseId) ?? 'current'
               const sets = getSets(exercise.exerciseId)
-              const saving = savingExercises.has(exercise.exerciseId)
+              const saveState = saveStates.get(exercise.exerciseId) ?? 'idle'
               const error = errors.get(exercise.exerciseId) ?? null
 
               return (
@@ -459,7 +496,7 @@ export default function TodayPage() {
                   exercise={exercise}
                   viewMode={viewMode}
                   sets={sets}
-                  saving={saving}
+                  saveState={saveState}
                   error={error}
                   onToggleView={() => handleToggleView(exercise.exerciseId)}
                   onAddSet={() => handleAddSet(exercise.exerciseId)}
