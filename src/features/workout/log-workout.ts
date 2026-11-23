@@ -13,8 +13,8 @@ import { normalizeSetLines, createEmptyLog } from '@/features/workout/workout-en
  * repository anything else, or applying `collapseDuplicateSets` here as a
  * second step, would put a copy of the canonical form in this file: a fact that
  * can disagree with the module that owns it. Sequencing the two rules by hand
- * at each call site is the only way a writer ever came to store an unfolded
- * row: it remembered one of them.
+ * at each call site is how a writer came to store an unfolded row in the first
+ * place: that writer remembered one of the two and not the other.
  */
 export function logWorkoutUseCase(repo: WorkoutRepository) {
   return {
