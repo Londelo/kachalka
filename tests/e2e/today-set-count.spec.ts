@@ -86,6 +86,91 @@ async function expectStoredSets(exerciseId: number, expected: StoredLine[]): Pro
 }
 
 // ============================================================================
+// The wire
+//
+// A refusal on the card is the tail of a round trip, not an event in itself: the
+// card only speaks once logWorkoutAction has answered (src/app/today/page.tsx ->
+// setError). Since the save moved onto the 5000 ms idle window
+// (src/features/workout/idle-save-controller.ts) that answer cannot arrive inside
+// Playwright's 5-second default — the request does not even START until the five
+// seconds are up. So the three refusal tests below wait on the request having
+// crossed the wire before they read the card, the way tests/e2e/today-page.spec.ts
+// proves its saves, instead of expressing the wait as wall clock.
+//
+// Counting the POST also settles something these three tests always needed and
+// could never show: that the save was really attempted. A `sets` column still
+// holding its seed is then a refusal, not a snapshot taken before anything was
+// sent — which is the claim the store reads at the foot of each test rests on.
+//
+// A Next.js server action is a POST whose body is the action's argument tuple,
+// sent to whatever url the router is on at the time, so the save is identified by
+// the shape it is contracted to send rather than by a url or a build-artifact
+// action hash: logWorkoutAction(userId, exerciseId, date, sets) — four arguments,
+// the third an ISO date, the last an array. getTodayExercisesAction sends two and
+// getTodayWorkoutsAction one, so neither is counted here.
+// ============================================================================
+
+/** Anything that only settles after a save has waited out its window and round-tripped. */
+const PAST_THE_WINDOW = { timeout: 30000 }
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+
+type SaveCall = {
+  exerciseId: number
+  date: string
+  sets: Record<string, unknown>[]
+  at: number
+}
+
+function watchSaves(page: import('@playwright/test').Page): SaveCall[] {
+  const calls: SaveCall[] = []
+  page.on('request', (req) => {
+    if (req.method() !== 'POST') return
+    const body = req.postData()
+    if (!body) return
+    let args: unknown
+    try {
+      args = JSON.parse(body)
+    } catch {
+      return
+    }
+    if (!Array.isArray(args) || args.length !== 4) return
+    const [userId, exerciseId, date, sets] = args as [unknown, unknown, unknown, unknown]
+    if (typeof userId !== 'number' || typeof exerciseId !== 'number') return
+    if (typeof date !== 'string' || !ISO_DATE.test(date)) return
+    if (!Array.isArray(sets)) return
+    calls.push({
+      exerciseId,
+      date,
+      sets: sets as Record<string, unknown>[],
+      at: Date.now(),
+    })
+  })
+  return calls
+}
+
+function callsFor(calls: SaveCall[], exerciseId: number): SaveCall[] {
+  return calls.filter((c) => c.exerciseId === exerciseId)
+}
+
+/**
+ * The one save this card owes: a single POST for this exercise, dispatched once the
+ * idle window closed. Resolves only after the request crossed the wire, so the
+ * caller can read the bytes the endpoint was handed and then assert what the card
+ * said in answer.
+ */
+async function expectOneSave(calls: SaveCall[], exerciseId: number): Promise<SaveCall> {
+  await expect
+    .poll(() => callsFor(calls, exerciseId).length, {
+      timeout: PAST_THE_WINDOW.timeout,
+      message: `exactly one save POST for exercise ${exerciseId}`,
+    })
+    .toBe(1)
+  const [call] = callsFor(calls, exerciseId)
+  return call
+}
+
+// ============================================================================
 // Locators — every box by its own data-id, the row by the whole named triple
 //
 // The three data-ids are the selector contract (src/app/today/page.tsx):
@@ -315,12 +400,18 @@ test('a negative count is refused on the card and the typed value stays in the b
   const exerciseId = seedExerciseOnToday('Front Squat')
   seedTodayLog(exerciseId, [{ id: 'seed-1', count: 1, weight: 185, reps: 5 }])
 
+  const saves = watchSaves(page)
   await openTodayPage(page, exerciseId)
   await expect(countBox(page, exerciseId, 0)).toHaveValue('1')
 
   await countBox(page, exerciseId, 0).fill('-1')
 
-  await expect(cardError(page, exerciseId)).toHaveText('Set count must be at least 1')
+  // The save was attempted: the window closed and the refusal-worthy byte crossed
+  const call = await expectOneSave(saves, exerciseId)
+  expect(call.sets).toMatchObject([{ count: -1, weight: 185, reps: 5 }])
+
+  // ...and what the endpoint answered with is what the commander is shown
+  await expect(cardError(page, exerciseId)).toHaveText('Set count must be at least 1', PAST_THE_WINDOW)
   await expect(countBox(page, exerciseId, 0)).toHaveValue('-1')
 
   // Nothing below 1 ever reached the store
@@ -344,8 +435,10 @@ test('a negative count is refused on the card and the typed value stays in the b
  * The seeded count is 3, so the three candidate outcomes are all distinct bytes:
  * the seed (3), the silent floor (1) and the junk (-0.5). The moment the floor
  * rule comes out of src/features/workout/workout-entity.ts the card stops
- * reporting the refusal and the column stops holding the seed, and both
- * assertions below go red.
+ * reporting the refusal and the column stops holding the seed, so those two
+ * assertions below go red. (The wire assertion does not: it pins what the card
+ * SENT, and the junk leaves the box either way — that is what makes the other two
+ * a refusal rather than a save that simply had not happened yet.)
  */
 test('junk the browser hands straight through is refused aloud on the card and never stored', async ({
   page,
@@ -353,6 +446,7 @@ test('junk the browser hands straight through is refused aloud on the card and n
   const exerciseId = seedExerciseOnToday('Romanian Deadlift')
   seedTodayLog(exerciseId, [{ id: 'seed-1', count: 3, weight: 175, reps: 6 }])
 
+  const saves = watchSaves(page)
   await openTodayPage(page, exerciseId)
   await expect(countBox(page, exerciseId, 0)).toHaveValue('3')
 
@@ -361,11 +455,17 @@ test('junk the browser hands straight through is refused aloud on the card and n
   // Chromium delivered it — a swallowed entry would have left the box blank
   await expect(countBox(page, exerciseId, 0)).toHaveValue('-0.5')
 
-  // The commander is told, not silently corrected
-  await expect(cardError(page, exerciseId)).toHaveText('Set count must be at least 1')
+  // The save was attempted with the junk intact: the window closed and the POST
+  // carried -0.5, so the endpoint really was asked to store it
+  const call = await expectOneSave(saves, exerciseId)
+  expect(call.sets).toMatchObject([{ count: -0.5, weight: 175, reps: 6 }])
 
-  // Read only after the round trip has settled: the refusal above proves the
-  // save was attempted and came back, so this is not a pre-save snapshot.
+  // The commander is told, not silently corrected
+  await expect(cardError(page, exerciseId)).toHaveText('Set count must be at least 1', PAST_THE_WINDOW)
+
+  // Not a pre-save snapshot: the POST above is the save being attempted, and the
+  // refusal above is its answer coming back. Only now is the column settled, and
+  // it still holds the seed.
   expect(readStoredSets(exerciseId)).toEqual([{ count: 3, weight: 175, reps: 6 }])
 })
 
@@ -410,13 +510,20 @@ test('a failing save surfaces on that exercise card without reverting the typed 
 }) => {
   const exerciseId = seedExerciseOnToday('Power Clean')
 
+  const saves = watchSaves(page)
   await openTodayPage(page, exerciseId)
 
   await countBox(page, exerciseId, 0).fill('3')
   await weightBox(page, exerciseId, 0).fill('135')
   await repsBox(page, exerciseId, 0).fill('0')
 
-  await expect(cardError(page, exerciseId)).toHaveText('Reps must be at least 1')
+  // The save was attempted: one POST after the window, carrying the typed count
+  // alongside the reps the endpoint is about to refuse — the card never rewrote
+  // the box on its own before sending
+  const call = await expectOneSave(saves, exerciseId)
+  expect(call.sets).toMatchObject([{ count: 3, weight: 135, reps: 0 }])
+
+  await expect(cardError(page, exerciseId)).toHaveText('Reps must be at least 1', PAST_THE_WINDOW)
   await expect(countBox(page, exerciseId, 0)).toHaveValue('3')
 
   // The rejected write never landed
