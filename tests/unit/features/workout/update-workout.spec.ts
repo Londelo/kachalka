@@ -161,24 +161,64 @@ describe('updateWorkoutUseCase — set count at the write boundary', () => {
     })
   })
 
-  // The finding-10 invariant: two writers must not disagree on one logical line.
-  // The first assertion catches a divergence between the writers; the second
-  // catches both writers drifting to the same wrong byte together.
-  it('stores identical bytes for one logical line through logWorkout and through updateWorkout', () => {
-    const logicalLine = { id: 's1', reps: 5, weight: 100, count: 2.7 }
+  // The finding-10 invariant: the two writers to the `sets` column must not
+  // disagree on one logical line. The fixture is therefore two lines the fold
+  // fuses, and it has to be — over a one-element array collapseDuplicateSets
+  // is the identity, so a single line leaves the two writers byte-identical no
+  // matter which of them forgot the fold, and the assertion would be describing
+  // the invariant instead of pinning it. A foldable array is the one input on
+  // which the two writers can be told apart at all.
+  //
+  // Counts are legal ones (2 and 1, not a fraction): since 7fbbe8a a fractional
+  // count is refused outright by normalizeSetCount, so a 2.7 fixture would prove
+  // the throw, not the fold.
+  const matchingLines = (): WorkoutSet[] => [
+    { id: 's1', reps: 5, weight: 100, count: 2 },
+    { id: 's2', reps: 5, weight: 100, count: 1 },
+  ]
 
+  // The canonical form of that array, written here rather than read back off the
+  // fold: one line, the first line's id, the two counts summed.
+  const fusedIntoOneLine = [{ id: 's1', reps: 5, weight: 100, count: 3 }]
+
+  // Each writer is handed its own array of its own line objects. Handed one shared
+  // array instead, a writer that mutated its input would bend the other writer's
+  // input into agreement with it, and the comparison below would pass for the
+  // wrong reason.
+  function bytesStoredByEachWriter() {
     const viaUpdateRepo = ownedRepo()
-    updateWorkoutUseCase(viaUpdateRepo).execute(1, 1, [{ ...logicalLine }])
+    updateWorkoutUseCase(viaUpdateRepo).execute(1, 1, matchingLines())
 
     const viaLogRepo = makeRepo()
     viaLogRepo.findByDateAndExercise.mockReturnValue(undefined)
     viaLogRepo.create.mockReturnValue(storedLog)
-    logWorkoutUseCase(viaLogRepo).execute(1, 5, '2025-01-01', [{ ...logicalLine }])
+    logWorkoutUseCase(viaLogRepo).execute(1, 5, '2025-01-01', matchingLines())
 
-    const storedByUpdate = viaUpdateRepo.update.mock.calls[0][1]
-    const storedByLog = viaLogRepo.create.mock.calls[0][0].sets
+    return {
+      viaUpdate: viaUpdateRepo.update.mock.calls[0][1],
+      viaLog: viaLogRepo.create.mock.calls[0][0].sets,
+    }
+  }
 
-    expect(storedByUpdate).toEqual(storedByLog)
-    expect(storedByUpdate).toEqual([{ id: 's1', reps: 5, weight: 100, count: 2 }])
+  // Red if either writer stops routing through normalizeSetLines and hands the
+  // repository its own idea of the canonical form — the defect this pair of cases
+  // exists to keep shut. The two writers reach the fold through one shared call
+  // today, so this is the assertion that fails when one of them walks around it.
+  it('stores identical bytes for two matching lines through logWorkout and through updateWorkout', () => {
+    const { viaUpdate, viaLog } = bytesStoredByEachWriter()
+
+    expect(viaUpdate).toEqual(viaLog)
+  })
+
+  // Red if the fold is dropped from the shared normalizer, which moves both writers
+  // to the same wrong bytes together and so is invisible to the comparison above:
+  // two agreeing writers storing an unfolded row is exactly the state finding 10
+  // describes, and this is the assertion that refuses it. Pins the surviving id and
+  // the summed count, so a fold that keeps the last line's id goes red here too.
+  it('fuses two matching lines into one before either writer reaches the repository', () => {
+    const { viaUpdate, viaLog } = bytesStoredByEachWriter()
+
+    expect(viaUpdate).toEqual(fusedIntoOneLine)
+    expect(viaLog).toEqual(fusedIntoOneLine)
   })
 })
