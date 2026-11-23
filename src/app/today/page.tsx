@@ -50,8 +50,34 @@ function generateId(): string {
 const EMPTY_COUNT_MEANS = 1
 const EMPTY_COUNT_PLACEHOLDER = String(EMPTY_COUNT_MEANS)
 
+/**
+ * BLANK-MEANS-UNTOUCHED — the one place the blank-row rule is written down.
+ * `defaultSet`, `isBlankSet` and `debouncedSave` are three readings of these two
+ * numbers; nothing else restates the rule.
+ *
+ * A blank row is the row the commander added and has not typed into — exactly the
+ * row `defaultSet` builds — not a set deliberately logged at zero weight for zero
+ * reps. Both boxes render empty for it (`value={set.weight || ''}` and the same
+ * for reps), so the number on screen and the number in state agree: nothing typed
+ * is nothing stored.
+ *
+ * Consequence, and it is deliberate: an untouched row never joins the fold and
+ * never reaches the write path. `validateSet`
+ * (src/features/workout/workout-entity.ts) refuses reps below 1, so an untouched
+ * row treated as real would either fuse with its untouched siblings into one
+ * phantom 0 lb line the commander never logged, or be refused by the server and
+ * throw an error at a row he never touched. Keeping it out of both is what makes
+ * "ADD A SET still appends a fresh row without collapsing" true.
+ *
+ * The SET box is the exception and stays the exception: a blank SET box means ONE
+ * set, not no set — see EMPTY_COUNT_MEANS. `defaultSet` seeds the count and the
+ * reps from two different rules on purpose, and they are not the same rule.
+ */
+const BLANK_WEIGHT = 0
+const BLANK_REPS = 0
+
 function defaultSet(): WorkoutSet {
-  return { id: generateId(), count: EMPTY_COUNT_MEANS, reps: 1, weight: 0 }
+  return { id: generateId(), count: EMPTY_COUNT_MEANS, reps: BLANK_REPS, weight: BLANK_WEIGHT }
 }
 
 /** Blank and junk both read as "no number typed" — see EMPTY_COUNT_MEANS for what that means. */
@@ -61,9 +87,12 @@ function parseCount(value: string): number | undefined {
   return Number.isNaN(parsed) ? undefined : parsed
 }
 
-/** The same blank rule `debouncedSave` filters on. */
+/**
+ * The one reading of "untouched" — what `defaultSet` builds, what the fold
+ * leaves alone and what `debouncedSave` refuses to store. Never restate it.
+ */
 function isBlankSet(set: WorkoutSet): boolean {
-  return set.weight === 0 && set.reps === 0
+  return set.weight === BLANK_WEIGHT && set.reps === BLANK_REPS
 }
 
 /**
@@ -365,8 +394,9 @@ export default function TodayPage() {
     const sets = exerciseSetsRef.current.get(exerciseId)
     if (!sets) return
 
-    // Filter out sets where both weight and reps are 0
-    const validSets = sets.filter((s) => s.weight !== 0 || s.reps !== 0)
+    // The same predicate the fold obeys, read the other way round: a row nobody
+    // typed into is not a set, so it never crosses the wire.
+    const validSets = sets.filter((set) => !isBlankSet(set))
     if (validSets.length === 0) return
 
     setSavingExercises((prev) => {
