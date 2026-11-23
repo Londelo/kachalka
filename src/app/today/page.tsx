@@ -112,6 +112,37 @@ function collapseFilledSets(sets: WorkoutSet[]): WorkoutSet[] {
   return next
 }
 
+/**
+ * CURSOR-KEEPS-ITS-OWN-ID — the half of the merge the ordering rule cannot own.
+ *
+ * `collapseDuplicateSets` keeps the FIRST matching line's id, and
+ * `collapseFilledSets` then re-lays the survivors into the slots the filled
+ * lines already held. Both are right, and together they throw the survivor's
+ * identity away from the commander: the keystroke that completes a match can
+ * hand his row's slot to a different line, or drop it entirely when the fold
+ * shortened the array. The row under his cursor changes `key`, React unmounts
+ * the input and mounts another one, and focus lands on BODY mid-word.
+ *
+ * So the survivor takes the id of the row he is typing in, not of the row that
+ * happened to be seen first. The fold groups by weight+reps, so exactly one
+ * collapsed line carries the key he just typed — that line is the survivor of
+ * his row, whichever slot the reassembly laid it in. Re-keying it is what makes
+ * React reconcile the element it was already rendering instead of replacing it.
+ *
+ * This lives here, in the page, and not in either rule above: only the page
+ * knows which row is focused, and the domain rule must stay a pure ordering
+ * rule. A blank row never joined the fold, so it keeps its own id untouched.
+ */
+function rekeySurvivorToCursor(sets: WorkoutSet[], cursorRow: WorkoutSet): WorkoutSet[] {
+  if (isBlankSet(cursorRow)) return sets
+
+  return sets.map((set) =>
+    !isBlankSet(set) && set.weight === cursorRow.weight && set.reps === cursorRow.reps
+      ? { ...set, id: cursorRow.id }
+      : set,
+  )
+}
+
 function getStoredUserId(): number | null {
   const match = document.cookie.match(/kachalka\.userId=(\d+)/)
   return match ? Number(match[1]) : null
@@ -469,7 +500,9 @@ export default function TodayPage() {
         ...current,
         [field]: field === 'count' ? parseCount(value) : parseFloat(value) || 0,
       }
-      return collapseFilledSets(updated)
+      // `updated[index]` still carries the row's own id — it is the row he is
+      // typing in, and it is what the survivor of his fold has to come back as.
+      return rekeySurvivorToCursor(collapseFilledSets(updated), updated[index])
     })
     triggerSave(exerciseId)
   }
