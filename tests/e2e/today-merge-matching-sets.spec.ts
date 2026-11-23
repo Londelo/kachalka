@@ -461,3 +461,64 @@ test('two blank lines neither fold into one nor put a line in the store', async 
 
   await expectStoredSets(exerciseId, [{ count: 1, weight: 95, reps: 10 }])
 })
+
+// The case above empties its rows by hand, so those rows satisfy the blank
+// predicate by construction rather than by the code under test. This one drives
+// the real control and lets defaultSet() decide the shape — the row the
+// acceptance criterion actually names is the one ADD A SET produces, and only
+// the page gets to say what that row is.
+test('rows ADD A SET produced never fold, never vanish, and never reach the store untouched', async ({
+  page,
+}) => {
+  const exerciseId = seedExerciseOnToday('Landmine Press')
+
+  await openTodayPage(page, exerciseId)
+
+  // A card with nothing logged today already shows one row, and it is the row
+  // defaultSet() built. Two clicks add two more of the same row.
+  await expect(countBoxes(page, exerciseId)).toHaveCount(1)
+  await addASet(page, exerciseId).click()
+  await addASet(page, exerciseId).click()
+
+  // (a) and (b) Three untouched rows, still three: none folded into a sibling,
+  // none vanished. Each still holds the shape defaultSet() gave it — an empty LB
+  // box, an empty REPS box, and a SET box showing the one set a blank box stands
+  // for. A REPS box that came back '1' is the phantom line the commander never
+  // logged, and it is the shape only the code under test can produce: nothing
+  // here hand-builds a row, so nothing here can make its own fixture consistent.
+  for (const index of [0, 1, 2]) {
+    await expect(countBox(page, exerciseId, index)).toHaveValue('1')
+    await expect(weightBox(page, exerciseId, index)).toHaveValue('')
+    await expect(repsBox(page, exerciseId, index)).toHaveValue('')
+  }
+
+  // (c) The untouched rows must contribute nothing to the column. An absence
+  // cannot be polled, so the write is provoked: this typed line fires the save
+  // for this exercise, and what the column holds afterwards is the evidence.
+  await typeLine(page, exerciseId, 0, { weight: '95', reps: '10', count: '1' })
+
+  // Typing a real line neither folded the untouched rows onto it nor swept them
+  // off the card.
+  await expect(countBoxes(page, exerciseId)).toHaveCount(3)
+  for (const index of [1, 2]) {
+    await expect(countBox(page, exerciseId, index)).toHaveValue('1')
+    await expect(weightBox(page, exerciseId, index)).toHaveValue('')
+    await expect(repsBox(page, exerciseId, index)).toHaveValue('')
+  }
+
+  // The column holds the one line that was typed and nothing else — no
+  // { weight: 0, reps: 1, count: 2 } line for the two rows nobody touched.
+  await expectStoredSets(exerciseId, [{ count: 1, weight: 95, reps: 10 }])
+
+  // The read path confirms it from the other side of the wire. An untouched row
+  // is by design never persisted, so what the reload proves is not that the two
+  // rows survived — they were never stored to survive from — but that no phantom
+  // 0 lb line was stored in their place: the commander gets back his typed line
+  // and nothing he did not log.
+  await page.reload()
+  await expect(card(page, exerciseId)).toBeVisible()
+  await expect(countBoxes(page, exerciseId)).toHaveCount(1)
+  await expect(countBox(page, exerciseId, 0)).toHaveValue('1')
+  await expect(weightBox(page, exerciseId, 0)).toHaveValue('95')
+  await expect(repsBox(page, exerciseId, 0)).toHaveValue('10')
+})
