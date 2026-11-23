@@ -96,20 +96,27 @@ function isBlankSet(set: WorkoutSet): boolean {
 }
 
 /**
- * Blank lines never join the fold and never move; each collapsed line takes,
- * in order, a slot a filled line already held, so the layout does not jump.
+ * Blank lines never join the fold and never move; each collapsed line takes, in
+ * order, a slot a filled line already held, so the layout does not jump. A filled
+ * line whose slot the fold never reached has no survivor to claim and maps to
+ * `null`, which the filter then drops — the dropped slot written down as a
+ * decision instead of left as an arm that does not exist.
+ *
+ * The slot is the line's rank among the filled lines, not its `id`: the fold
+ * re-keys a survivor to the row under the cursor (see `rekeySurvivorToCursor`),
+ * so an id is not a stable handle on a slot, and matching survivors up by id
+ * would move a blank row to the far side of a survivor whenever the fold drops a
+ * filled line that is not the last one.
  */
 function collapseFilledSets(sets: WorkoutSet[]): WorkoutSet[] {
   const collapsed = collapseDuplicateSets(sets.filter((set) => !isBlankSet(set)))
-  const next: WorkoutSet[] = []
-  let nextCollapsed = 0
+  /** How many filled lines precede this position — the slot this line already held. */
+  const filledRank = (position: number): number =>
+    sets.slice(0, position).filter((earlier) => !isBlankSet(earlier)).length
 
-  for (const [index, set] of sets.entries()) {
-    if (isBlankSet(set)) next.push(set)
-    else if (nextCollapsed < collapsed.length) next.push(collapsed[nextCollapsed++])
-  }
-
-  return next
+  return sets
+    .map((set, position) => (isBlankSet(set) ? set : collapsed[filledRank(position)] ?? null))
+    .filter((set) => set !== null)
 }
 
 /**
