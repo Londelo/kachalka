@@ -79,12 +79,25 @@ export function validateSet(set: WorkoutSet): WorkoutSet {
  * Inbound projection of a whole set array — the single write-side enforcement
  * point for what reaches the `sets` column.
  *
- * Every writer calls this and stores what it returns, so no writer can apply
- * the count rule but forget the projection, or the reverse. One owner per
- * direction is what keeps two writers from disagreeing on the same logical line.
+ * This is the whole canonical form, not half of it: every line is projected
+ * and count-checked by `validateSet`, and the array then comes back already
+ * folded by `collapseDuplicateSets`. So a stored row is canonical bytes by
+ * construction, and the guarantee is a property of this module rather than of
+ * any one use case's memory — a writer cannot apply the count rule and forget
+ * the fold, or the reverse, because there is no way to reach the column past
+ * either half.
+ *
+ * Sequencing matters and is the same order every caller used to write by hand:
+ * validate first, so a line nobody meant throws before it can be summed into a
+ * line somebody did mean. Folding is idempotent, so re-normalizing an already
+ * canonical array is a no-op and client and server agree on the bytes.
+ *
+ * Write path only. The read path (`mapRowToWorkoutLog`) decodes with
+ * `decodeSetCount` and never comes through here, so stored history is never
+ * silently folded on its way out.
  */
 export function normalizeSetLines(sets: WorkoutSet[]): WorkoutSet[] {
-  return sets.map((set) => validateSet(set))
+  return collapseDuplicateSets(sets.map((set) => validateSet(set)))
 }
 
 export function calculateVolume(sets: { reps: number; weight: number }[]): number {

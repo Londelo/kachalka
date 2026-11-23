@@ -1,17 +1,20 @@
 import type { WorkoutRepository } from '@/features/workout/workout-repository'
 import type { WorkoutLog, WorkoutSet } from '@/features/workout/types'
-import { collapseDuplicateSets, normalizeSetLines, createEmptyLog } from '@/features/workout/workout-entity'
+import { normalizeSetLines, createEmptyLog } from '@/features/workout/workout-entity'
 
 /**
  * The write path for one exercise's sets on one date: the domain rules first,
  * the repository last, and nothing else.
  *
- * This use case validates nothing of its own. What a set line means — weight,
- * reps, and the whole-number count rule — is owned by
- * src/features/workout/workout-entity.ts and throws from there, and the fold is
- * owned by `collapseDuplicateSets`. Sequencing those two over the array the
- * domain handed back is the whole job; a guard restated here would be a second
- * owner of a rule that already has one, free to disagree with it.
+ * This use case enforces nothing of its own. What a set line means — weight,
+ * reps, the whole-number count rule, and the fold of same-weight-same-reps
+ * lines into one — is owned by src/features/workout/workout-entity.ts, and all
+ * of it arrives through the one call to `normalizeSetLines`. Handing the
+ * repository anything else, or applying `collapseDuplicateSets` here as a
+ * second step, would put a copy of the canonical form in this file: a fact that
+ * can disagree with the module that owns it. Sequencing the two rules by hand
+ * at each call site is the only way a writer ever came to store an unfolded
+ * row: it remembered one of them.
  */
 export function logWorkoutUseCase(repo: WorkoutRepository) {
   return {
@@ -21,16 +24,15 @@ export function logWorkoutUseCase(repo: WorkoutRepository) {
       }
 
       const canonicalSets = normalizeSetLines(sets)
-      const collapsed = collapseDuplicateSets(canonicalSets)
 
       const existing = repo.findByDateAndExercise(userId, date, exerciseId)
 
       if (existing) {
-        return repo.update(existing.id, collapsed)!
+        return repo.update(existing.id, canonicalSets)!
       }
 
       const unsaved = createEmptyLog(userId, exerciseId, date)
-      return repo.create({ ...unsaved, sets: collapsed })
+      return repo.create({ ...unsaved, sets: canonicalSets })
     },
   }
 }
