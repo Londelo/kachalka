@@ -3,11 +3,20 @@ import type { WorkoutSet, WorkoutLog } from '@/features/workout/types'
 export { WorkoutLog }
 
 /**
- * Inbound normalizer — the single enforcement point of the set-count floor rule.
+ * Inbound normalizer — the single enforcement point of the set-count rule.
  *
- * Write path only. Blank, absent and zero all mean one set; anything genuinely
- * below 1 or non-numeric is rejected rather than silently corrected, so the
- * commander is told instead of quietly rewritten.
+ * Write path only, and the whole rule lives in these ten lines: blank, absent
+ * and zero all mean one set, and anything else has to already be a whole number
+ * of sets. Non-numeric, non-finite, negative and fractional counts are all
+ * refused, with the one message, rather than silently corrected — a line
+ * claiming 2.7 sets is not a count that got rounded wrong, it is a line nobody
+ * meant, and flooring it would hand the commander a number he never typed.
+ *
+ * `Number.isInteger` is the whole test: it refuses NaN and Infinity along with
+ * every fraction, so no second guard is needed beside it. Every writer reaches
+ * this through `normalizeSetLines` and stores what comes back; nobody restates
+ * any half of it downstream. `decodeSetCount` is the read-side counterpart and
+ * deliberately not this function's mirror — it coerces, this one refuses.
  */
 export function normalizeSetCount(raw: unknown): number {
   if (raw === undefined || raw === null || raw === '') {
@@ -16,11 +25,11 @@ export function normalizeSetCount(raw: unknown): number {
 
   const value = typeof raw === 'number' || typeof raw === 'string' ? Number(raw) : NaN
 
-  if (!Number.isFinite(value) || value < 0) {
+  if (!Number.isInteger(value) || value < 0) {
     throw new Error('Set count must be at least 1')
   }
 
-  return Math.max(1, Math.floor(value))
+  return Math.max(1, value)
 }
 
 /**
@@ -39,9 +48,9 @@ export function decodeSetCount(raw: unknown): number {
 
 /**
  * Domain check for one incoming set line. Returns the canonical line — a
- * projection onto exactly the fields the type claims, count normalised to the
- * floor — so a writer can store what the domain handed back instead of
- * re-deriving the rule a second time.
+ * projection onto exactly the fields the type claims, count resolved by
+ * `normalizeSetCount` — so a writer can store what the domain handed back
+ * instead of re-deriving the rule a second time.
  *
  * This is a projection, not a spread. `sets` arrives from a `'use server'`
  * entry point, so the incoming object may carry keys nobody in this codebase
@@ -71,7 +80,7 @@ export function validateSet(set: WorkoutSet): WorkoutSet {
  * point for what reaches the `sets` column.
  *
  * Every writer calls this and stores what it returns, so no writer can apply
- * the floor rule but forget the projection, or the reverse. One owner per
+ * the count rule but forget the projection, or the reverse. One owner per
  * direction is what keeps two writers from disagreeing on the same logical line.
  */
 export function normalizeSetLines(sets: WorkoutSet[]): WorkoutSet[] {

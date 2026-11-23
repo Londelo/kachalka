@@ -2,18 +2,17 @@ import type { WorkoutRepository } from '@/features/workout/workout-repository'
 import type { WorkoutLog, WorkoutSet } from '@/features/workout/types'
 import { collapseDuplicateSets, normalizeSetLines, createEmptyLog } from '@/features/workout/workout-entity'
 
-function assertWholeSetCount(count: unknown): void {
-  if (count === undefined || count === null || count === '') {
-    return
-  }
-
-  const value = typeof count === 'number' || typeof count === 'string' ? Number(count) : NaN
-
-  if (!Number.isInteger(value) || value < 0) {
-    throw new Error('Set count must be a whole number of at least 1')
-  }
-}
-
+/**
+ * The write path for one exercise's sets on one date: the domain rules first,
+ * the repository last, and nothing else.
+ *
+ * This use case validates nothing of its own. What a set line means — weight,
+ * reps, and the whole-number count rule — is owned by
+ * src/features/workout/workout-entity.ts and throws from there, and the fold is
+ * owned by `collapseDuplicateSets`. Sequencing those two over the array the
+ * domain handed back is the whole job; a guard restated here would be a second
+ * owner of a rule that already has one, free to disagree with it.
+ */
 export function logWorkoutUseCase(repo: WorkoutRepository) {
   return {
     execute(userId: number, exerciseId: number, date: string, sets: WorkoutSet[]): WorkoutLog {
@@ -22,9 +21,6 @@ export function logWorkoutUseCase(repo: WorkoutRepository) {
       }
 
       const canonicalSets = normalizeSetLines(sets)
-
-      sets.forEach((set) => assertWholeSetCount(set.count))
-
       const collapsed = collapseDuplicateSets(canonicalSets)
 
       const existing = repo.findByDateAndExercise(userId, date, exerciseId)
