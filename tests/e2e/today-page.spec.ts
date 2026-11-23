@@ -91,6 +91,30 @@ function callsFor(calls: SaveCall[], exerciseId: number): SaveCall[] {
 }
 
 /**
+ * The other half of the wire: the moment each save's response came back. A save is
+ * only genuinely in flight between its request and this, and an "in flight" test that
+ * never checked which half of that it was in proves nothing.
+ */
+function watchSaveResponses(page: Page): number[] {
+  const landed: number[] = []
+  page.on('response', (res) => {
+    const req = res.request()
+    if (req.method() !== 'POST') return
+    const body = req.postData()
+    if (!body) return
+    let args: unknown
+    try {
+      args = JSON.parse(body)
+    } catch {
+      return
+    }
+    if (!Array.isArray(args) || args.length !== 4) return
+    landed.push(Date.now())
+  })
+  return landed
+}
+
+/**
  * The window the controller is contracted to hold: five seconds from the last
  * change, plus room for the browser's own scheduling and for this event to
  * reach Playwright. A save that fired on a 500 ms debounce, on a re-arm that
@@ -189,6 +213,10 @@ function saveError(page: Page, exerciseId: number) {
 
 function addSetButton(page: Page, exerciseId: number) {
   return card(page, exerciseId).getByRole('button', { name: 'ADD A SET' })
+}
+
+function toggleViewButton(page: Page, exerciseId: number) {
+  return page.locator(`[data-id="toggle-view-${exerciseId}"]`)
 }
 
 async function openTodayPage(page: Page, ...exerciseIds: number[]): Promise<void> {
@@ -473,6 +501,145 @@ test('leaving the page with a save pending flushes it and the typed work is ther
   await expect(weightBox(page, exerciseId, 0)).toHaveValue('165')
   await expect(repsBox(page, exerciseId, 0)).toHaveValue('5')
   await expectStoredLines(exerciseId, [{ count: 1, weight: 165, reps: 5 }])
+})
+
+test('toggling the view away mid-window still saves what was typed', async ({ page }) => {
+  const exerciseId = seedExerciseOnToday('Landmine Press')
+  const saves = watchSaves(page)
+
+  await openTodayPage(page, exerciseId)
+
+  await weightBox(page, exerciseId, 0).fill('205')
+  await repsBox(page, exerciseId, 0).fill('12')
+  const changedAt = Date.now()
+
+  // Walk away from the card inside its own window. The toggle drops the typed lines,
+  // so this click is the moment the feature's promise is either kept or lost: if the
+  // waiting timer is left armed instead of settled first, it fires five seconds later
+  // against an entry that no longer exists, saveExercise finds no sets, returns
+  // silently, and the commander is left with a PENDING marker that never meant a save.
+  await toggleViewButton(page, exerciseId).click()
+
+  await expect(card(page, exerciseId).getByText('VIEWING LAST SESSION')).toBeVisible()
+  await expect(toggleViewButton(page, exerciseId)).toHaveText('CURRENT SESSION')
+
+  // Proved on the wire, not on the screen: the save the toggle was about to lose
+  // crossed the boundary anyway, and it crossed it on the click, not on the clock.
+  await expect.poll(() => callsFor(saves, exerciseId).length, { timeout: 15000 }).toBe(1)
+  const [call] = callsFor(saves, exerciseId)
+  expect(
+    call.at - changedAt,
+    'the save fired on the toggle, not when its five-second window expired',
+  ).toBeLessThan(IDLE_MS - 1000)
+  expect(
+    call.sets.map(({ id, ...line }) => line),
+    'the flushed save carries the bytes typed before the card was switched',
+  ).toEqual([{ count: 1, weight: 205, reps: 12 }])
+
+  // The marker the screen promised is not quietly taken back — it reports the save
+  // and clears when that save actually lands.
+  await expect(saveStateMarker(page, exerciseId)).toHaveCount(0, PAST_THE_WINDOW)
+
+  // Nothing stayed armed behind the flush to fire a second time.
+  await elapsedAtLeast(changedAt, IDLE_MS + 2000)
+  expect(
+    callsFor(saves, exerciseId),
+    'the flushed timer did not survive to save the same exercise twice',
+  ).toHaveLength(1)
+
+  // Nothing typed was lost: the record is in storage, and it is there on return.
+  await expectStoredLines(exerciseId, [{ count: 1, weight: 205, reps: 12 }])
+
+  // What the toggle-back shows is deliberately NOT asserted here. Toggling away deletes
+  // the card's entry (src/app/today/page.tsx, handleToggleView) and nothing puts it back
+  // until mount, so toggling back renders defaultSet() — an empty weight box — even
+  // though the save landed. Probing it confirmed exactly that. Rendering the past/current
+  // views is the Past Session Collapsed feature's contract, and this gate puts it out of
+  // scope, so pinning it here would be this tier testing somebody else's screen. What
+  // THIS feature promises is that nothing typed is lost, and the reload below is where
+  // that promise is actually kept: the bytes come back out of the store.
+  await page.reload()
+  await expect(card(page, exerciseId)).toBeVisible()
+  await expect(weightBox(page, exerciseId, 0)).toHaveValue('205')
+  await expect(repsBox(page, exerciseId, 0)).toHaveValue('12')
+})
+
+test('a change made while a save is in flight re-arms the card and still saves the later bytes', async ({
+  page,
+}) => {
+  const exerciseId = seedExerciseOnToday('Hang Snatch')
+  const saves = watchSaves(page)
+  const responses = watchSaveResponses(page)
+
+  await openTodayPage(page, exerciseId)
+
+  // Throttle the boundary outside the feature so the in-flight half of the machine is
+  // long enough to type into. The real server action still runs and still writes.
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Network.enable')
+  await cdp.send('Network.emulateNetworkConditions', {
+    offline: false,
+    latency: 1200,
+    downloadThroughput: 40960,
+    uploadThroughput: 40960,
+  })
+
+  await weightBox(page, exerciseId, 0).fill('95')
+  await repsBox(page, exerciseId, 0).fill('8')
+
+  const marker = saveStateMarker(page, exerciseId)
+  await expect(marker, 'the first window fired').toHaveAttribute('data-save-state', 'saving', PAST_THE_WINDOW)
+  await expect.poll(() => callsFor(saves, exerciseId).length, PAST_THE_WINDOW).toBe(1)
+
+  // Type into a card whose request is still out — the interleaving neither tier walks
+  // today. The response for the save this change supersedes is on its way back.
+  await repsBox(page, exerciseId, 0).fill('16')
+  const secondChangeAt = Date.now()
+  expect(
+    responses,
+    'the second change landed while the first request was still in flight',
+  ).toHaveLength(0)
+
+  await expect(
+    marker,
+    'the card goes back to pending while the superseded request is still out',
+  ).toHaveAttribute('data-save-state', 'pending', PAST_THE_WINDOW)
+
+  // Sample the card continuously until the SECOND save crosses the wire. A retired
+  // save's late response must not be allowed to clear the marker: the failure mode is
+  // the card going blank for the whole next window, telling the commander nothing is
+  // coming while a five-second timer is in fact still running behind it.
+  let wentIdle = false
+  await expect
+    .poll(
+      async () => {
+        const state = await page.evaluate((id) => {
+          const el = document.querySelector(`[data-id="save-state-${id}"]`)
+          return el?.getAttribute('data-save-state') ?? 'gone'
+        }, exerciseId)
+        if (state === 'gone' || state === 'idle') wentIdle = true
+        return callsFor(saves, exerciseId).length >= 2
+      },
+      { timeout: 30000, intervals: [50] },
+    )
+    .toBe(true)
+  expect(wentIdle, 'the card never went idle while the second save was still owed').toBe(false)
+
+  // Two saves crossed, and each carries the bytes that were on the card when it was
+  // dispatched — the superseded request never rewrote the later one.
+  const [first, second] = callsFor(saves, exerciseId)
+  expect(first.sets.map(({ id, ...line }) => line)).toEqual([{ count: 1, weight: 95, reps: 8 }])
+  expect(
+    second.sets.map(({ id, ...line }) => line),
+    'the save after the in-flight change carries the bytes typed during the first request',
+  ).toEqual([{ count: 1, weight: 95, reps: 16 }])
+  expectIdleWindow(second.at - secondChangeAt, 'the change made in flight waits its own full window')
+
+  await expect(
+    marker,
+    'the marker clears only once the save the card is actually waiting for lands',
+  ).toHaveCount(0, PAST_THE_WINDOW)
+  await expectStoredLines(exerciseId, [{ count: 1, weight: 95, reps: 16 }])
 })
 
 // ============================================================================
