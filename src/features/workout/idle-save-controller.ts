@@ -25,12 +25,31 @@ export function createIdleSaveController({
 }): IdleSaveController {
   const timers = new Map<number, unknown>()
   const states = new Map<number, SaveState>()
+  /**
+   * One generation per exercise, advanced every time the controller opens a new
+   * window (schedule) or dispatches a new save. A save in flight carries the
+   * generation it was dispatched under, so when it lands it can tell whether the
+   * state it is about to write is still the state it left behind — a later
+   * schedule, or a later save, retires it and its result is dropped on the floor.
+   */
+  const generations = new Map<number, number>()
 
-  const runSave = (exerciseId: number): void => {
+  const advanceGenerationFor = (exerciseId: number): number => {
+    const generation = (generations.get(exerciseId) ?? 0) + 1
+    generations.set(exerciseId, generation)
+    return generation
+  }
+
+  const isCurrentGeneration = (exerciseId: number, generation: number): boolean =>
+    generations.get(exerciseId) === generation
+
+  const runSave = (exerciseId: number, generation: number): void => {
     const settle = (): void => {
+      if (!isCurrentGeneration(exerciseId, generation)) return
       states.set(exerciseId, 'idle')
     }
     const fail = (): void => {
+      if (!isCurrentGeneration(exerciseId, generation)) return
       states.set(exerciseId, 'error')
     }
 
@@ -56,18 +75,21 @@ export function createIdleSaveController({
     if (!timers.has(exerciseId)) return
     clearTimerFor(exerciseId)
     states.set(exerciseId, 'saving')
-    runSave(exerciseId)
+    runSave(exerciseId, advanceGenerationFor(exerciseId))
   }
 
   return {
     schedule(exerciseId: number): void {
       clearTimerFor(exerciseId)
+      // A new window retires any save still in flight for this exercise: whatever
+      // it returns describes sets this edit has already superseded.
+      advanceGenerationFor(exerciseId)
       states.set(exerciseId, 'pending')
 
       const handle = setTimer(() => {
         timers.delete(exerciseId)
         states.set(exerciseId, 'saving')
-        runSave(exerciseId)
+        runSave(exerciseId, advanceGenerationFor(exerciseId))
       }, waitMs)
 
       timers.set(exerciseId, handle)
