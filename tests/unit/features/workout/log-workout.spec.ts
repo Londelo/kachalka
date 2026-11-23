@@ -120,6 +120,269 @@ describe('logWorkoutUseCase', () => {
 
     expect(() => useCase.execute(1, 5, '2025-01-01', [{ id: 's1', reps: 5, weight: 100 }])).toThrow('Database connection lost')
   })
+
+  describe('folding before the write', () => {
+    const storedLog = {
+      id: 1,
+      userId: 1,
+      exerciseId: 5,
+      date: '2025-01-01',
+      sets: [],
+      createdAt: '2025-01-01T00:00:00.000Z',
+      updatedAt: '2025-01-01T00:00:00.000Z',
+    }
+
+    function createPathRepo() {
+      const repo = makeRepo()
+      repo.findByDateAndExercise.mockReturnValue(undefined)
+      repo.create.mockReturnValue(storedLog)
+      return repo
+    }
+
+    function writtenSets(repo: ReturnType<typeof makeRepo>) {
+      return repo.create.mock.calls[0][0].sets
+    }
+
+    it('folds two identical lines into one line carrying the summed count', () => {
+      const repo = createPathRepo()
+
+      logWorkoutUseCase(repo).execute(1, 5, '2025-01-01', [
+        { id: 'a', reps: 5, weight: 135, count: 2 },
+        { id: 'b', reps: 5, weight: 135, count: 3 },
+      ])
+
+      expect(repo.create).toHaveBeenCalledTimes(1)
+      expect(repo.create.mock.calls[0][0]).toEqual({
+        userId: 1,
+        exerciseId: 5,
+        date: '2025-01-01',
+        sets: [{ id: 'a', reps: 5, weight: 135, count: 5 }],
+      })
+    })
+
+    it('folds three identical lines into one line carrying all three counts', () => {
+      const repo = createPathRepo()
+
+      logWorkoutUseCase(repo).execute(1, 5, '2025-01-01', [
+        { id: 'a', reps: 5, weight: 135, count: 2 },
+        { id: 'b', reps: 5, weight: 135, count: 1 },
+        { id: 'c', reps: 5, weight: 135, count: 3 },
+      ])
+
+      expect(writtenSets(repo)).toEqual([{ id: 'a', reps: 5, weight: 135, count: 6 }])
+    })
+
+    it('keeps lines apart when the weight differs, each with its own count', () => {
+      const repo = createPathRepo()
+
+      logWorkoutUseCase(repo).execute(1, 5, '2025-01-01', [
+        { id: 'a', reps: 5, weight: 135, count: 2 },
+        { id: 'b', reps: 5, weight: 140, count: 3 },
+      ])
+
+      expect(writtenSets(repo)).toEqual([
+        { id: 'a', reps: 5, weight: 135, count: 2 },
+        { id: 'b', reps: 5, weight: 140, count: 3 },
+      ])
+    })
+
+    it('keeps lines apart when the reps differ, each with its own count', () => {
+      const repo = createPathRepo()
+
+      logWorkoutUseCase(repo).execute(1, 5, '2025-01-01', [
+        { id: 'a', reps: 5, weight: 135, count: 2 },
+        { id: 'b', reps: 6, weight: 135, count: 3 },
+      ])
+
+      expect(writtenSets(repo)).toEqual([
+        { id: 'a', reps: 5, weight: 135, count: 2 },
+        { id: 'b', reps: 6, weight: 135, count: 3 },
+      ])
+    })
+
+    it('folds duplicates that are not adjacent, keeping the first line id and position', () => {
+      const repo = createPathRepo()
+
+      logWorkoutUseCase(repo).execute(1, 5, '2025-01-01', [
+        { id: 'a', reps: 5, weight: 135, count: 2 },
+        { id: 'b', reps: 8, weight: 95, count: 1 },
+        { id: 'c', reps: 5, weight: 135, count: 4 },
+      ])
+
+      expect(writtenSets(repo)).toEqual([
+        { id: 'a', reps: 5, weight: 135, count: 6 },
+        { id: 'b', reps: 8, weight: 95, count: 1 },
+      ])
+    })
+
+    it('folds two lines that both arrive with a zero count into two sets', () => {
+      const repo = createPathRepo()
+
+      logWorkoutUseCase(repo).execute(1, 5, '2025-01-01', [
+        { id: 'a', reps: 5, weight: 135, count: 0 },
+        { id: 'b', reps: 5, weight: 135, count: 0 },
+      ])
+
+      expect(writtenSets(repo)).toEqual([{ id: 'a', reps: 5, weight: 135, count: 2 }])
+    })
+
+    it('writes a lone line rather than an empty array', () => {
+      const repo = createPathRepo()
+
+      logWorkoutUseCase(repo).execute(1, 5, '2025-01-01', [{ id: 'a', reps: 5, weight: 135, count: 4 }])
+
+      expect(repo.create).toHaveBeenCalledTimes(1)
+      expect(writtenSets(repo)).toEqual([{ id: 'a', reps: 5, weight: 135, count: 4 }])
+    })
+
+    it('hands repo.update the collapsed array and never calls repo.create', () => {
+      const repo = makeRepo()
+      repo.findByDateAndExercise.mockReturnValue({ id: 7 })
+      repo.update.mockReturnValue({ ...storedLog, id: 7 })
+
+      logWorkoutUseCase(repo).execute(1, 5, '2025-01-01', [
+        { id: 'a', reps: 5, weight: 135, count: 2 },
+        { id: 'b', reps: 5, weight: 135, count: 3 },
+      ])
+
+      expect(repo.update).toHaveBeenCalledWith(7, [{ id: 'a', reps: 5, weight: 135, count: 5 }])
+      expect(repo.create).not.toHaveBeenCalled()
+    })
+
+    // The floor rule lives in normalizeSetCount and the whole-number rule in
+    // assertWholeSetCount, and only a finite non-integer ever reaches the second
+    // one — every other unusable count is refused by the first. A POSTed body
+    // reaches this boundary as JSON, so a string count is a real input, not a
+    // type error: '3' is three sets and '0' is one.
+    it.each(
+      [
+        ['a null count as one set', { id: 's1', reps: 5, weight: 135, count: null }, 1],
+        ['a numeric string count unchanged', { id: 's1', reps: 5, weight: 135, count: '3' }, 3],
+        ['a numeric string zero count as one set', { id: 's1', reps: 5, weight: 135, count: '0' }, 1],
+      ] as [string, unknown, number][],
+    )('normalises %s on the way to the repository', (_label, line, expectedCount) => {
+      const repo = createPathRepo()
+
+      logWorkoutUseCase(repo).execute(1, 5, '2025-01-01', [line as WorkoutSet])
+
+      expect(writtenSets(repo)).toEqual([{ id: 's1', reps: 5, weight: 135, count: expectedCount }])
+    })
+  })
+
+  describe('a rejected count never reaches the repository', () => {
+    // `normalizeSetLines` runs before `assertWholeSetCount`, so the entity floor
+    // rule refuses -1, NaN, Infinity and any non-numeric value first; only a
+    // finite non-integer survives long enough to be refused as a fraction.
+    it.each(
+      [
+        ['a fractional count', [{ id: 's1', reps: 5, weight: 135, count: 2.5 }], /^Set count must be a whole number of at least 1$/],
+        ['a NaN count', [{ id: 's1', reps: 5, weight: 135, count: NaN }], /^Set count must be at least 1$/],
+        ['an Infinity count', [{ id: 's1', reps: 5, weight: 135, count: Infinity }], /^Set count must be at least 1$/],
+        ['a boolean count', [{ id: 's1', reps: 5, weight: 135, count: true }], /^Set count must be at least 1$/],
+      ] as [string, unknown[], RegExp][],
+    )('throws for %s before touching the repository', (_label, sets, message) => {
+      const repo = makeRepo()
+
+      expect(() => logWorkoutUseCase(repo).execute(1, 5, '2025-01-01', sets as WorkoutSet[])).toThrow(message)
+      expect(repo.findByDateAndExercise).not.toHaveBeenCalled()
+      expect(repo.create).not.toHaveBeenCalled()
+      expect(repo.update).not.toHaveBeenCalled()
+    })
+
+    it('refuses the whole batch when a duplicate line carries a count below the floor', () => {
+      const repo = makeRepo()
+
+      expect(() =>
+        logWorkoutUseCase(repo).execute(1, 5, '2025-01-01', [
+          { id: 'a', reps: 5, weight: 135, count: 2 },
+          { id: 'b', reps: 5, weight: 135, count: -1 },
+        ]),
+      ).toThrow(/^Set count must be at least 1$/)
+      expect(repo.findByDateAndExercise).not.toHaveBeenCalled()
+      expect(repo.create).not.toHaveBeenCalled()
+      expect(repo.update).not.toHaveBeenCalled()
+    })
+
+    it('refuses two fractional counts the fold would have summed into a whole one', () => {
+      const repo = makeRepo()
+
+      expect(() =>
+        logWorkoutUseCase(repo).execute(1, 5, '2025-01-01', [
+          { id: 'a', reps: 5, weight: 135, count: 2.5 },
+          { id: 'b', reps: 5, weight: 135, count: 2.5 },
+        ]),
+      ).toThrow(/^Set count must be a whole number of at least 1$/)
+      expect(repo.create).not.toHaveBeenCalled()
+      expect(repo.update).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('the rules that run before the fold', () => {
+    it('refuses an empty array before any repository call at all', () => {
+      const repo = makeRepo()
+
+      expect(() => logWorkoutUseCase(repo).execute(1, 5, '2025-01-01', [])).toThrow(/^Must log at least one set$/)
+      expect(repo.findByDateAndExercise).not.toHaveBeenCalled()
+      expect(repo.create).not.toHaveBeenCalled()
+      expect(repo.update).not.toHaveBeenCalled()
+    })
+
+    it('rejects an unusable weight on a line the fold would have merged away', () => {
+      const repo = makeRepo()
+
+      expect(() =>
+        logWorkoutUseCase(repo).execute(1, 5, '2025-01-01', [
+          { id: 'a', reps: 5, weight: 135, count: 2 },
+          { id: 'b', reps: 5, weight: -10, count: 3 },
+        ]),
+      ).toThrow(/^Weight must be non-negative$/)
+      expect(repo.findByDateAndExercise).not.toHaveBeenCalled()
+      expect(repo.create).not.toHaveBeenCalled()
+      expect(repo.update).not.toHaveBeenCalled()
+    })
+
+    it('rejects an unusable reps on a line the fold would have merged away', () => {
+      const repo = makeRepo()
+
+      expect(() =>
+        logWorkoutUseCase(repo).execute(1, 5, '2025-01-01', [
+          { id: 'a', reps: 5, weight: 135, count: 2 },
+          { id: 'b', reps: 0, weight: 135, count: 3 },
+        ]),
+      ).toThrow(/^Reps must be at least 1$/)
+      expect(repo.findByDateAndExercise).not.toHaveBeenCalled()
+      expect(repo.create).not.toHaveBeenCalled()
+      expect(repo.update).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('what the repository hands back', () => {
+    it('returns whatever repo.update hands back, including nothing', () => {
+      const repo = makeRepo()
+      repo.findByDateAndExercise.mockReturnValue({ id: 7 })
+      repo.update.mockReturnValue(undefined)
+
+      const result = logWorkoutUseCase(repo).execute(1, 5, '2025-01-01', [
+        { id: 'a', reps: 5, weight: 135, count: 2 },
+        { id: 'b', reps: 5, weight: 135, count: 3 },
+      ])
+
+      expect(result).toBeUndefined()
+      expect(repo.update).toHaveBeenCalledWith(7, [{ id: 'a', reps: 5, weight: 135, count: 5 }])
+    })
+
+    it('propagates a repo.update failure unchanged', () => {
+      const repo = makeRepo()
+      repo.findByDateAndExercise.mockReturnValue({ id: 7 })
+      repo.update.mockImplementation(() => {
+        throw new Error('Database connection lost')
+      })
+
+      expect(() =>
+        logWorkoutUseCase(repo).execute(1, 5, '2025-01-01', [{ id: 'a', reps: 5, weight: 135, count: 2 }]),
+      ).toThrow('Database connection lost')
+    })
+  })
 })
 
 describe('logWorkoutUseCase — set count at the write boundary', () => {
