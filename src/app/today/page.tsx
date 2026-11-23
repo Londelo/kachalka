@@ -266,29 +266,28 @@ export default function TodayPage() {
   const [errors, setErrors] = useState<Map<number, string>>(new Map())
   const exerciseSetsRef = useRef<Map<number, WorkoutSet[]>>(new Map())
   exerciseSetsRef.current = exerciseSets
-  const exercisesRef = useRef<ExerciseItem[]>([])
-  exercisesRef.current = exercises
   const mountedRef = useRef(true)
   const controllerRef = useRef<IdleSaveController | null>(null)
 
   const { start, end } = useLoading()
 
-  function syncSaveStates(): void {
+  /**
+   * The mirror of the controller's states, written by the controller itself: it calls
+   * this after every state it writes (see `onStateChange` in createIdleSaveController),
+   * so the page never has to guess when a save is over and read the states back on a
+   * turn count that nothing pins. An exercise with no entry has never been written and
+   * reads 'idle' at the card.
+   *
+   * Guarded by mountedRef because the controller's `settle`/`fail` land in a microtask,
+   * which can arrive after this component is gone.
+   */
+  function mirrorSaveState(exerciseId: number, state: SaveState): void {
     if (!mountedRef.current) return
-    const controller = controllerRef.current
-    if (!controller) return
-
-    const next = new Map<number, SaveState>()
-    for (const exercise of exercisesRef.current) {
-      next.set(exercise.exerciseId, controller.getState(exercise.exerciseId))
-    }
-    setSaveStates(next)
-  }
-
-  // The controller flips an exercise out of 'saving' in the microtask after the
-  // save promise settles, so the mirror is read back one turn later than now.
-  function syncSaveStatesAfterControllerSettles(): void {
-    Promise.resolve().then(syncSaveStates).then(syncSaveStates).catch(() => {})
+    setSaveStates((prev) => {
+      const next = new Map(prev)
+      next.set(exerciseId, state)
+      return next
+    })
   }
 
   function setError(exerciseId: number, message: string): void {
@@ -310,40 +309,45 @@ export default function TodayPage() {
     })
   }
 
+  // The controller owns when this runs and what the card shows around it: it marks the
+  // exercise 'saving' before calling, and tells the mirror 'idle' or 'error' when the
+  // returned promise lands. Nothing here reaches for the states.
   async function saveExercise(exerciseId: number): Promise<void> {
-    try {
-      const userId = getStoredUserId()
-      if (!userId) return
+    const userId = getStoredUserId()
+    if (!userId) return
 
-      const sets = exerciseSetsRef.current.get(exerciseId)
-      if (!sets) return
+    const sets = exerciseSetsRef.current.get(exerciseId)
+    if (!sets) return
 
-      const validSets = sets.filter((s) => s.weight !== 0 || s.reps !== 0)
-      if (validSets.length === 0) return
+    const validSets = sets.filter((s) => s.weight !== 0 || s.reps !== 0)
+    if (validSets.length === 0) return
 
-      syncSaveStates()
+    const today = getTodayISO()
+    const res = await logWorkoutAction(userId, exerciseId, today, validSets)
 
-      const today = getTodayISO()
-      const res = await logWorkoutAction(userId, exerciseId, today, validSets)
+    if (!res.success) {
+      const message = res.error ?? 'Failed to save workout'
+      setError(exerciseId, message)
+      // This rejection is how the page tells the controller the save failed: it is what
+      // routes the controller to its `fail` branch and puts the card on 'error'. Keep it
+      // throwing — resolving instead settles the card 'idle' and contradicts, on the same
+      // card, the refusal the line above just showed the commander.
+      throw new Error(message)
+    }
 
-      if (!res.success) {
-        const message = res.error ?? 'Failed to save workout'
-        setError(exerciseId, message)
-        throw new Error(message)
-      }
-
-      const dayOfWeek = jsDayToAppIndex(new Date().getDay())
-      const exRes = await getTodayExercisesAction(userId, dayOfWeek)
-      if (mountedRef.current && exRes.success && exRes.exercises) {
-        setExercises(exRes.exercises)
-      }
-    } finally {
-      syncSaveStatesAfterControllerSettles()
+    const dayOfWeek = jsDayToAppIndex(new Date().getDay())
+    const exRes = await getTodayExercisesAction(userId, dayOfWeek)
+    if (mountedRef.current && exRes.success && exRes.exercises) {
+      setExercises(exRes.exercises)
     }
   }
 
   if (!controllerRef.current) {
-    controllerRef.current = createIdleSaveController({ save: saveExercise, waitMs: IDLE_SAVE_MS })
+    controllerRef.current = createIdleSaveController({
+      save: saveExercise,
+      onStateChange: mirrorSaveState,
+      waitMs: IDLE_SAVE_MS,
+    })
   }
 
   // Load exercises on mount
@@ -418,7 +422,6 @@ export default function TodayPage() {
   function scheduleSave(exerciseId: number): void {
     clearError(exerciseId)
     controllerRef.current?.schedule(exerciseId)
-    syncSaveStates()
   }
 
   function handleToggleView(exerciseId: number): void {
@@ -435,7 +438,6 @@ export default function TodayPage() {
     // finds no sets, returns silently, and the PENDING... marker the screen promised
     // is quietly taken back. Toggling away must never lose what was typed.
     controllerRef.current?.flush(exerciseId)
-    syncSaveStates()
     setExerciseSets((prev) => {
       const next = new Map(prev)
       next.delete(exerciseId)

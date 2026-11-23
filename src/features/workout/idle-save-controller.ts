@@ -15,11 +15,21 @@ export const IDLE_SAVE_MS = 5000
 export function createIdleSaveController({
   save,
   waitMs = IDLE_SAVE_MS,
+  onStateChange,
   setTimer = (cb: () => void, ms: number) => setTimeout(cb, ms),
   clearTimer = (handle: unknown) => clearTimeout(handle as Parameters<typeof clearTimeout>[0]),
 }: {
   save: (exerciseId: number) => Promise<void>
   waitMs?: number
+  /**
+   * Called with the state just written, after every state write this controller makes.
+   * A reader that mirrors these states is told when one changes instead of guessing when
+   * the controller is done: the write and the notification are one step, so nothing on
+   * the reading side has to count microtask turns between this file's `settle`/`fail`
+   * and whatever it reads back. Optional — `getState` remains the pull for a reader that
+   * has no live interest in the states.
+   */
+  onStateChange?: (exerciseId: number, state: SaveState) => void
   setTimer?: (cb: () => void, ms: number) => unknown
   clearTimer?: (handle: unknown) => void
 }): IdleSaveController {
@@ -43,14 +53,25 @@ export function createIdleSaveController({
   const isCurrentGeneration = (exerciseId: number, generation: number): boolean =>
     generations.get(exerciseId) === generation
 
+  /**
+   * The one way a state changes: the map write and the listener call are never apart,
+   * so a mirror can never be reading a state nobody has been told about yet. Every
+   * `states.set` below goes through here — a write that skips it is a write a reader
+   * is left to discover by polling.
+   */
+  const writeState = (exerciseId: number, state: SaveState): void => {
+    states.set(exerciseId, state)
+    onStateChange?.(exerciseId, state)
+  }
+
   const runSave = (exerciseId: number, generation: number): void => {
     const settle = (): void => {
       if (!isCurrentGeneration(exerciseId, generation)) return
-      states.set(exerciseId, 'idle')
+      writeState(exerciseId, 'idle')
     }
     const fail = (): void => {
       if (!isCurrentGeneration(exerciseId, generation)) return
-      states.set(exerciseId, 'error')
+      writeState(exerciseId, 'error')
     }
 
     try {
@@ -74,7 +95,7 @@ export function createIdleSaveController({
   const settleTimerFor = (exerciseId: number): void => {
     if (!timers.has(exerciseId)) return
     clearTimerFor(exerciseId)
-    states.set(exerciseId, 'saving')
+    writeState(exerciseId, 'saving')
     runSave(exerciseId, advanceGenerationFor(exerciseId))
   }
 
@@ -84,11 +105,11 @@ export function createIdleSaveController({
       // A new window retires any save still in flight for this exercise: whatever
       // it returns describes sets this edit has already superseded.
       advanceGenerationFor(exerciseId)
-      states.set(exerciseId, 'pending')
+      writeState(exerciseId, 'pending')
 
       const handle = setTimer(() => {
         timers.delete(exerciseId)
-        states.set(exerciseId, 'saving')
+        writeState(exerciseId, 'saving')
         runSave(exerciseId, advanceGenerationFor(exerciseId))
       }, waitMs)
 
@@ -98,7 +119,7 @@ export function createIdleSaveController({
     cancel(exerciseId: number): void {
       clearTimerFor(exerciseId)
       if (!states.has(exerciseId)) return
-      if (states.get(exerciseId) !== 'saving') states.set(exerciseId, 'idle')
+      if (states.get(exerciseId) !== 'saving') writeState(exerciseId, 'idle')
     },
 
     cancelAll(): void {
@@ -107,7 +128,7 @@ export function createIdleSaveController({
         timers.delete(exerciseId)
       }
       for (const [exerciseId, state] of [...states]) {
-        if (state !== 'saving') states.set(exerciseId, 'idle')
+        if (state !== 'saving') writeState(exerciseId, 'idle')
       }
     },
 
