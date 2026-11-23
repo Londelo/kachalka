@@ -4,6 +4,7 @@ export type IdleSaveController = {
   schedule(exerciseId: number): void
   cancel(exerciseId: number): void
   cancelAll(): void
+  flush(exerciseId: number): void
   flushAll(): void
   getState(exerciseId: number): SaveState
   hasPending(): boolean
@@ -46,6 +47,18 @@ export function createIdleSaveController({
     timers.delete(exerciseId)
   }
 
+  /**
+   * The one way a waiting window turns into a save: only an exercise with a live
+   * timer is settled, so an exercise that already fired, or was cancelled, or was
+   * never scheduled is left alone and never saved twice.
+   */
+  const settleTimerFor = (exerciseId: number): void => {
+    if (!timers.has(exerciseId)) return
+    clearTimerFor(exerciseId)
+    states.set(exerciseId, 'saving')
+    runSave(exerciseId)
+  }
+
   return {
     schedule(exerciseId: number): void {
       clearTimerFor(exerciseId)
@@ -76,11 +89,18 @@ export function createIdleSaveController({
       }
     },
 
+    /**
+     * Settle one exercise's waiting window now, synchronously, before the caller
+     * changes state the save reads back. Use this when a single card is about to
+     * lose its data — the save reads that data while this call is still on the stack.
+     */
+    flush(exerciseId: number): void {
+      settleTimerFor(exerciseId)
+    },
+
     flushAll(): void {
       for (const exerciseId of [...timers.keys()]) {
-        clearTimerFor(exerciseId)
-        states.set(exerciseId, 'saving')
-        runSave(exerciseId)
+        settleTimerFor(exerciseId)
       }
     },
 

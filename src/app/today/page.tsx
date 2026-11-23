@@ -428,6 +428,14 @@ export default function TodayPage() {
       next.set(exerciseId, current === 'past' ? 'current' : 'past')
       return next
     })
+    // Settle this card's waiting save BEFORE its lines are dropped. The save reads
+    // exerciseSetsRef synchronously, while this call is still on the stack, so the
+    // typed sets below still reach the server. Leaving the timer armed instead would
+    // point it at an entry about to be deleted: it fires five seconds later, saveExercise
+    // finds no sets, returns silently, and the PENDING... marker the screen promised
+    // is quietly taken back. Toggling away must never lose what was typed.
+    controllerRef.current?.flush(exerciseId)
+    syncSaveStates()
     setExerciseSets((prev) => {
       const next = new Map(prev)
       next.delete(exerciseId)
