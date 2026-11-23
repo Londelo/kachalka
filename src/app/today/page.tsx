@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { logWorkoutAction, getTodayWorkoutsAction, getTodayExercisesAction } from '@/features/workout/workout-server-actions'
 import { useLoading } from '@/components/loading-context'
 import type { WorkoutSet } from '@/features/workout/types'
+import { collapseDuplicateSets } from '@/features/workout/workout-entity'
 import { jsDayToAppIndex, getTodayISO } from '@/shared/utils/date'
 
 type ExerciseItem = {
@@ -58,6 +59,28 @@ function parseCount(value: string): number | undefined {
   if (value === '') return undefined
   const parsed = Number(value)
   return Number.isNaN(parsed) ? undefined : parsed
+}
+
+/** The same blank rule `debouncedSave` filters on. */
+function isBlankSet(set: WorkoutSet): boolean {
+  return set.weight === 0 && set.reps === 0
+}
+
+/**
+ * Blank lines never join the fold and never move; each collapsed line takes,
+ * in order, a slot a filled line already held, so the layout does not jump.
+ */
+function collapseFilledSets(sets: WorkoutSet[]): WorkoutSet[] {
+  const collapsed = collapseDuplicateSets(sets.filter((set) => !isBlankSet(set)))
+  const next: WorkoutSet[] = []
+  let nextCollapsed = 0
+
+  for (const [index, set] of sets.entries()) {
+    if (isBlankSet(set)) next.push(set)
+    else if (nextCollapsed < collapsed.length) next.push(collapsed[nextCollapsed++])
+  }
+
+  return next
 }
 
 function getStoredUserId(): number | null {
@@ -416,7 +439,7 @@ export default function TodayPage() {
         ...current,
         [field]: field === 'count' ? parseCount(value) : parseFloat(value) || 0,
       }
-      return updated
+      return collapseFilledSets(updated)
     })
     triggerSave(exerciseId)
   }
