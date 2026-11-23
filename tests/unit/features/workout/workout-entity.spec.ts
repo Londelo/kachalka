@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   validateSet,
   calculateVolume,
+  countSets,
+  countReps,
   normalizeSetCount,
   WorkoutLog,
 } from '@/features/workout/workout-entity'
@@ -133,6 +135,148 @@ describe('calculateVolume', () => {
     ]
 
     expect(calculateVolume(sets)).toBe(calculateVolume([...sets].reverse()))
+  })
+})
+
+type CountedLine = { reps: number; weight: number; count?: number }
+
+describe('countSets', () => {
+  it('returns 0 for an empty array', () => {
+    expect(countSets([])).toBe(0)
+  })
+
+  describe('a single line', () => {
+    it.each(
+      [
+        ['a line with no count key', { reps: 5, weight: 100 }, 1],
+        ['a count of 1', { reps: 5, weight: 100, count: 1 }, 1],
+        ['a count of 3', { reps: 5, weight: 100, count: 3 }, 3],
+        ['a count of 100', { reps: 1, weight: 1, count: 100 }, 100],
+      ] as [string, CountedLine, number][],
+    )('counts %s', (_label, line, expected) => {
+      expect(countSets([line])).toBe(expected)
+    })
+  })
+
+  describe('the count floor — a line never means fewer than one set', () => {
+    it.each(
+      [
+        ['an explicit undefined count', { count: undefined }],
+        ['a count of 0', { count: 0 }],
+        ['a negative count', { count: -4 }],
+        ['a NaN count', { count: NaN }],
+        ['an Infinity count', { count: Infinity }],
+      ] as [string, { count?: number }][],
+    )('reads %s as one set', (_label, countPart) => {
+      const lines: CountedLine[] = [{ reps: 5, weight: 100, ...countPart }]
+      expect(countSets(lines)).toBe(1)
+    })
+  })
+
+  it('sums lines carrying different counts', () => {
+    const sets: CountedLine[] = [
+      { count: 3, reps: 5, weight: 100 },
+      { count: 2, reps: 8, weight: 60 },
+    ]
+    expect(countSets(sets)).toBe(5)
+  })
+
+  it('counts three pre-count lines as three sets', () => {
+    const sets: CountedLine[] = [
+      { reps: 5, weight: 100 },
+      { reps: 5, weight: 100 },
+      { reps: 5, weight: 100 },
+    ]
+    expect(countSets(sets)).toBe(3)
+  })
+
+  it('counts a session entered as three explicit singles as three sets', () => {
+    const sets: CountedLine[] = [
+      { count: 1, reps: 5, weight: 100 },
+      { count: 1, reps: 5, weight: 100 },
+      { count: 1, reps: 5, weight: 100 },
+    ]
+    expect(countSets(sets)).toBe(3)
+  })
+
+  it('totals one counted line the same as the same number of count-less lines', () => {
+    const collapsed: CountedLine[] = [{ count: 3, reps: 5, weight: 135 }]
+    const uncollapsed: CountedLine[] = [
+      { reps: 5, weight: 135 },
+      { reps: 5, weight: 135 },
+      { reps: 5, weight: 135 },
+    ]
+
+    expect(countSets(collapsed)).toBe(countSets(uncollapsed))
+    expect(countSets(collapsed)).toBe(3)
+  })
+})
+
+describe('countReps', () => {
+  it('returns 0 for an empty array', () => {
+    expect(countReps([])).toBe(0)
+  })
+
+  describe('a single line', () => {
+    it.each(
+      [
+        ['a line with no count key', { reps: 5, weight: 100 }, 5],
+        ['a count of 1', { reps: 5, weight: 100, count: 1 }, 5],
+        ['3 sets of 5 at 135', { reps: 5, weight: 135, count: 3 }, 15],
+        ['a reps of 0', { reps: 0, weight: 100 }, 0],
+        ['a reps of 0 under a count of 3', { reps: 0, weight: 100, count: 3 }, 0],
+      ] as [string, CountedLine, number][],
+    )('totals %s', (_label, line, expected) => {
+      expect(countReps([line])).toBe(expected)
+    })
+  })
+
+  describe('the count floor — a line never means fewer than one set', () => {
+    it.each(
+      [
+        ['an explicit undefined count', { count: undefined }],
+        ['a count of 0', { count: 0 }],
+        ['a negative count', { count: -4 }],
+        ['a NaN count', { count: NaN }],
+        ['an Infinity count', { count: Infinity }],
+      ] as [string, { count?: number }][],
+    )('reads %s as unmultiplied reps', (_label, countPart) => {
+      const lines: CountedLine[] = [{ reps: 5, weight: 100, ...countPart }]
+      expect(countReps(lines)).toBe(5)
+    })
+  })
+
+  it('ignores weight entirely — a line at weight 0 still contributes its reps', () => {
+    const lines: CountedLine[] = [{ count: 2, reps: 5, weight: 0 }]
+    expect(countReps(lines)).toBe(10)
+  })
+
+  it('sums lines carrying different counts', () => {
+    const sets: CountedLine[] = [
+      { count: 3, reps: 5, weight: 100 },
+      { count: 2, reps: 10, weight: 60 },
+    ]
+    expect(countReps(sets)).toBe(35)
+  })
+
+  it('does not care what order the lines arrive in', () => {
+    const sets: CountedLine[] = [
+      { count: 3, reps: 5, weight: 100 },
+      { count: 2, reps: 10, weight: 60 },
+    ]
+
+    expect(countReps(sets)).toBe(countReps([...sets].reverse()))
+    expect(countReps(sets)).toBe(35)
+  })
+})
+
+describe('the three tally rules agree on one session', () => {
+  it('reports 3 sets, 15 reps and 2025 volume for 3 sets of 5 at 135', () => {
+    const lines: CountedLine[] = [{ count: 3, reps: 5, weight: 135 }]
+
+    expect(countSets(lines)).toBe(3)
+    expect(countReps(lines)).toBe(15)
+    expect(calculateVolume(lines)).toBe(2025)
   })
 })
 
