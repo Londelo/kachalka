@@ -1,6 +1,10 @@
 import Database from 'better-sqlite3'
 import { test, expect } from '@playwright/test'
 
+import { getE2eBaseUrl } from './e2e-config'
+
+const BASE_URL = getE2eBaseUrl()
+
 const db = new Database('data/kachalka.db')
 db.pragma('foreign_keys = ON')
 
@@ -14,7 +18,7 @@ test.beforeEach(() => {
 
 test('full user selection flow', async ({ page }) => {
   // ---- Step 1: Create Bruno ----
-  await page.goto('http://localhost:3111/')
+  await page.goto(`${BASE_URL}/`)
   await expect(page.getByRole('heading', { name: 'SELECT COMMANDER' })).toBeVisible()
   await page.getByRole('button', { name: 'Add User' }).click()
   await expect(page.locator('#add-user-modal')).toBeVisible()

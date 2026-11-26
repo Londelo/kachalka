@@ -1,6 +1,10 @@
 import Database from 'better-sqlite3'
 import { test, expect } from '@playwright/test'
+
+import { getE2eBaseUrl } from './e2e-config'
 import { loginAsBruno } from './helpers'
+
+const BASE_URL = getE2eBaseUrl()
 
 // ============================================================================
 // Database setup — runs once per test file worker
@@ -78,7 +82,7 @@ test('plan page loads with existing assignments', async ({ page }) => {
   assignExercise(3, 4) // FRI
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/plan')
+  await page.goto(`${BASE_URL}/plan`)
   await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
   await expect(page.getByText('LOADING...')).not.toBeVisible({ timeout: 10000 })
 
@@ -101,7 +105,7 @@ test('plan page loads with existing assignments', async ({ page }) => {
 test('shows empty state on a day with no exercises', async ({ page }) => {
   // No exercises created — Bruno has a clean slate
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/plan')
+  await page.goto(`${BASE_URL}/plan`)
   await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click MON — should show empty state
@@ -125,7 +129,7 @@ test('shows empty state on a day with no exercises', async ({ page }) => {
 test('day selection selects the day and shows assignments', async ({ page }) => {
   // Clicking a day selects it — ADD EXERCISE button and CURRENT ASSETS always visible
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/plan')
+  await page.goto(`${BASE_URL}/plan`)
   await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click MON — should be selected, ADD EXERCISE always visible
@@ -139,7 +143,7 @@ test('day selection selects the day and shows assignments', async ({ page }) => 
 
 test('creates new exercise inline and auto-assigns to selected day', async ({ page }) => {
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/plan')
+  await page.goto(`${BASE_URL}/plan`)
   await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click MON
@@ -171,7 +175,7 @@ test('selects existing exercise to assign', async ({ page }) => {
   const ids = createExercises(['Barbell Curl'])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/plan')
+  await page.goto(`${BASE_URL}/plan`)
   await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click MON
@@ -201,7 +205,7 @@ test('removes exercise from day', async ({ page }) => {
   assignExercise(2, 0) // MON
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/plan')
+  await page.goto(`${BASE_URL}/plan`)
   await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click MON
@@ -227,7 +231,7 @@ test('duplicate assignment guard prevents assigning same exercise twice', async 
   assignExercise(1, 0) // MON — already assigned, filters out of dropdown
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/plan')
+  await page.goto(`${BASE_URL}/plan`)
   await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click MON
@@ -257,7 +261,7 @@ test('duplicate assignment guard prevents assigning same exercise twice', async 
 
 test('exercise name validation rejects empty name', async ({ page }) => {
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/plan')
+  await page.goto(`${BASE_URL}/plan`)
   await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click MON
@@ -279,7 +283,7 @@ test('exercise name validation rejects empty name', async ({ page }) => {
 
 test('modal closes via overlay click', async ({ page }) => {
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/plan')
+  await page.goto(`${BASE_URL}/plan`)
   await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click ADD EXERCISE to open modal
@@ -295,7 +299,7 @@ test('modal closes via overlay click', async ({ page }) => {
 
 test('modal closes via CANCEL button', async ({ page }) => {
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/plan')
+  await page.goto(`${BASE_URL}/plan`)
   await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click ADD EXERCISE to open modal
@@ -311,7 +315,7 @@ test('modal closes via CANCEL button', async ({ page }) => {
 
 test('creates exercise on new mode and assigns to day', async ({ page }) => {
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/plan')
+  await page.goto(`${BASE_URL}/plan`)
   await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click MON
@@ -338,7 +342,7 @@ test('creates exercise on new mode and assigns to day', async ({ page }) => {
 
 test('switches from new mode back to select mode in modal', async ({ page }) => {
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/plan')
+  await page.goto(`${BASE_URL}/plan`)
   await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Click ADD EXERCISE
@@ -363,7 +367,7 @@ test('switches from new mode back to select mode in modal', async ({ page }) => 
 
 test('error state displays error banner for long exercise name', async ({ page }) => {
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/plan')
+  await page.goto(`${BASE_URL}/plan`)
   await expect(page.getByRole('heading', { name: 'MY BATTLE PLAN' })).toBeVisible()
 
   // Open modal and switch to new exercise mode

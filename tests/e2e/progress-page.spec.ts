@@ -1,6 +1,10 @@
 import Database from 'better-sqlite3'
 import { test, expect, type Page } from '@playwright/test'
+
+import { getE2eBaseUrl } from './e2e-config'
 import { loginAsBruno } from './helpers'
+
+const BASE_URL = getE2eBaseUrl()
 
 const db = new Database('data/kachalka.db')
 db.pragma('foreign_keys = ON')
@@ -70,7 +74,7 @@ async function openBarModal(page: Page) {
 
 test('progress page loads with header and controls', async ({ page }) => {
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
   await expect(page.locator('[id="progress-exercise-selector"]')).toBeVisible()
@@ -92,7 +96,7 @@ test('shows empty state when no workout data exists', async ({ page }) => {
   createExercises(['Bench Press', 'Squat'])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
   await expect(page.locator('[id="progress-empty"]')).toBeVisible()
@@ -115,7 +119,7 @@ test('shows chart bars when workout data exists', async ({ page }) => {
   ])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
   await expect(page.getByText('LOADING...')).not.toBeVisible({ timeout: 10000 })
@@ -132,7 +136,7 @@ test('exercise dropdown lists exercises with workout logs', async ({ page }) => 
   createWorkoutLog(ids[2], daysAgo(10), [{ id: 's2', reps: 5, weight: 225 }])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
   await expect(page.locator('[id="progress-bar-chart"]')).toBeVisible({ timeout: 10000 })
 
@@ -152,7 +156,7 @@ test('selecting an exercise filters chart to that exercise', async ({ page }) =>
   createWorkoutLog(ids[1], daysAgo(10), [{ id: 's2', reps: 5, weight: 225 }])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
   await expect(page.locator('[id="progress-bar-chart"]')).toBeVisible({ timeout: 10000 })
 
@@ -170,7 +174,7 @@ test('selecting ALL EXERCISES shows aggregated data', async ({ page }) => {
   createWorkoutLog(ids[1], daysAgo(10), [{ id: 's2', reps: 5, weight: 225 }])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
   await expect(page.locator('[id="progress-bar-chart"]')).toBeVisible({ timeout: 10000 })
@@ -189,7 +193,7 @@ test('changes time range when clicking 6M pill', async ({ page }) => {
   createWorkoutLog(exerciseId, daysAgo(10), [{ id: 's2', reps: 5, weight: 140 }])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
   await expect(page.locator('[id="progress-bar-chart"]')).toBeVisible({ timeout: 10000 })
@@ -208,7 +212,7 @@ test('changes time range when clicking 1Y pill', async ({ page }) => {
   createWorkoutLog(exerciseId, daysAgo(240), [{ id: 's1', reps: 5, weight: 135 }])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
   await page.getByRole('button', { name: '1Y' }).click()
@@ -224,7 +228,7 @@ test('changes granularity between session week and month', async ({ page }) => {
   createWorkoutLog(exerciseId, daysAgo(24), [{ id: 's3', reps: 5, weight: 145 }])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
   await expect(page.getByText('VOLUME BY MONTH')).toBeVisible()
@@ -249,7 +253,7 @@ test('clicking a bar opens detail modal', async ({ page }) => {
   ])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
   await openBarModal(page)
@@ -265,7 +269,7 @@ test('modal shows date, exercise name, and metrics', async ({ page }) => {
   ])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
   await openBarModal(page)
@@ -294,7 +298,7 @@ test('closing modal via close button dismisses it', async ({ page }) => {
   ])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
   await openBarModal(page)
@@ -312,7 +316,7 @@ test('closing modal via backdrop click dismisses it', async ({ page }) => {
   ])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
   await openBarModal(page)
@@ -330,7 +334,7 @@ test('modal does not open on hover', async ({ page }) => {
   ])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
   await expect(page.locator('[id="progress-bar-chart"]')).toBeVisible({ timeout: 10000 })
@@ -349,7 +353,7 @@ test('volume calculation is correct', async ({ page }) => {
   ])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
   await openBarModal(page)
@@ -369,7 +373,7 @@ test('multiple exercises in ALL mode shows all in chart', async ({ page }) => {
   createWorkoutLog(ids[2], daysAgo(10), [{ id: 's3', reps: 5, weight: 315 }])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
   const options = page.locator('[id="progress-exercise-selector"] select option')
@@ -389,7 +393,7 @@ test('multiple exercises in ALL mode shows all in chart', async ({ page }) => {
 })
 
 test('redirects to home when no user cookie', async ({ page }) => {
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
 
   await expect(page.locator('[id="progress-page"]')).toBeVisible({ timeout: 10000 })
 })
@@ -398,7 +402,7 @@ test('dropdown is empty when no exercises have logs', async ({ page }) => {
   createExercises(['Bench Press', 'Squat', 'Deadlift'])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
   const options = page.locator('[id="progress-exercise-selector"] select option')
@@ -410,7 +414,7 @@ test('dropdown is empty when no exercises have logs', async ({ page }) => {
 
 test('nav drawer links to progress page', async ({ page }) => {
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/today')
+  await page.goto(`${BASE_URL}/today`)
   await expect(page.getByRole('heading', { name: "TODAY'S BATTLE" })).toBeVisible({ timeout: 10000 })
 
   await page.getByRole('button', { name: 'menu' }).click()
@@ -426,7 +430,7 @@ test('chart title updates with granularity change', async ({ page }) => {
   createWorkoutLog(exerciseId, daysAgo(10), [{ id: 's1', reps: 5, weight: 135 }])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/progress')
+  await page.goto(`${BASE_URL}/progress`)
   await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
 
   await expect(page.getByText('VOLUME BY MONTH')).toBeVisible()

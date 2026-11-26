@@ -1,6 +1,10 @@
 import Database from 'better-sqlite3'
 import { test, expect } from '@playwright/test'
+
+import { getE2eBaseUrl } from './e2e-config'
 import { loginAsBruno } from './helpers'
+
+const BASE_URL = getE2eBaseUrl()
 
 const db = new Database('data/kachalka.db')
 db.pragma('foreign_keys = ON')
@@ -58,13 +62,13 @@ test.afterEach(() => {
 
 test('renders header and subtitle for authenticated user', async ({ page }) => {
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/history')
+  await page.goto(`${BASE_URL}/history`)
   await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
   await expect(page.getByText('CAMPAIGN HISTORY & PERFORMANCE DATA')).toBeVisible({ timeout: 10000 })
 })
 
 test('redirects to home when no user cookie', async ({ page }) => {
-  await page.goto('http://localhost:3111/history')
+  await page.goto(`${BASE_URL}/history`)
   // Without a user cookie, the page client redirects to /
   // The history page should never render
   await expect(page.locator('#history-page')).not.toBeVisible({ timeout: 5000 })
@@ -84,7 +88,7 @@ test('history list displays when workout data exists', async ({ page }) => {
   ])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/history')
+  await page.goto(`${BASE_URL}/history`)
   await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
 
   // Session card should be visible
@@ -99,7 +103,7 @@ test('multiple sessions display newest first', async ({ page }) => {
   createWorkoutLog(exerciseId, '2026-06-17', [{ reps: 5, weight: 250 }])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/history')
+  await page.goto(`${BASE_URL}/history`)
   await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
 
   // All three session cards should exist
@@ -140,7 +144,7 @@ test('exercise rows display correct name, set count, and max weight', async ({ p
   ])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/history')
+  await page.goto(`${BASE_URL}/history`)
   await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
 
   // Exercise names
@@ -178,7 +182,7 @@ test('aggregate metrics show correct volume for session', async ({ page }) => {
   ])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/history')
+  await page.goto(`${BASE_URL}/history`)
   await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
 
   const sessionCard = page.locator('#history-date-2026-06-08')
@@ -219,7 +223,7 @@ test('modal opens, displays exercise name, and shows set details', async ({ page
   ])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/history')
+  await page.goto(`${BASE_URL}/history`)
   await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
 
   // Open modal by clicking Pull-Up exercise button
@@ -250,7 +254,7 @@ test('modal shows exercise summary (volume, sets, max)', async ({ page }) => {
   ])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/history')
+  await page.goto(`${BASE_URL}/history`)
   await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
 
   await page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Deadlift' }).click()
@@ -279,7 +283,7 @@ test('modal closes via backdrop click and CLOSE button', async ({ page }) => {
   ])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/history')
+  await page.goto(`${BASE_URL}/history`)
   await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
 
   // Close via backdrop click
@@ -299,7 +303,7 @@ test('modal closes via backdrop click and CLOSE button', async ({ page }) => {
 test('empty state shows when no history', async ({ page }) => {
   // No workout logs created — only Bruno user exists
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/history')
+  await page.goto(`${BASE_URL}/history`)
   await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
 
   // Empty state should be visible
@@ -327,7 +331,7 @@ test('multiple exercises in same session show as separate rows', async ({ page }
   ])
 
   await loginAsBruno(page)
-  await page.goto('http://localhost:3111/history')
+  await page.goto(`${BASE_URL}/history`)
   await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
 
   // Both exercise buttons should exist
