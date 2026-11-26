@@ -3,6 +3,7 @@ import {
   validateSet,
   calculateVolume,
   getSetCount,
+  collapseSets,
   WorkoutLog,
 } from '@/features/workout/workout-entity'
 import type { WorkoutSet } from '@/features/workout/types'
@@ -282,5 +283,255 @@ describe('WorkoutLog type structure', () => {
     expect(log.sets).toHaveLength(1)
     expect(log.createdAt).toBe('2025-01-01T00:00:00.000Z')
     expect(log.updatedAt).toBe('2025-01-01T00:00:00.000Z')
+  })
+})
+
+describe('collapseSets', () => {
+  const foldCases: { label: string; sets: WorkoutSet[]; expected: WorkoutSet[] }[] = [
+    {
+      label: 'nothing folds to nothing',
+      sets: [],
+      expected: [],
+    },
+    {
+      label: 'a lone legacy line comes back with its count resolved to one',
+      sets: [{ id: 'a', reps: 5, weight: 100 }],
+      expected: [{ id: 'a', reps: 5, weight: 100, count: 1 }],
+    },
+    {
+      label: 'two lines of the same work become one line counted twice',
+      sets: [
+        { id: 'a', reps: 5, weight: 100 },
+        { id: 'b', reps: 5, weight: 100 },
+      ],
+      expected: [{ id: 'a', reps: 5, weight: 100, count: 2 }],
+    },
+    {
+      label: 'counts 2, absent and 4 on the same work sum to seven on the first line id',
+      sets: [
+        { id: 'first', reps: 5, weight: 100, count: 2 },
+        { id: 'second', reps: 5, weight: 100 },
+        { id: 'third', reps: 5, weight: 100, count: 4 },
+      ],
+      expected: [{ id: 'first', reps: 5, weight: 100, count: 7 }],
+    },
+    {
+      label: '100kg and 135kg stay two separate lines in the order they arrived',
+      sets: [
+        { id: 'a', reps: 5, weight: 100 },
+        { id: 'b', reps: 5, weight: 135 },
+      ],
+      expected: [
+        { id: 'a', reps: 5, weight: 100, count: 1 },
+        { id: 'b', reps: 5, weight: 135, count: 1 },
+      ],
+    },
+    {
+      label: '100kg and 101kg are different work however close they sit',
+      sets: [
+        { id: 'a', reps: 5, weight: 100 },
+        { id: 'b', reps: 5, weight: 101 },
+      ],
+      expected: [
+        { id: 'a', reps: 5, weight: 100, count: 1 },
+        { id: 'b', reps: 5, weight: 101, count: 1 },
+      ],
+    },
+    {
+      label: '5 reps and 6 reps are different work at the same weight',
+      sets: [
+        { id: 'a', reps: 5, weight: 100 },
+        { id: 'b', reps: 6, weight: 100 },
+      ],
+      expected: [
+        { id: 'a', reps: 5, weight: 100, count: 1 },
+        { id: 'b', reps: 6, weight: 100, count: 1 },
+      ],
+    },
+    {
+      label: 'count is not part of the key, so a line counted once joins its twin counted three times',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 1 },
+        { id: 'b', reps: 5, weight: 100, count: 3 },
+      ],
+      expected: [{ id: 'a', reps: 5, weight: 100, count: 4 }],
+    },
+    {
+      label: 'two lines of count 2.5 each floor to 2 on their own way in and sum to 4',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 2.5 },
+        { id: 'b', reps: 5, weight: 100, count: 2.5 },
+      ],
+      expected: [{ id: 'a', reps: 5, weight: 100, count: 4 }],
+    },
+    {
+      label: '2.9 and 2.1 floor apart to 2 plus 2 rather than summing raw to 5',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 2.9 },
+        { id: 'b', reps: 5, weight: 100, count: 2.1 },
+      ],
+      expected: [{ id: 'a', reps: 5, weight: 100, count: 4 }],
+    },
+    {
+      label: 'unusable reps and weight are folded rather than judged, that being validateSet contract',
+      sets: [
+        { id: 'a', reps: -1, weight: -50 },
+        { id: 'b', reps: -1, weight: -50 },
+      ],
+      expected: [{ id: 'a', reps: -1, weight: -50, count: 2 }],
+    },
+    {
+      label: 'a hundred matching lines become one line counted a hundred',
+      sets: Array.from({ length: 100 }, (_unused, index) => ({
+        id: `s${index}`,
+        reps: 5,
+        weight: 100,
+        count: 1,
+      })),
+      expected: [{ id: 's0', reps: 5, weight: 100, count: 100 }],
+    },
+  ]
+
+  it.each(foldCases)('folds $label', ({ sets, expected }) => {
+    expect(collapseSets(sets)).toStrictEqual(expected)
+  })
+
+  it('emits in order of first occurrence, not sorted and not in the order the matching line arrived', () => {
+    const result = collapseSets([
+      { id: 'a', reps: 5, weight: 100, count: 1 },
+      { id: 'b', reps: 8, weight: 60 },
+      { id: 'c', reps: 5, weight: 100, count: 2 },
+    ])
+
+    expect(result).toStrictEqual([
+      { id: 'a', reps: 5, weight: 100, count: 3 },
+      { id: 'b', reps: 8, weight: 60, count: 1 },
+    ])
+  })
+
+  it('keys on the work alone and keeps the id of the first line for it, however the ids differ', () => {
+    const result = collapseSets([
+      { id: 'first', reps: 5, weight: 100 },
+      { id: 'middle', reps: 5, weight: 100 },
+      { id: 'last', reps: 5, weight: 100 },
+    ])
+
+    expect(result).toStrictEqual([{ id: 'first', reps: 5, weight: 100, count: 3 }])
+  })
+
+  it('treats -0 and 0 as one weight, being one and the same number', () => {
+    const result = collapseSets([
+      { id: 'a', reps: 5, weight: -0 },
+      { id: 'b', reps: 5, weight: 0 },
+    ])
+
+    expect(result).toHaveLength(1)
+    expect(result[0].count).toBe(2)
+  })
+
+  const countKeyCases: { label: string; sets: WorkoutSet[] }[] = [
+    {
+      label: 'a lone legacy line carried no count at all',
+      sets: [{ id: 'a', reps: 5, weight: 100 }],
+    },
+    {
+      label: 'a lone line carried its own count',
+      sets: [{ id: 'a', reps: 5, weight: 100, count: 3 }],
+    },
+    {
+      label: 'two lines of different work each resolved their own',
+      sets: [
+        { id: 'a', reps: 5, weight: 100 },
+        { id: 'b', reps: 8, weight: 60 },
+      ],
+    },
+    {
+      label: 'two lines of the same work merged into one',
+      sets: [
+        { id: 'a', reps: 5, weight: 100 },
+        { id: 'b', reps: 5, weight: 100 },
+      ],
+    },
+  ]
+
+  it.each(countKeyCases)('hands every returned line its own count key, even when $label', ({ sets }) => {
+    const result = collapseSets(sets)
+
+    expect(result.length).toBeGreaterThan(0)
+    for (const line of result) {
+      expect(Object.keys(line)).toContain('count')
+    }
+  })
+
+  it('returns exactly the four canonical keys, dropping anything else the stored line carried', () => {
+    const stored = { id: 'a', reps: 5, weight: 100, note: 'felt heavy' } as WorkoutSet
+
+    expect(collapseSets([stored])).toStrictEqual([{ id: 'a', reps: 5, weight: 100, count: 1 }])
+  })
+
+  it('leaves the array it was handed and every line inside it exactly as it found them', () => {
+    const sets: WorkoutSet[] = [
+      { id: 'a', reps: 5, weight: 100 },
+      { id: 'b', reps: 5, weight: 100, count: 2.5 },
+      { id: 'c', reps: 8, weight: 60 },
+    ]
+    const snapshot = sets.map((line) => ({ ...line }))
+
+    collapseSets(sets)
+
+    expect(sets).toEqual(snapshot)
+  })
+
+  it('never stamps the resolved count onto a legacy line it read', () => {
+    const legacy: WorkoutSet = { id: 'a', reps: 5, weight: 100 }
+
+    collapseSets([legacy, { id: 'b', reps: 5, weight: 100 }])
+
+    expect(Object.keys(legacy)).toEqual(['id', 'reps', 'weight'])
+  })
+
+  it('returns a new array, never the one it was handed', () => {
+    const sets: WorkoutSet[] = [{ id: 'a', reps: 5, weight: 100 }]
+
+    expect(collapseSets(sets)).not.toBe(sets)
+  })
+
+  it('returns brand-new line objects even when a returned line is indistinguishable from the line it came from', () => {
+    const line: WorkoutSet = { id: 'a', reps: 5, weight: 100, count: 1 }
+    const sets = [line]
+
+    const result = collapseSets(sets)
+
+    expect(result[0]).toEqual(line)
+    expect(result[0]).not.toBe(line)
+    expect(sets.includes(result[0])).toBe(false)
+  })
+
+  it('folds an already-folded list to itself, so a read path may feed it its own output', () => {
+    const sets: WorkoutSet[] = [
+      { id: 'a', reps: 5, weight: 100 },
+      { id: 'b', reps: 5, weight: 100, count: 2 },
+      { id: 'c', reps: 8, weight: 60 },
+    ]
+
+    const once = collapseSets(sets)
+
+    expect(collapseSets(once)).toStrictEqual(once)
+  })
+
+  it('propagates the shared count rule refusal rather than swallowing it', () => {
+    const ruleMessage = messageThrownBy(() => getSetCount({ count: 0 }))
+
+    expect(() => collapseSets([{ id: 'a', reps: 5, weight: 100, count: 0 }])).toThrow(ruleMessage)
+  })
+
+  it('refuses the whole fold when only a later line carries an unusable count', () => {
+    const fold = () =>
+      collapseSets([
+        { id: 'a', reps: 5, weight: 100 },
+        { id: 'b', reps: 5, weight: 100, count: 0 },
+      ])
+
+    expect(fold).toThrow(REFUSAL_MESSAGE)
   })
 })
