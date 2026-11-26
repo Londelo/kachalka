@@ -9,29 +9,146 @@ import {
 import type { WorkoutSet } from '@/features/workout/types'
 
 describe('validateSet', () => {
-  it('passes for a valid set', () => {
-    const validSet: WorkoutSet = { id: 's1', reps: 5, weight: 100 }
-    expect(() => validateSet(validSet)).not.toThrow()
-  })
+  const EMPTY_ARRAY_MESSAGE = 'Must log at least one set'
 
-  it('allows weight of 0', () => {
-    const set: WorkoutSet = { id: 's1', reps: 5, weight: 0 }
+  const weightMessage = messageThrownBy(() => validateSet({ id: 's1', reps: 5, weight: 0 }))
+  const repsMessage = messageThrownBy(() => validateSet({ id: 's1', reps: 0, weight: 100 }))
+  const countMessage = messageThrownBy(() =>
+    validateSet({ id: 's1', reps: 5, weight: 100, count: 0 }),
+  )
+
+  const legalCases: { label: string; set: WorkoutSet }[] = [
+    { label: 'a plain legacy line with no count at all', set: { id: 's1', reps: 5, weight: 100 } },
+    { label: 'a line carrying count 3', set: { id: 's1', reps: 5, weight: 100, count: 3 } },
+    { label: 'a line carrying the floor boundary count 1', set: { id: 's1', reps: 5, weight: 100, count: 1 } },
+    {
+      label: 'a line carrying the fractional count 2.5, floored later by the read rule',
+      set: { id: 's1', reps: 5, weight: 100, count: 2.5 },
+    },
+    {
+      label: 'a line whose count is explicitly undefined',
+      set: { id: 's1', reps: 5, weight: 100, count: undefined },
+    },
+    {
+      label: 'a line whose count is null, absent meaning one set rather than an error',
+      set: { id: 's1', reps: 5, weight: 100, count: null } as unknown as WorkoutSet,
+    },
+    {
+      label: 'fractional reps, never promised to be whole',
+      set: { id: 's1', reps: 2.5, weight: 60 },
+    },
+  ]
+
+  it.each(legalCases)('accepts $label', ({ set }) => {
     expect(() => validateSet(set)).not.toThrow()
   })
 
-  it('throws when weight is negative', () => {
-    const set: WorkoutSet = { id: 's1', reps: 5, weight: -10 }
-    expect(() => validateSet(set)).toThrow('Weight must be non-negative')
+  const weightRejections: { label: string; weight: unknown }[] = [
+    { label: '0, which the old rule let through', weight: 0 },
+    { label: 'the negative -10', weight: -10 },
+    { label: 'NaN', weight: NaN },
+    { label: 'Infinity', weight: Infinity },
+    { label: '-Infinity', weight: -Infinity },
+    { label: 'the non-numeric string "heavy"', weight: 'heavy' },
+    { label: 'the boolean true', weight: true },
+  ]
+
+  it.each(weightRejections)('refuses a weight of $label', ({ weight }) => {
+    const set: WorkoutSet = { id: 's1', reps: 5, weight: weight as number }
+
+    expect(() => validateSet(set)).toThrow(new Error(weightMessage))
   })
 
-  it('throws when reps is 0', () => {
-    const set: WorkoutSet = { id: 's1', reps: 0, weight: 100 }
-    expect(() => validateSet(set)).toThrow('Reps must be at least 1')
+  const repsRejections: { label: string; reps: unknown }[] = [
+    { label: '0', reps: 0 },
+    { label: 'the negative -1', reps: -1 },
+    { label: 'NaN', reps: NaN },
+    { label: 'Infinity', reps: Infinity },
+    { label: '-Infinity', reps: -Infinity },
+    { label: 'the non-numeric string "five"', reps: 'five' },
+  ]
+
+  it.each(repsRejections)('refuses a reps of $label', ({ reps }) => {
+    const set: WorkoutSet = { id: 's1', reps: reps as number, weight: 100 }
+
+    expect(() => validateSet(set)).toThrow(new Error(repsMessage))
   })
 
-  it('throws when reps is negative', () => {
-    const set: WorkoutSet = { id: 's1', reps: -1, weight: 100 }
-    expect(() => validateSet(set)).toThrow('Reps must be at least 1')
+  const countRejections: { label: string; count: unknown }[] = [
+    { label: '0', count: 0 },
+    { label: 'the negative -1', count: -1 },
+    { label: '0.5, which floors to 0', count: 0.5 },
+    { label: 'NaN', count: NaN },
+    { label: 'Infinity', count: Infinity },
+    { label: '-Infinity', count: -Infinity },
+    { label: 'the non-numeric string "three"', count: 'three' },
+  ]
+
+  it.each(countRejections)('refuses a count of $label', ({ count }) => {
+    const set: WorkoutSet = { id: 's1', reps: 5, weight: 100, count: count as number }
+
+    expect(() => validateSet(set)).toThrow(new Error(countMessage))
+  })
+
+  it('reports the weight problem when every field is bad at once', () => {
+    const set: WorkoutSet = { id: 's1', reps: 0, weight: 0, count: 0 }
+
+    expect(() => validateSet(set)).toThrow(new Error(weightMessage))
+    expect(messageThrownBy(() => validateSet(set))).not.toBe(repsMessage)
+    expect(messageThrownBy(() => validateSet(set))).not.toBe(countMessage)
+  })
+
+  it('reports the reps problem before the count problem', () => {
+    const set: WorkoutSet = { id: 's1', reps: 0, weight: 100, count: 0 }
+
+    expect(() => validateSet(set)).toThrow(new Error(repsMessage))
+    expect(messageThrownBy(() => validateSet(set))).not.toBe(countMessage)
+  })
+
+  it('names the weight field and tells the lifter what to do', () => {
+    expect(weightMessage).toMatch(/weight/i)
+    expect(weightMessage).toMatch(/more than 0/i)
+    expect(weightMessage).toMatch(/remove the line/i)
+  })
+
+  it('names the reps field and tells the lifter what to do', () => {
+    expect(repsMessage).toMatch(/reps/i)
+    expect(repsMessage).toMatch(/more than 0/i)
+    expect(repsMessage).toMatch(/remove the line/i)
+  })
+
+  it('names the set count and tells the lifter what to do', () => {
+    expect(countMessage).toMatch(/count/i)
+    expect(countMessage).toMatch(/at least 1/i)
+    expect(countMessage).toMatch(/how many sets you did/i)
+    expect(countMessage).toMatch(/leave it blank for one/i)
+  })
+
+  it('never mistakes a reps failure for a weight failure', () => {
+    expect(repsMessage).not.toMatch(/weight/i)
+  })
+
+  it('never mistakes a count failure for a weight or reps failure', () => {
+    expect(countMessage).not.toMatch(/weight/i)
+    expect(countMessage).not.toMatch(/reps/i)
+  })
+
+  it('throws a message unique to each of the three fields', () => {
+    expect(weightMessage).not.toBe(repsMessage)
+    expect(weightMessage).not.toBe(countMessage)
+    expect(repsMessage).not.toBe(countMessage)
+  })
+
+  it('never borrows the write path empty-array message', () => {
+    expect(weightMessage).not.toBe(EMPTY_ARRAY_MESSAGE)
+    expect(repsMessage).not.toBe(EMPTY_ARRAY_MESSAGE)
+    expect(countMessage).not.toBe(EMPTY_ARRAY_MESSAGE)
+  })
+
+  it('throws an Error instance from every refusal', () => {
+    expect(() => validateSet({ id: 's1', reps: 5, weight: 0 })).toThrowError(Error)
+    expect(() => validateSet({ id: 's1', reps: 0, weight: 100 })).toThrowError(Error)
+    expect(() => validateSet({ id: 's1', reps: 5, weight: 100, count: 0 })).toThrowError(Error)
   })
 })
 
