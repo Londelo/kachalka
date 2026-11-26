@@ -6,7 +6,7 @@ import type { WorkoutRepository } from '@/features/workout/workout-repository'
 import type { WorkoutLog, WorkoutSet } from '@/features/workout/types'
 import { and } from 'drizzle-orm'
 import * as R from 'ramda'
-import { calculateVolume, collapseSets } from '@/features/workout/workout-entity'
+import { calculateVolume } from '@/features/workout/workout-entity'
 
 function mapRowToWorkoutLog(row: Record<string, unknown>): WorkoutLog {
   // Drizzle JSON mode auto-parses JSON columns in .select() queries,
@@ -256,10 +256,13 @@ export function createSqliteWorkoutRepository(db: ReturnType<typeof Database>): 
         } else {
           unwrappedSets = setsValue
         }
+        // Read door: the stored lines go back out exactly as they came in, as every other read
+        // here returns them. The fold is the write path's rule (log-workout.ts collapses before
+        // it stores); folding again on the way out would hand a reader one line for what the user
+        // logged as several, and stamp a synthesised count onto a legacy line that has none.
         const parsedSets = Array.isArray(unwrappedSets)
           ? (unwrappedSets as WorkoutSet[])
           : JSON.parse(unwrappedSets as string) as WorkoutSet[]
-        const collapsed = collapseSets(parsedSets)
 
         return {
           date: row.date as string,
@@ -268,8 +271,8 @@ export function createSqliteWorkoutRepository(db: ReturnType<typeof Database>): 
           exerciseName: typeof row.exerciseName === 'object' && row.exerciseName !== null && 'value' in row.exerciseName
             ? (row.exerciseName as { value: string }).value
             : (row.exerciseName as string),
-          sets: collapsed,
-          volume: calculateVolume(collapsed),
+          sets: parsedSets,
+          volume: calculateVolume(parsedSets),
         }
       }, rows)
 
