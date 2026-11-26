@@ -38,6 +38,28 @@ export function calculateVolume(sets: { reps: number; weight: number; count?: nu
   return sets.reduce((total, line) => total + getSetCount(line) * line.weight * line.reps, 0)
 }
 
+export function collapseSets(sets: WorkoutSet[]): WorkoutSet[] {
+  const folded = new Map<string, { first: WorkoutSet; count: number }>()
+
+  for (const line of sets) {
+    const key = `${line.weight},${line.reps}`
+    const seen = folded.get(key)
+
+    if (seen) {
+      seen.count += getSetCount(line)
+    } else {
+      folded.set(key, { first: line, count: getSetCount(line) })
+    }
+  }
+
+  return [...folded.values()].map(({ first, count }) => ({
+    id: first.id,
+    reps: first.reps,
+    weight: first.weight,
+    count,
+  }))
+}
+
 export function createEmptyLog(
   userId: number,
   exerciseId: number,
