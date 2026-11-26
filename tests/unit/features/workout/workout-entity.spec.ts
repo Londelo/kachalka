@@ -35,7 +35,7 @@ describe('validateSet', () => {
       set: { id: 's1', reps: 5, weight: 100, count: null } as unknown as WorkoutSet,
     },
     {
-      label: 'fractional reps, never promised to be whole',
+      label: 'fractional reps above the floor, which the pre-branch `reps < 1` rule always accepted',
       set: { id: 's1', reps: 2.5, weight: 60 },
     },
   ]
@@ -63,6 +63,7 @@ describe('validateSet', () => {
   const repsRejections: { label: string; reps: unknown }[] = [
     { label: '0', reps: 0 },
     { label: 'the negative -1', reps: -1 },
+    { label: 'the fractional 0.5, above zero but below one whole rep', reps: 0.5 },
     { label: 'NaN', reps: NaN },
     { label: 'Infinity', reps: Infinity },
     { label: '-Infinity', reps: -Infinity },
