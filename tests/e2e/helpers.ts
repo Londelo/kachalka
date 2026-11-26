@@ -1,11 +1,13 @@
 import type { Page } from '@playwright/test'
 
+import { getE2eBaseUrl } from './e2e-config'
+
 export async function loginAsBruno(page: Page): Promise<void> {
   await page.context().addCookies([
     {
       name: 'kachalka.userId',
       value: '1',
-      url: 'http://localhost:3111',
+      url: getE2eBaseUrl(),
     },
   ])
 }
