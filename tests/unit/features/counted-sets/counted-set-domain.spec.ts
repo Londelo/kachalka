@@ -2,13 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
 import fs from 'fs'
 import path from 'path'
+import * as R from 'ramda'
 import { createSqliteWorkoutRepository } from '@/features/workout/workout-repo-impl'
 import { createSqliteRoutineRepository } from '@/features/routine/routine-repo-impl'
 import { createSqliteExerciseRepository } from '@/features/exercise/exercise-repo-impl'
 import { createSqliteChartRepository } from '@/features/chart/chart-repo-impl'
 import { logWorkoutUseCase } from '@/features/workout/log-workout'
 import { getTodayExercisesUseCase } from '@/features/workout/get-today-exercises'
-import { calculateVolume } from '@/features/workout/workout-entity'
+import { calculateVolume, getSetCount } from '@/features/workout/workout-entity'
 import type { WorkoutSet } from '@/features/workout/types'
 
 const connection: { db: Database.Database | undefined } = { db: undefined }
@@ -86,6 +87,10 @@ function insertLegacyRow(lines: { id: string; reps: number; weight: number }[]):
   ).run(userId, exerciseId, TODAY, JSON.stringify(JSON.stringify(lines)))
 }
 
+function clearStoredLogs(): void {
+  db.prepare('DELETE FROM workout_logs').run()
+}
+
 function storedRowCount(): number {
   return (db.prepare('SELECT COUNT(*) AS c FROM workout_logs').get() as { c: number }).c
 }
@@ -121,7 +126,38 @@ async function volumeFromEveryReader(): Promise<Record<string, number>> {
   }
 }
 
-async function countFromEveryReader(): Promise<Record<string, number | undefined>> {
+/**
+ * Everything a door says about *how many sets* it handed back.
+ *
+ * The three fields are three separate accusations, and only two of them used to
+ * exist. Sampling `sets[0].count` — the old shape of this helper — asks one line
+ * what its own tally is, and a door that folded three sets of ten into a single
+ * line answers `3` and walks free while the War Logs page renders `SETS 1`.
+ *
+ * `totalSets` is the aggregate the feature promises the lifter: the counts of
+ * every line, summed the way `calculateVolume` sums them for volume. A door that
+ * throws lines away — or folds them and loses the tally — comes out short here.
+ * `lineCount` is how many lines actually arrived. A door that folds identical
+ * lines keeps `totalSets` exact and still reports the wrong `lineCount`, which is
+ * the only way a fold that faithfully carries the tally gets caught.
+ * `firstCount` is the per-line field, kept as its own assertion so a legacy line
+ * that must stay un-stamped stays proven un-stamped.
+ */
+type DoorReading = {
+  totalSets: number
+  lineCount: number
+  firstCount: number | undefined
+}
+
+function readDoor(sets: WorkoutSet[]): DoorReading {
+  return {
+    totalSets: R.sum(R.map(getSetCount, sets)),
+    lineCount: sets.length,
+    firstCount: sets[0]?.count,
+  }
+}
+
+async function countFromEveryReader(): Promise<Record<string, DoorReading>> {
   const byDateAndExercise = workoutRepo.findByDateAndExercise(userId, TODAY, exerciseId)
   const byUser = workoutRepo.findAllByUser(userId)
   const history = workoutRepo.findHistoryByDate(userId)
@@ -134,12 +170,12 @@ async function countFromEveryReader(): Promise<Record<string, number | undefined
   const workouts = (await getTodayWorkoutsAction(userId)).workouts
 
   return {
-    findByDateAndExercise: byDateAndExercise!.sets[0]!.count,
-    findAllByUser: byUser[0]!.sets[0]!.count,
-    findHistoryByDate: history[0]!.logs[0]!.sets[0]!.count,
-    getTodayExercisesUseCase: today!.lastLog![0]!.count,
-    getTodayWorkoutsAction: workouts![exerciseId]![0]!.count,
-    chartGetVolumeByDate: chartPoints[0]!.sets[0]!.count,
+    findByDateAndExercise: readDoor(byDateAndExercise!.sets),
+    findAllByUser: readDoor(byUser[0]!.sets),
+    findHistoryByDate: readDoor(history[0]!.logs[0]!.sets),
+    getTodayExercisesUseCase: readDoor(today!.lastLog!),
+    getTodayWorkoutsAction: readDoor(workouts![exerciseId]!),
+    chartGetVolumeByDate: readDoor(chartPoints[0]!.sets),
   }
 }
 
@@ -202,14 +238,18 @@ describe('journey 1 — one counted write, every reader agrees', () => {
     })
   })
 
-  it('reports a count of 3 out of every door the feature touched', async () => {
-    expect(await countFromEveryReader()).toEqual({
-      findByDateAndExercise: 3,
-      findAllByUser: 3,
-      findHistoryByDate: 3,
-      getTodayExercisesUseCase: 3,
-      getTodayWorkoutsAction: 3,
-      chartGetVolumeByDate: 3,
+  it('reports three sets out of every door the feature touched, as one line carrying the tally 3', async () => {
+    // The three fields are three separate claims about the same write: the door
+    // sums to three sets, it handed back exactly one line to do it, and that line
+    // owns the tally itself. A door free to drop two of three lines still answers
+    // `3` if only the surviving line is asked.
+    expect(await countFromEveryReader()).toStrictEqual({
+      findByDateAndExercise: { totalSets: 3, lineCount: 1, firstCount: 3 },
+      findAllByUser: { totalSets: 3, lineCount: 1, firstCount: 3 },
+      findHistoryByDate: { totalSets: 3, lineCount: 1, firstCount: 3 },
+      getTodayExercisesUseCase: { totalSets: 3, lineCount: 1, firstCount: 3 },
+      getTodayWorkoutsAction: { totalSets: 3, lineCount: 1, firstCount: 3 },
+      chartGetVolumeByDate: { totalSets: 3, lineCount: 1, firstCount: 3 },
     })
   })
 })
@@ -231,32 +271,102 @@ describe('journey 2 — legacy equivalence, the no-regression spine', () => {
     })
   })
 
-  it('leaves a legacy line’s count absent rather than stamped with 1 on every verbatim door', async () => {
-    const counts = await countFromEveryReader()
-
-    expect(counts.findByDateAndExercise).toBeUndefined()
-    expect(counts.findAllByUser).toBeUndefined()
-    expect(counts.getTodayExercisesUseCase).toBeUndefined()
-    expect(counts.getTodayWorkoutsAction).toBeUndefined()
-    expect(counts.chartGetVolumeByDate).toBeUndefined()
+  it('leaves a legacy line’s count absent rather than stamped with 1 on every door, and still reads it as one set', async () => {
+    // `findHistoryByDate` is in this list now because it can be: the door used to
+    // fold on the way out, which stamped a synthesised `count: 1` onto a line the
+    // lifter never gave a count, and forced this assertion to except the one door
+    // the War Logs page actually reads.
+    expect(await countFromEveryReader()).toStrictEqual({
+      findByDateAndExercise: { totalSets: 1, lineCount: 1, firstCount: undefined },
+      findAllByUser: { totalSets: 1, lineCount: 1, firstCount: undefined },
+      findHistoryByDate: { totalSets: 1, lineCount: 1, firstCount: undefined },
+      getTodayExercisesUseCase: { totalSets: 1, lineCount: 1, firstCount: undefined },
+      getTodayWorkoutsAction: { totalSets: 1, lineCount: 1, firstCount: undefined },
+      chartGetVolumeByDate: { totalSets: 1, lineCount: 1, firstCount: undefined },
+    })
   })
 
-  it('publishes the collapse tally 1 only where the line is folded, and still reports 675', () => {
+  it('publishes the legacy line verbatim through the history door, with the pre-change volume and set total', () => {
     const history = workoutRepo.findHistoryByDate(userId)
+    const lines = history[0]!.logs[0]!.sets
 
-    expect(history[0]!.logs[0]!.sets).toEqual([{ id: 's1', reps: 5, weight: 135, count: 1 }])
+    expect(lines).toEqual([{ id: 's1', reps: 5, weight: 135 }])
     expect(history[0]!.logs[0]!.volume).toBe(675)
+    expect(R.sum(R.map(getSetCount, lines))).toBe(1)
   })
 
-  it('leaves the external Playwright witness naming the three pre-change volumes', () => {
-    const witness = fs.readFileSync(
-      path.join(process.cwd(), 'tests', 'e2e', 'history-page.spec.ts'),
-      'utf-8',
+  it('hands three identical legacy lines back as three lines to every door, so the set total the page sums is 3', async () => {
+    // The shape the counted-set domain must survive, and the one the browser caught
+    // when it did not. The write path folds identical lines before it stores, so a
+    // row holding three of them can only be legacy data — exactly what the Playwright
+    // fixture at tests/e2e/history-page.spec.ts:169 writes, three uncounted
+    // `{ reps: 10, weight: 100 }` lines for one exercise. A read door that folded
+    // them reported `SETS 1` for what the lifter logged as three sets, and the old
+    // helper could not see it: it asked the surviving line for its tally, got `3`,
+    // and passed. `lineCount` is what a faithful fold cannot talk its way past.
+    clearStoredLogs()
+    insertLegacyRow([
+      { id: 's1', reps: 10, weight: 100 },
+      { id: 's2', reps: 10, weight: 100 },
+      { id: 's3', reps: 10, weight: 100 },
+    ])
+
+    expect(await countFromEveryReader()).toStrictEqual({
+      findByDateAndExercise: { totalSets: 3, lineCount: 3, firstCount: undefined },
+      findAllByUser: { totalSets: 3, lineCount: 3, firstCount: undefined },
+      findHistoryByDate: { totalSets: 3, lineCount: 3, firstCount: undefined },
+      getTodayExercisesUseCase: { totalSets: 3, lineCount: 3, firstCount: undefined },
+      getTodayWorkoutsAction: { totalSets: 3, lineCount: 3, firstCount: undefined },
+      chartGetVolumeByDate: { totalSets: 3, lineCount: 3, firstCount: undefined },
+    })
+  })
+
+  it('publishes the history door’s own numbers for the session the browser renders, so the page has 4,560 / 6 / 54 to show', () => {
+    // The claim the deleted Playwright-source witness only pretended to make. That
+    // test read tests/e2e/history-page.spec.ts as a string and checked three
+    // literals appeared in it — unfailable, and blind to what the app renders. The
+    // feature tier's real claim is the contract underneath the page: HistoryPageClient
+    // sums `log.volume`, `log.sets.length` and `set.reps` across the logs this door
+    // publishes, so pinning those three aggregates here is what proves the browser
+    // has the right numbers to render. The browser's own rendering is the e2e tier's
+    // claim, and tests/e2e/history-page.spec.ts:193-195 makes it green.
+    clearStoredLogs()
+
+    // `exerciseId` is already this user's 'Bench Press' (resetDb); `exercises.name`
+    // is unique, so the session's second exercise is the only one that needs minting.
+    const pressId = Number(
+      db
+        .prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)')
+        .run('Overhead Press', userId).lastInsertRowid,
     )
 
-    expect(witness).toContain("'4,560'")
-    expect(witness).toContain("'2,875'")
-    expect(witness).toContain("'3,225'")
+    db.prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)').run(
+      userId,
+      exerciseId,
+      TODAY,
+      JSON.stringify([
+        { id: 'b1', reps: 10, weight: 100 },
+        { id: 'b2', reps: 10, weight: 100 },
+        { id: 'b3', reps: 10, weight: 100 },
+      ]),
+    )
+    db.prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)').run(
+      userId,
+      pressId,
+      TODAY,
+      JSON.stringify([
+        { id: 'p1', reps: 8, weight: 65 },
+        { id: 'p2', reps: 8, weight: 65 },
+        { id: 'p3', reps: 8, weight: 65 },
+      ]),
+    )
+
+    const session = workoutRepo.findHistoryByDate(userId)[0]!
+
+    expect(session.logs).toHaveLength(2)
+    expect(R.sum(R.map((log) => log.volume, session.logs))).toBe(4560)
+    expect(R.sum(R.map((log) => log.sets.length, session.logs))).toBe(6)
+    expect(R.sum(R.map((log) => R.sum(R.map((line) => line.reps, log.sets)), session.logs))).toBe(54)
   })
 })
 
@@ -277,13 +387,13 @@ describe('journey 3 — the collapse journey', () => {
       chartGetVolumeByDate: 2000,
       chartGetPeakVolume: 2000,
     })
-    expect(await countFromEveryReader()).toEqual({
-      findByDateAndExercise: 4,
-      findAllByUser: 4,
-      findHistoryByDate: 4,
-      getTodayExercisesUseCase: 4,
-      getTodayWorkoutsAction: 4,
-      chartGetVolumeByDate: 4,
+    expect(await countFromEveryReader()).toStrictEqual({
+      findByDateAndExercise: { totalSets: 4, lineCount: 1, firstCount: 4 },
+      findAllByUser: { totalSets: 4, lineCount: 1, firstCount: 4 },
+      findHistoryByDate: { totalSets: 4, lineCount: 1, firstCount: 4 },
+      getTodayExercisesUseCase: { totalSets: 4, lineCount: 1, firstCount: 4 },
+      getTodayWorkoutsAction: { totalSets: 4, lineCount: 1, firstCount: 4 },
+      chartGetVolumeByDate: { totalSets: 4, lineCount: 1, firstCount: 4 },
     })
   })
 
@@ -310,6 +420,21 @@ describe('journey 3 — the collapse journey', () => {
     ).toHaveLength(2)
     expect(chartRepo.getVolumeByDate(userId, exerciseId, 'ALL')[0]!.sets).toHaveLength(2)
     expect(workouts![exerciseId]).toHaveLength(2)
+
+    // The lengths above say the lines arrived; this says their tallies did. Two
+    // lines of different work is the one fixture where the two claims come apart:
+    // a door that reads line one honestly (`count: 2`) and then quietly downgrades
+    // every line after it reads two lines, first count 2, and a set total of 2
+    // instead of 5. Sampling `sets[0].count` — the old shape of the helper — saw
+    // the honest `2` and passed. Only the sum across all lines can see the theft.
+    expect(await countFromEveryReader()).toStrictEqual({
+      findByDateAndExercise: { totalSets: 5, lineCount: 2, firstCount: 2 },
+      findAllByUser: { totalSets: 5, lineCount: 2, firstCount: 2 },
+      findHistoryByDate: { totalSets: 5, lineCount: 2, firstCount: 2 },
+      getTodayExercisesUseCase: { totalSets: 5, lineCount: 2, firstCount: 2 },
+      getTodayWorkoutsAction: { totalSets: 5, lineCount: 2, firstCount: 2 },
+      chartGetVolumeByDate: { totalSets: 5, lineCount: 2, firstCount: 2 },
+    })
   })
 })
 
@@ -414,13 +539,13 @@ describe('journey 5 — the fractional journey', () => {
       chartGetVolumeByDate: 1350,
       chartGetPeakVolume: 1350,
     })
-    expect(await countFromEveryReader()).toEqual({
-      findByDateAndExercise: 2,
-      findAllByUser: 2,
-      findHistoryByDate: 2,
-      getTodayExercisesUseCase: 2,
-      getTodayWorkoutsAction: 2,
-      chartGetVolumeByDate: 2,
+    expect(await countFromEveryReader()).toStrictEqual({
+      findByDateAndExercise: { totalSets: 2, lineCount: 1, firstCount: 2 },
+      findAllByUser: { totalSets: 2, lineCount: 1, firstCount: 2 },
+      findHistoryByDate: { totalSets: 2, lineCount: 1, firstCount: 2 },
+      getTodayExercisesUseCase: { totalSets: 2, lineCount: 1, firstCount: 2 },
+      getTodayWorkoutsAction: { totalSets: 2, lineCount: 1, firstCount: 2 },
+      chartGetVolumeByDate: { totalSets: 2, lineCount: 1, firstCount: 2 },
     })
   })
 
