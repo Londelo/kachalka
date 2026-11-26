@@ -8,6 +8,7 @@ READINESS_POLL_INTERVAL_SECONDS=1
 READINESS_PATH="/"
 READINESS_MARKER='id="user-selection-main"'
 SHUTDOWN_TIMEOUT_SECONDS=15
+SURVIVOR_GRACE_SECONDS=5
 SERVER_LOG_TAIL_LINES=40
 
 export NODE_ENV="${NODE_ENV:-development}"
@@ -16,6 +17,7 @@ export DATABASE_PATH="${DATABASE_PATH:-$CHECKOUT_ROOT/data/kachalka.db}"
 mkdir -p "$(dirname "$DATABASE_PATH")"
 
 SERVER_PID=""
+TEARDOWN_STATUS=0
 SERVER_LOG="$(mktemp "${TMPDIR:-/tmp}/kachalka-e2e-server.XXXXXX")"
 READINESS_BODY="$(mktemp "${TMPDIR:-/tmp}/kachalka-e2e-readiness.XXXXXX")"
 
@@ -24,29 +26,68 @@ die() {
   exit 1
 }
 
+live_group_members() {
+  ps -eo pid=,pgid=,stat=,args= 2>/dev/null | awk -v group="$1" '$2 == group && $3 !~ /Z/' || true
+}
+
 teardown() {
   if [ -z "$SERVER_PID" ]; then
     return 0
   fi
 
-  kill -TERM -- "-$SERVER_PID" 2>/dev/null || true
+  local server_pid="$SERVER_PID"
+  SERVER_PID=""
+
+  local term_status=0 kill_status=0 term_error="" kill_error=""
+  term_error="$(kill -TERM -- "-$server_pid" 2>&1)" || term_status=$?
 
   local deadline=$(( $(date +%s) + SHUTDOWN_TIMEOUT_SECONDS ))
-  while kill -0 -- "-$SERVER_PID" 2>/dev/null; do
+  while kill -0 -- "-$server_pid" 2>/dev/null; do
     if [ "$(date +%s)" -ge "$deadline" ]; then
       break
     fi
     sleep 1
   done
 
-  kill -KILL -- "-$SERVER_PID" 2>/dev/null || true
-  wait "$SERVER_PID" 2>/dev/null || true
-  SERVER_PID=""
+  kill_error="$(kill -KILL -- "-$server_pid" 2>&1)" || kill_status=$?
+
+  local survivors grace
+  grace=$(( $(date +%s) + SURVIVOR_GRACE_SECONDS ))
+  survivors="$(live_group_members "$server_pid")"
+  while [ -n "$survivors" ] && [ "$(date +%s)" -lt "$grace" ]; do
+    sleep 1
+    survivors="$(live_group_members "$server_pid")"
+  done
+
+  if [ -z "$survivors" ]; then
+    wait "$server_pid" 2>/dev/null || true
+    return 0
+  fi
+
+  {
+    echo "Teardown failed: the server group this run started is still alive after SIGTERM and SIGKILL."
+    echo "  pid:  $server_pid"
+    echo "  pgid: $server_pid"
+    echo "  kill -TERM status $term_status: ${term_error:-no diagnostic}"
+    echo "  kill -KILL status $kill_status: ${kill_error:-no diagnostic}"
+    echo "  surviving processes (pid pgid state command line):"
+    printf '%s\n' "$survivors" | sed 's/^/    /'
+  } >&2
+  TEARDOWN_STATUS=1
 }
 
-trap teardown EXIT
-trap 'teardown; exit 130' INT
-trap 'teardown; exit 143' TERM
+finish() {
+  local status="$1"
+  teardown
+  if [ "$TEARDOWN_STATUS" -ne 0 ]; then
+    status="$TEARDOWN_STATUS"
+  fi
+  exit "$status"
+}
+
+trap 'finish "$?"' EXIT
+trap 'finish 130' INT
+trap 'finish 143' TERM
 
 if [ -n "${PORT:-}" ]; then
   RESOLVED_PORT="$PORT"
