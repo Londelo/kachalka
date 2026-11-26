@@ -2,6 +2,17 @@ import type { WorkoutSet, WorkoutLog } from '@/features/workout/types'
 
 export { WorkoutLog }
 
+/**
+ * The one authored sentence behind the rule "a count must be at least 1".
+ *
+ * Every place that enforces or reports that rule reads it from here, so a
+ * lifter never sees two spellings of one instruction. The em dash matches the
+ * weight and reps messages below — the punctuation is part of the message the
+ * user acts on, not decoration.
+ */
+export const COUNT_TOO_SMALL =
+  'Set count must be at least 1 — enter how many sets you did, or leave it blank for one.'
+
 export function validateSet(set: WorkoutSet): void {
   if (!Number.isFinite(set.weight) || set.weight <= 0) {
     throw new Error(
@@ -17,9 +28,7 @@ export function validateSet(set: WorkoutSet): void {
 
   if (set.count !== undefined && set.count !== null) {
     if (!Number.isFinite(set.count) || Math.floor(set.count) < 1) {
-      throw new Error(
-        'Set count must be at least 1 — enter how many sets you did, or leave it blank for one.',
-      )
+      throw new Error(COUNT_TOO_SMALL)
     }
   }
 }

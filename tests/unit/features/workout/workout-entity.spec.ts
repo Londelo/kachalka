@@ -4,6 +4,7 @@ import {
   calculateVolume,
   getSetCount,
   collapseSets,
+  COUNT_TOO_SMALL,
   WorkoutLog,
 } from '@/features/workout/workout-entity'
 import type { WorkoutSet } from '@/features/workout/types'
@@ -287,8 +288,9 @@ function messageThrownBy(run: () => unknown): string {
   throw new Error('the shared rule was expected to throw and did not')
 }
 
-const REFUSAL_MESSAGE =
-  'Set count must be at least 1 - enter how many sets you did, or leave it blank for one.'
+// The shared rule's own sentence, imported rather than re-spelled here: a second
+// literal in this file is how the hyphen/em-dash drift became load-bearing.
+const REFUSAL_MESSAGE = COUNT_TOO_SMALL
 
 describe('getSetCount', () => {
   const acceptedCases: { label: string; line: { count?: number }; expected: number }[] = [
