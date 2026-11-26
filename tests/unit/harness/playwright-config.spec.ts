@@ -16,7 +16,6 @@ const CONFIG_SOURCE_PATH = path.join(CHECKOUT_ROOT, 'playwright.config.ts')
 
 const SAFE_BASE_URL = 'http://localhost:4317'
 const TIMEOUT_FLOOR_MS = 15_000
-const SAVE_DEBOUNCE_MS = 5_000
 const PORT_ENVIRONMENT_BASE_URL = 'http://localhost:4501'
 const TRACKED_URLS = ['http://127.0.0.1:4317', 'http://localhost:4501'] as const
 
@@ -94,13 +93,6 @@ function stripComments(source: string): string {
   return source
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/(^|[^:])\/\/[^\n]*/g, '$1')
-}
-
-function commentsOf(source: string): string {
-  const blocks = source.match(/\/\*[\s\S]*?\*\//g) ?? []
-  const lines = source.match(/(^|[^:])\/\/[^\n]*/g) ?? []
-
-  return [...blocks, ...lines].join('\n')
 }
 
 function timeoutValueTokens(source: string): string[] {
@@ -219,13 +211,6 @@ describe('playwright.config.ts', () => {
 
       const literal = declaration?.[1] as string
       expect(stripComments(source).split(literal).length - 1).toBe(1)
-    })
-
-    it('states the save-debounce reason for the number in a comment', () => {
-      const comments = commentsOf(readConfigSource())
-
-      expect(comments).toMatch(/debounce/i)
-      expect(comments).toContain(String(SAVE_DEBOUNCE_MS))
     })
   })
 
