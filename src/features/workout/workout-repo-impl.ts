@@ -9,8 +9,12 @@ import * as R from 'ramda'
 import { calculateVolume } from '@/features/workout/workout-entity'
 
 function mapRowToWorkoutLog(row: Record<string, unknown>): WorkoutLog {
-  // Drizzle JSON mode auto-parses JSON columns in .select() queries,
-  // so row.sets may already be an array (not a string).
+  // The sets column is text('sets', { mode: 'json' }) (src/db/schema.ts:42) and create()/update()
+  // JSON.stringify it again, so the stored bytes are double-encoded. What decides the arrival shape
+  // is whether the query projects its columns, not whether it is a .select(): an unprojected
+  // .select() hands back the raw text, a projected one — the .returning({ ... }) of create()/update()
+  // — hands back a Drizzle { value: ... } wrapper, and an already-parsed array has been seen too.
+  // Every branch below is load-bearing; deleting one reintroduces a crash on real rows.
   const setsValue = row.sets
   const parsedSets = Array.isArray(setsValue)
     ? (setsValue as WorkoutSet[])
