@@ -1,18 +1,15 @@
-import Database from 'better-sqlite3'
 import { test, expect, type Page } from '@playwright/test'
 
+import { ensureSchema, openE2eDatabase, wipeE2eData } from '../harness/e2e-database'
 import { getE2eBaseUrl } from './e2e-config'
 import { loginAsBruno } from './helpers'
 
 const BASE_URL = getE2eBaseUrl()
 
-const db = new Database('data/kachalka.db')
-db.pragma('foreign_keys = ON')
+const db = openE2eDatabase()
+ensureSchema(db)
 
-db.exec('DELETE FROM workout_logs')
-db.exec('DELETE FROM user_routines')
-db.exec('DELETE FROM exercises')
-db.exec('DELETE FROM users')
+wipeE2eData(db)
 db.exec('DELETE FROM sqlite_sequence')
 
 function createExercises(names: string[]): number[] {
@@ -54,6 +51,7 @@ function cleanupBruno(): void {
 }
 
 test.beforeEach(async ({ page }) => {
+  ensureSchema(db)
   db.prepare('INSERT OR REPLACE INTO users (id, name, is_active) VALUES (1, ?, ?)').run('Bruno', 1)
   db.exec("DELETE FROM sqlite_sequence WHERE name IN ('users', 'exercises')")
 })

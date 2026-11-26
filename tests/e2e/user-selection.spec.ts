@@ -1,18 +1,16 @@
-import Database from 'better-sqlite3'
 import { test, expect } from '@playwright/test'
 
+import { ensureSchema, openE2eDatabase, wipeE2eData } from '../harness/e2e-database'
 import { getE2eBaseUrl } from './e2e-config'
 
 const BASE_URL = getE2eBaseUrl()
 
-const db = new Database('data/kachalka.db')
-db.pragma('foreign_keys = ON')
+const db = openE2eDatabase()
+ensureSchema(db)
 
 test.beforeEach(() => {
-  db.exec('DELETE FROM workout_logs')
-  db.exec('DELETE FROM user_routines')
-  db.exec('DELETE FROM exercises')
-  db.exec('DELETE FROM users')
+  ensureSchema(db)
+  wipeE2eData(db)
   db.exec('DELETE FROM sqlite_sequence')
 })
 
