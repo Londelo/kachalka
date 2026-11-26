@@ -34,8 +34,8 @@ export function getSetCount(line: { count?: number }): number {
   return floored
 }
 
-export function calculateVolume(sets: { reps: number; weight: number }[]): number {
-  return sets.reduce((total, set) => total + set.reps * set.weight, 0)
+export function calculateVolume(sets: { reps: number; weight: number; count?: number }[]): number {
+  return sets.reduce((total, line) => total + getSetCount(line) * line.weight * line.reps, 0)
 }
 
 export function createEmptyLog(
