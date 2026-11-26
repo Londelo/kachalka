@@ -9,7 +9,7 @@ SHUTDOWN_TIMEOUT_SECONDS=15
 SERVER_LOG_TAIL_LINES=40
 
 export NODE_ENV="${NODE_ENV:-development}"
-export DATABASE_PATH="${DATABASE_PATH:-$(pwd)/data/kachalka.db}"
+export DATABASE_PATH="${DATABASE_PATH:-$CHECKOUT_ROOT/data/kachalka.db}"
 
 mkdir -p "$(dirname "$DATABASE_PATH")"
 
@@ -62,7 +62,7 @@ node "$ENDPOINT_MODULE" guard "$PORT" "$$" ||
 echo "E2E endpoint: $E2E_BASE_URL"
 
 echo "Wiping test data..."
-node scripts/cleanup-test-data.js
+node "$CHECKOUT_ROOT/scripts/cleanup-test-data.js"
 
 echo "Starting dev server on port $PORT (log: $SERVER_LOG)..."
 setsid --wait npx next dev -p "$PORT" >"$SERVER_LOG" 2>&1 </dev/null &
