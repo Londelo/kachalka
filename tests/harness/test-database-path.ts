@@ -1,6 +1,6 @@
 import path from 'path'
 import os from 'os'
-import { AppError } from '@/shared/errors/app-error'
+import { AppError } from '../../src/shared/errors/app-error'
 
 export const TEST_DATABASE_FILENAME = 'kachalka.test.db'
 export const DEVELOPER_DATABASE_FILENAME = 'kachalka.db'
