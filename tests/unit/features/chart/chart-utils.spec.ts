@@ -229,7 +229,12 @@ describe('setCount — counted sets', () => {
       'session',
     )
 
-    expect(result[0].tooltipData?.sets).toStrictEqual([{ id: 'a', reps: 5, weight: 100, count: 4 }])
+    // The bar carries both lines, unfolded: the count is a sum over the lines,
+    // not a rewrite of them. Two lines of identical work stay two lines.
+    expect(result[0].tooltipData?.sets).toStrictEqual([
+      { id: 'a', reps: 5, weight: 100, count: 2 },
+      { id: 'b', reps: 5, weight: 100, count: 2 },
+    ])
     expect(result[0].tooltipData?.setCount).toBe(4)
   })
 
@@ -239,7 +244,9 @@ describe('setCount — counted sets', () => {
     const result = groupByGranularity([squatSession('2025-01-01', [legacy], 500)], 'session')
 
     expect(result[0].tooltipData?.setCount).toBe(1)
-    expect(result[0].tooltipData?.sets).toStrictEqual([{ id: 'a', reps: 5, weight: 100, count: 1 }])
+    // The one set is counted, never written: neither the line it read nor the
+    // copy it hands back grows a `count` the stored row never had.
+    expect(result[0].tooltipData?.sets).toStrictEqual([{ id: 'a', reps: 5, weight: 100 }])
     expect(Object.keys(legacy)).toEqual(['id', 'reps', 'weight'])
   })
 
@@ -278,7 +285,12 @@ describe('setCount — counted sets', () => {
       'session',
     )
 
-    expect(result[0].tooltipData?.sets).toStrictEqual([{ id: 'a', reps: 5, weight: 100, count: 4 }])
+    // Each line is floored at the moment it is counted, not in the list it
+    // came from: the bar still shows the two halves it was handed.
+    expect(result[0].tooltipData?.sets).toStrictEqual([
+      { id: 'a', reps: 5, weight: 100, count: 2.5 },
+      { id: 'b', reps: 5, weight: 100, count: 2.5 },
+    ])
     expect(result[0].tooltipData?.setCount).toBe(4)
   })
 
@@ -462,4 +474,87 @@ describe('setCount — counted sets', () => {
       }
     }
   })
+})
+
+describe('groupByGranularity — one time group holding two exercises', () => {
+  // A `week` or `month` group is built by `getVolumeByDate` with no exercise
+  // filter (chart-repo-impl.ts:78), so the entries landing in one group are rows
+  // for *different* exercises. `collapseSets` keys on `weight,reps` alone and
+  // carries no exercise identity, so running that write-side fold over the lines
+  // flattened across those entries merged a Squat line and a Bench line of
+  // identical work into one line owned by whichever arrived first — while
+  // `setCount` came out identical either way. Every other fixture in this file
+  // built its sessions through `squatSession()`, which puts one exercise name on
+  // every entry, so nothing here had ever put two exercises with matching
+  // weight-and-reps into a single group.
+
+  const countedLine = (id: string): WorkoutSet => ({ id, reps: 5, weight: 100, count: 1 })
+
+  const sessionOf = (
+    date: string,
+    name: string,
+    ids: string[],
+    volume: number,
+  ): ChartDataPoint => {
+    const lines = ids.map((id) => countedLine(id))
+    return { date, volume, sets: lines, exercises: [{ name, sets: [...lines] }] }
+  }
+
+  const crossExerciseCases: {
+    label: string
+    granularity: TimeGranularity
+    squatDate: string
+    benchDate: string
+  }[] = [
+    { label: 'week', granularity: 'week', squatDate: '2025-01-06', benchDate: '2025-01-08' },
+    { label: 'month', granularity: 'month', squatDate: '2025-01-05', benchDate: '2025-01-15' },
+  ]
+
+  it.each(crossExerciseCases)(
+    'keeps the lines of both exercises in one $label group instead of folding identical work into the first',
+    ({ granularity, squatDate, benchDate }) => {
+      const result = groupByGranularity(
+        [
+          sessionOf(squatDate, 'Squat', ['squat-a', 'squat-b'], 1000),
+          sessionOf(benchDate, 'Bench', ['bench-a'], 500),
+        ],
+        granularity,
+      )
+
+      expect(result).toHaveLength(1)
+
+      // The defect: all three lines are 100kg × 5, so the fold collapsed them to
+      // a single `{ id: 'squat-a', count: 3 }` and the Bench work vanished from
+      // the list `chart-repo-impl.ts:103` publishes as the bar's `sets`. Each
+      // line keeps its own identity here — none of them owns another.
+      expect(result[0].tooltipData?.sets).toStrictEqual([
+        { id: 'squat-a', reps: 5, weight: 100, count: 1 },
+        { id: 'squat-b', reps: 5, weight: 100, count: 1 },
+        { id: 'bench-a', reps: 5, weight: 100, count: 1 },
+      ])
+
+      // The number the feature exists to produce is fold-invariant: these are
+      // the very values the folded version produced, so dropping the fold moved
+      // nothing the chart reads.
+      expect(result[0].tooltipData?.setCount).toBe(3)
+      expect(result[0].tooltipData?.totalVolume).toBe(1500)
+      expect(result[0].volume).toBe(1500)
+
+      // The per-exercise fold is the legitimate one and stays: there the lines
+      // genuinely all belong to one named exercise, so Squat's two identical
+      // lines still collapse into one line of count 2.
+      expect(result[0].exercises).toStrictEqual([
+        {
+          name: 'Squat',
+          sets: [{ id: 'squat-a', reps: 5, weight: 100, count: 2 }],
+          setCount: 2,
+        },
+        {
+          name: 'Bench',
+          sets: [{ id: 'bench-a', reps: 5, weight: 100, count: 1 }],
+          setCount: 1,
+        },
+      ])
+    },
+  )
 })
