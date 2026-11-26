@@ -27,16 +27,35 @@ function seedExerciseScheduledToday(name: string): number {
   return exerciseId
 }
 
-function loggedSetsToday(exerciseId: number): { reps: number; weight: number }[] | null {
+function readStoredSets(exerciseId: number): unknown {
   const row = db
     .prepare('SELECT sets FROM workout_logs WHERE user_id = 1 AND exercise_id = ? AND date = ?')
-    .get(exerciseId, todayUTCDate()) as { sets: string | { reps: number; weight: number }[] } | undefined
+    .get(exerciseId, todayUTCDate()) as { sets: unknown } | undefined
 
   if (row === undefined) return null
 
-  const parsed: { reps: number; weight: number }[] =
-    typeof row.sets === 'string' ? JSON.parse(row.sets) : row.sets
-  return parsed.map((set) => ({ reps: set.reps, weight: set.weight }))
+  let value = row.sets
+  for (let depth = 0; depth < 3 && typeof value === 'string'; depth += 1) {
+    value = JSON.parse(value)
+  }
+  return value
+}
+
+function loggedSetsToday(exerciseId: number): { reps: number; weight: number }[] | null {
+  const value = readStoredSets(exerciseId)
+  if (value === null) return null
+
+  if (!Array.isArray(value)) {
+    throw new Error(
+      `workout_logs.sets for exercise ${exerciseId} on ${todayUTCDate()} is not an array: ` +
+        `typeof ${typeof value} / value ${JSON.stringify(value)}`,
+    )
+  }
+
+  return (value as { reps: number; weight: number }[]).map((set) => ({
+    reps: set.reps,
+    weight: set.weight,
+  }))
 }
 
 test.beforeEach(() => {
