@@ -24,6 +24,8 @@ const NODE_MODULES_DIRECTORY = 'node_modules'
 const DATA_DIRECTORY = 'data'
 const UNIT_SPEC_PATTERN = 'tests/unit/**/*.spec.ts'
 const UNIT_TEST_PATTERN = 'tests/unit/**/*.test.ts'
+const UNIT_DIRECTORY = 'tests/unit'
+const UNIT_FILE_SUFFIXES = ['.spec.ts', '.test.ts']
 const E2E_PATTERN = 'tests/e2e/**'
 const E2E_DIRECTORY = 'tests/e2e'
 const HARNESS_DIRECTORY = path.join(CHECKOUT_ROOT, 'tests', 'unit', 'harness')
@@ -92,19 +94,33 @@ function nodeModulesOwnerOf(file: string): string | undefined {
   return index > 0 ? segments.slice(0, index).join(path.sep) : undefined
 }
 
-function filesMatching(patterns: string[]): string[] {
-  const matches = new Set<string>()
+function toFiles(matches: string[]): string[] {
+  const files = new Set<string>()
 
-  for (const pattern of patterns) {
-    for (const match of fs.globSync(pattern, { cwd: CHECKOUT_ROOT })) {
-      const absolute = path.resolve(CHECKOUT_ROOT, match)
-      if (isFile(absolute)) {
-        matches.add(absolute)
-      }
+  for (const match of matches) {
+    const absolute = path.resolve(CHECKOUT_ROOT, match)
+    if (isFile(absolute)) {
+      files.add(absolute)
     }
   }
 
-  return [...matches].sort()
+  return [...files].sort()
+}
+
+function filesMatching(patterns: string[]): string[] {
+  const matches: string[] = []
+
+  for (const pattern of patterns) {
+    matches.push(...fs.globSync(pattern, { cwd: CHECKOUT_ROOT }))
+  }
+
+  return toFiles(matches)
+}
+
+function unitTestFilesOnDisk(): string[] {
+  return toFiles(fs.globSync(`${UNIT_DIRECTORY}/**`, { cwd: CHECKOUT_ROOT })).filter((file) =>
+    UNIT_FILE_SUFFIXES.some((suffix) => file.endsWith(suffix)),
+  )
 }
 
 function liesInsidePackage(entry: string, scope: string, name: string): boolean {
@@ -271,10 +287,13 @@ describe('vitest.config.ts', () => {
 
     it('actually matches files on disk', () => {
       const collected = filesMatching(config.test?.include ?? [])
+      const onDisk = unitTestFilesOnDisk()
 
-      console.info(`[vitest-config] test.include matched ${collected.length} files`)
+      console.info(
+        `[vitest-config] test.include matched ${collected.length} of ${onDisk.length} files on disk`,
+      )
 
-      expect(collected.length).toBeGreaterThan(0)
+      expect(collected).toEqual(onDisk)
     })
 
     it('collects none of the end-to-end specs', () => {
