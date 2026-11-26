@@ -60,7 +60,114 @@ describe('calculateVolume', () => {
     ]
     expect(calculateVolume(sets)).toBe(500 + 440 + 360)
   })
+
+  const countedCases: {
+    label: string
+    sets: { reps: number; weight: number; count?: number }[]
+    expected: number
+  }[] = [
+    {
+      label: 'a line carrying count 3 is the work multiplied by three',
+      sets: [{ reps: 5, weight: 135, count: 3 }],
+      expected: 2025,
+    },
+    {
+      label: 'a line with no count is exactly what it always was',
+      sets: [{ reps: 5, weight: 135 }],
+      expected: 675,
+    },
+    {
+      label: 'an explicit count of 1 is identical to an absent count',
+      sets: [{ reps: 5, weight: 135, count: 1 }],
+      expected: 675,
+    },
+    {
+      label: 'one line counted once sits beside its twin counted three times',
+      sets: [
+        { reps: 5, weight: 100 },
+        { reps: 5, weight: 100, count: 3 },
+      ],
+      expected: 2000,
+    },
+    {
+      label: 'a fractional count floors before the multiply',
+      sets: [{ reps: 10, weight: 50, count: 2.7 }],
+      expected: 1000,
+    },
+    {
+      label: 'each line floors on its own instead of the total flooring',
+      sets: [
+        { reps: 10, weight: 50, count: 2.5 },
+        { reps: 10, weight: 50, count: 2.5 },
+      ],
+      expected: 2000,
+    },
+    {
+      label: 'the same line at count 1 is the unmultiplied base',
+      sets: [{ reps: 10, weight: 50, count: 1 }],
+      expected: 500,
+    },
+    {
+      label: 'large values stay exact with no float drift',
+      sets: [{ reps: 100, weight: 1000, count: 10 }],
+      expected: 1000000,
+    },
+    {
+      label: 'zero reps is passed through, being validateSet problem not this one',
+      sets: [{ reps: 0, weight: 100, count: 2 }],
+      expected: 0,
+    },
+    {
+      label: 'negative reps is passed through, being validateSet problem not this one',
+      sets: [{ reps: -1, weight: 100 }],
+      expected: -100,
+    },
+  ]
+
+  it.each(countedCases)('totals $label', ({ sets, expected }) => {
+    expect(calculateVolume(sets)).toBe(expected)
+  })
+
+  const refusedCounts: { label: string; count: unknown }[] = [
+    { label: '0', count: 0 },
+    { label: '-2', count: -2 },
+    { label: '0.5, which floors to 0', count: 0.5 },
+    { label: 'NaN', count: NaN },
+    { label: 'Infinity', count: Infinity },
+  ]
+
+  it.each(refusedCounts)('refuses a line whose count is $label', ({ count }) => {
+    const total = () => calculateVolume([{ reps: 5, weight: 100, count: count as number }])
+
+    expect(total).toThrow(new Error(REFUSAL_MESSAGE))
+  })
+
+  it('refuses the whole total when only a later line carries a bad count', () => {
+    const total = () =>
+      calculateVolume([
+        { reps: 5, weight: 100 },
+        { reps: 5, weight: 100, count: 0 },
+      ])
+
+    expect(total).toThrow(new Error(REFUSAL_MESSAGE))
+  })
+
+  it('refuses a bad count with the very message the shared rule throws', () => {
+    const ruleMessage = messageThrownBy(() => getSetCount({ count: 0 }))
+
+    expect(() => calculateVolume([{ reps: 5, weight: 100, count: 0 }])).toThrow(ruleMessage)
+  })
 })
+
+function messageThrownBy(run: () => unknown): string {
+  try {
+    run()
+  } catch (error) {
+    return (error as Error).message
+  }
+
+  throw new Error('the shared rule was expected to throw and did not')
+}
 
 const REFUSAL_MESSAGE =
   'Set count must be at least 1 - enter how many sets you did, or leave it blank for one.'
