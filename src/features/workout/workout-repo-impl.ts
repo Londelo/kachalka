@@ -10,10 +10,11 @@ import { calculateVolume } from '@/features/workout/workout-entity'
 
 function mapRowToWorkoutLog(row: Record<string, unknown>): WorkoutLog {
   // The sets column is text('sets', { mode: 'json' }) (src/db/schema.ts:42) and create()/update()
-  // JSON.stringify it again, so the stored bytes are double-encoded. What decides the arrival shape
-  // is whether the query projects its columns, not whether it is a .select(): an unprojected
-  // .select() hands back the raw text, a projected one — the .returning({ ... }) of create()/update()
-  // — hands back a Drizzle { value: ... } wrapper, and an already-parsed array has been seen too.
+  // JSON.stringify it again, so the stored bytes are double-encoded. Drizzle applies exactly one
+  // JSON.parse on read, so what is stored decides the arrival shape, not how the query is written:
+  // every door here — the bare .select() reads and the .returning({ ... }) of create()/update()
+  // alike — was traced handing back raw JSON text for a double-encoded row, and an already-parsed
+  // array for a row stored single-encoded before that write path.
   // Every branch below is load-bearing; deleting one reintroduces a crash on real rows.
   const setsValue = row.sets
   const parsedSets = Array.isArray(setsValue)
@@ -250,10 +251,13 @@ export function createSqliteWorkoutRepository(db: ReturnType<typeof Database>): 
 
         const setsValue = row.sets
         // The sets column is text('sets', { mode: 'json' }) (src/db/schema.ts:42) and create()
-        // and update() JSON.stringify it again, so the stored bytes are double-encoded. A
-        // projected select has been observed handing back all three shapes: a Drizzle
-        // { value: ... } wrapper, an already-parsed array, and raw JSON text. Every branch
-        // here is load-bearing; deleting one reintroduces a crash on real rows.
+        // and update() JSON.stringify it again, so the stored bytes are double-encoded. Drizzle
+        // applies exactly one JSON.parse on read, so what is stored decides the arrival shape,
+        // not how this query is written: those double-encoded rows come back as raw JSON text,
+        // and a row written before that write path — stored single-encoded — comes back as an
+        // already-parsed array. This door projects and still sees both. The { value: ... }
+        // wrapper branch is the one no query here produces; it serves direct callers that
+        // hand-build such a row. Every branch stays load-bearing.
         let unwrappedSets: unknown
         if (typeof setsValue === 'object' && setsValue !== null && 'value' in setsValue) {
           unwrappedSets = (setsValue as { value: unknown }).value

@@ -8,10 +8,15 @@ import { groupByGranularity } from '@/features/chart/chart-utils'
 import { calculateVolume } from '@/features/workout/workout-entity'
 import type { WorkoutSet } from '@/features/workout/types'
 
-// Both queries in this file project their columns. A projected JSON column can
-// arrive as a Drizzle { value: T } wrapper, as an already-parsed array, or as the
-// raw JSON text. The arrival shape is not guaranteed by Drizzle, so unwrapJson and
-// parseSets handle all three; these branches are defensive, not historical.
+// The arrival shape is decided by the bytes stored in the column, not by the query.
+// The column is text('sets', { mode: 'json' }) (src/db/schema.ts:42), so drizzle applies
+// exactly one JSON.parse on read: a row stored double-encoded — what create()/update()
+// write, since they JSON.stringify before drizzle stringifies again — comes back as raw
+// JSON text, and a row stored single-encoded, from before that write path, comes back as
+// an already-parsed array. Projection is not the variable: getVolumeByDate (projected +
+// innerJoin) and getPeakVolume (bare select) were both traced handing back both shapes.
+// The { value: T } wrapper branch is the one no query in this file produces; it serves
+// direct callers that hand-build such a row.
 function unwrapJson<T>(value: unknown): T {
   if (typeof value === 'object' && value !== null && 'value' in value) {
     return (value as { value: T }).value
