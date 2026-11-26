@@ -5,6 +5,8 @@ CHECKOUT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 ENDPOINT_MODULE="$CHECKOUT_ROOT/tests/harness/e2e-endpoint.mjs"
 READINESS_TIMEOUT_SECONDS=180
 READINESS_POLL_INTERVAL_SECONDS=1
+READINESS_PATH="/"
+READINESS_MARKER='id="user-selection-main"'
 SHUTDOWN_TIMEOUT_SECONDS=15
 SERVER_LOG_TAIL_LINES=40
 
@@ -15,6 +17,7 @@ mkdir -p "$(dirname "$DATABASE_PATH")"
 
 SERVER_PID=""
 SERVER_LOG="$(mktemp "${TMPDIR:-/tmp}/kachalka-e2e-server.XXXXXX")"
+READINESS_BODY="$(mktemp "${TMPDIR:-/tmp}/kachalka-e2e-readiness.XXXXXX")"
 
 die() {
   printf '%s\n' "$1" >&2
@@ -76,8 +79,8 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
     break
   fi
 
-  status="$(curl -s -o /dev/null -w '%{http_code}' "$E2E_BASE_URL" 2>/dev/null || true)"
-  if [ "$status" = "200" ]; then
+  status="$(curl -s -o "$READINESS_BODY" -w '%{http_code}' "$E2E_BASE_URL$READINESS_PATH" 2>/dev/null || true)"
+  if [ "$status" = "200" ] && grep -qF "$READINESS_MARKER" "$READINESS_BODY" 2>/dev/null; then
     ready="yes"
     break
   fi
@@ -87,8 +90,9 @@ done
 
 if [ "$ready" != "yes" ]; then
   {
-    echo "The dev server this run started (pid ${SERVER_PID:-none}) never answered $E2E_BASE_URL with HTTP 200"
-    echo "within ${READINESS_TIMEOUT_SECONDS}s. Last HTTP status: ${status:-none}."
+    echo "The dev server this run started (pid ${SERVER_PID:-none}) never answered GET $E2E_BASE_URL$READINESS_PATH"
+    echo "with HTTP 200 carrying this app's own ${READINESS_MARKER} within ${READINESS_TIMEOUT_SECONDS}s."
+    echo "Last HTTP status: ${status:-none}. The last answer is kept in $READINESS_BODY."
     echo "--- tail of the server log ($SERVER_LOG) ---"
     tail -n "$SERVER_LOG_TAIL_LINES" "$SERVER_LOG" 2>/dev/null || echo "(no server log was written)"
     echo "--- end of server log ---"
