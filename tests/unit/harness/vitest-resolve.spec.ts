@@ -10,6 +10,9 @@ const PACKAGE_NAME = 'jest-dom'
 const NODE_MODULES_DIRECTORY = 'node_modules'
 const RESOLUTION_ANCHOR = 'harness-anchor.js'
 const PROBE_NAME = '__vitest-resolve-probe__'
+const CACHED_CHECKOUT_NAME = 'vite-cached-checkout'
+const VITE_CACHE_DIRECTORY = '.vite'
+const VITEST_CACHE_DIRECTORY = 'vitest'
 
 const CHECKOUT_ROOT = process.cwd()
 
@@ -352,6 +355,49 @@ describe('the nested worker checkout — the shape that broke collection', () =>
     for (const entry of entries) {
       expect(isStrictAncestor(entry, REPO)).toBe(false)
     }
+  })
+
+  describe('once Vite has written its own cache directory into the nested checkout', () => {
+    let cachedCheckout = ''
+
+    beforeAll(() => {
+      cachedCheckout = path.join(PROBE_DIR, CACHED_CHECKOUT_NAME)
+      fs.mkdirSync(
+        path.join(cachedCheckout, NODE_MODULES_DIRECTORY, VITE_CACHE_DIRECTORY, VITEST_CACHE_DIRECTORY),
+        { recursive: true },
+      )
+    })
+
+    afterAll(() => {
+      fs.rmSync(cachedCheckout, { recursive: true, force: true })
+    })
+
+    it('holds a node_modules directory that owns no packages, the way a worktree that ran npm test once does', () => {
+      const nodeModules = path.join(cachedCheckout, NODE_MODULES_DIRECTORY)
+
+      expect(isDirectory(nodeModules)).toBe(true)
+      expect(listingOf(nodeModules)).toEqual([VITE_CACHE_DIRECTORY])
+      expect(listingOf(path.join(nodeModules, VITE_CACHE_DIRECTORY))).toEqual([VITEST_CACHE_DIRECTORY])
+      expect(isDirectory(path.join(nodeModules, PACKAGE_SCOPE))).toBe(false)
+    })
+
+    it('still allows Vite to serve the parent checkout it inherits dependencies from', () => {
+      const entries = resolveServerFsAllow(cachedCheckout)
+
+      expect(entries).toContain(cachedCheckout)
+      expect(
+        entries.some((entry) => entry === REPO || entry === path.join(REPO, NODE_MODULES_DIRECTORY)),
+      ).toBe(true)
+    })
+
+    it('still resolves its setup entry inside the parent checkout', () => {
+      const entries = resolveSetupFiles(cachedCheckout)
+
+      expect(entries).toHaveLength(1)
+      for (const entry of entries) {
+        expect(entry.startsWith(path.join(REPO, NODE_MODULES_DIRECTORY) + path.sep)).toBe(true)
+      }
+    })
   })
 })
 
