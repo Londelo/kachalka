@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { validateSet, calculateVolume, WorkoutLog } from '@/features/workout/workout-entity'
+import {
+  validateSet,
+  calculateVolume,
+  getSetCount,
+  WorkoutLog,
+} from '@/features/workout/workout-entity'
 import type { WorkoutSet } from '@/features/workout/types'
 
 describe('validateSet', () => {
@@ -54,6 +59,100 @@ describe('calculateVolume', () => {
       { reps: 3, weight: 120 },
     ]
     expect(calculateVolume(sets)).toBe(500 + 440 + 360)
+  })
+})
+
+const REFUSAL_MESSAGE =
+  'Set count must be at least 1 - enter how many sets you did, or leave it blank for one.'
+
+describe('getSetCount', () => {
+  const acceptedCases: { label: string; line: { count?: number }; expected: number }[] = [
+    { label: 'the count is absent', line: {}, expected: 1 },
+    { label: 'the count is undefined', line: { count: undefined }, expected: 1 },
+    {
+      label: 'the count is null',
+      line: { count: null } as unknown as { count?: number },
+      expected: 1,
+    },
+    { label: 'the count is the floor boundary 1', line: { count: 1 }, expected: 1 },
+    { label: 'the count is 3', line: { count: 3 }, expected: 3 },
+    { label: 'the count is a large integer 12', line: { count: 12 }, expected: 12 },
+    { label: 'the count is 2.7', line: { count: 2.7 }, expected: 2 },
+    { label: 'the count is exactly half, 2.5', line: { count: 2.5 }, expected: 2 },
+    { label: 'the count is 1.5, just above the floor', line: { count: 1.5 }, expected: 1 },
+  ]
+
+  it.each(acceptedCases)('reads $expected when $label', ({ line, expected }) => {
+    expect(getSetCount(line)).toBe(expected)
+  })
+
+  const refusedCases: { label: string; count: unknown }[] = [
+    { label: '0.5, which floors to 0', count: 0.5 },
+    { label: '0', count: 0 },
+    { label: '-1', count: -1 },
+    { label: '-0.5, a legal HTML float that floors to 0', count: -0.5 },
+    { label: 'NaN', count: NaN },
+    { label: 'Infinity', count: Infinity },
+    { label: '-Infinity', count: -Infinity },
+    { label: 'the non-numeric string "heavy"', count: 'heavy' },
+    { label: 'the numeric string "3", which Math.floor would accept', count: '3' },
+    { label: 'the boolean true, which Math.floor would read as 1', count: true },
+  ]
+
+  it.each(refusedCases)('refuses the count $label', ({ count }) => {
+    const read = () => getSetCount({ count: count as number })
+
+    expect(read).toThrow(REFUSAL_MESSAGE)
+  })
+
+  it.each(refusedCases)('tells the lifter what to do when the count is $label', ({ count }) => {
+    const read = () => getSetCount({ count: count as number })
+
+    expect(read).toThrow(/count/i)
+    expect(read).toThrow(/enter how many sets you did/i)
+    expect(read).toThrow(/leave it blank for one/i)
+    expect(read).not.toThrow('Must log at least one set')
+  })
+
+  it('throws an Error instance, not a bare string', () => {
+    expect(() => getSetCount({ count: 0 })).toThrowError(Error)
+  })
+
+  it('never stamps the default onto a line that carried no count', () => {
+    const line: { count?: number } = {}
+
+    expect(getSetCount(line)).toBe(1)
+    expect(Object.keys(line)).not.toContain('count')
+    expect(line).toEqual({})
+  })
+
+  it('never rewrites a fractional count onto the line it read', () => {
+    const line = { count: 2.7 }
+
+    expect(getSetCount(line)).toBe(2)
+    expect(line).toEqual({ count: 2.7 })
+  })
+
+  it('reads a frozen line without a frozen-object error', () => {
+    const line = Object.freeze({ count: 3 })
+
+    expect(() => getSetCount(line)).not.toThrow()
+    expect(getSetCount(line)).toBe(3)
+  })
+
+  it('reads a frozen line with no count without a frozen-object error', () => {
+    const line = Object.freeze({}) as { count?: number }
+
+    expect(() => getSetCount(line)).not.toThrow()
+    expect(getSetCount(line)).toBe(1)
+  })
+
+  it('leaves the stored line untouched when the same line is read twice', () => {
+    const line: WorkoutSet = { id: 's1', reps: 5, weight: 100, count: 4 }
+
+    expect(getSetCount(line)).toBe(4)
+    expect(getSetCount(line)).toBe(4)
+    expect(line).toEqual({ id: 's1', reps: 5, weight: 100, count: 4 })
   })
 })
 
