@@ -9,14 +9,6 @@ const PACKAGE_MANIFEST = 'package.json'
 const RESOLUTION_ANCHOR = 'harness-anchor.js'
 const PREFERRED_EXPORT_CONDITIONS = ['import', 'node', 'default']
 
-function isDirectory(candidate: string): boolean {
-  try {
-    return statSync(candidate).isDirectory()
-  } catch {
-    return false
-  }
-}
-
 function isFile(candidate: string): boolean {
   try {
     return statSync(candidate).isFile()
@@ -25,14 +17,19 @@ function isFile(candidate: string): boolean {
   }
 }
 
-function nearestDirectoryWithNodeModules(startingDirectory: string): string | undefined {
-  let current = path.resolve(startingDirectory)
+function directoryHoldingPackages(entry: string): string | undefined {
+  let current = path.dirname(path.resolve(entry))
 
   while (current !== path.parse(current).root) {
-    if (isDirectory(path.join(current, NODE_MODULES_DIRECTORY))) {
-      return current
+    if (path.basename(current) === NODE_MODULES_DIRECTORY) {
+      return path.dirname(current)
     }
-    current = path.dirname(current)
+
+    const parent = path.dirname(current)
+    if (parent === current) {
+      return undefined
+    }
+    current = parent
   }
 
   return undefined
@@ -160,9 +157,18 @@ export function resolveSetupFiles(root: string): string[] {
   return [resolveEntryFromRoot(path.resolve(root), JEST_DOM_VITEST_SPECIFIER)]
 }
 
+function resolvedSetupEntry(root: string): string | undefined {
+  try {
+    return resolveEntryFromRoot(root, JEST_DOM_VITEST_SPECIFIER)
+  } catch {
+    return undefined
+  }
+}
+
 export function resolveServerFsAllow(root: string): string[] {
   const checkoutRoot = path.resolve(root)
-  const inheritedRoot = nearestDirectoryWithNodeModules(checkoutRoot)
+  const setupEntry = resolvedSetupEntry(checkoutRoot)
+  const packagesRoot = setupEntry === undefined ? undefined : directoryHoldingPackages(setupEntry)
 
-  return [...new Set(inheritedRoot ? [checkoutRoot, inheritedRoot] : [checkoutRoot])]
+  return [...new Set(packagesRoot === undefined ? [checkoutRoot] : [checkoutRoot, packagesRoot])]
 }
