@@ -52,8 +52,8 @@ describe('getVolumeByDate — granularity mapping', () => {
         date: '2025-01-01',
         volume: 300,
         exercises: [
-          { name: 'Bench Press', sets: [{ id: 's1', reps: 10, weight: 100 }] },
-          { name: 'Squat', sets: [{ id: 's2', reps: 8, weight: 50 }] },
+          { name: 'Bench Press', sets: [{ id: 's1', reps: 10, weight: 100 }], setCount: 1 },
+          { name: 'Squat', sets: [{ id: 's2', reps: 8, weight: 50 }], setCount: 1 },
         ],
       },
     ]
@@ -69,8 +69,8 @@ describe('getVolumeByDate — granularity mapping', () => {
 
     expect(result).toHaveLength(1)
     expect(result[0].exercises).toEqual([
-      { name: 'Bench Press', sets: [{ id: 's1', reps: 10, weight: 100 }] },
-      { name: 'Squat', sets: [{ id: 's2', reps: 8, weight: 50 }] },
+      { name: 'Bench Press', sets: [{ id: 's1', reps: 10, weight: 100 }], setCount: 1 },
+      { name: 'Squat', sets: [{ id: 's2', reps: 8, weight: 50 }], setCount: 1 },
     ])
   })
 })

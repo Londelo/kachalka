@@ -1,4 +1,5 @@
 import type { ChartBarData, ChartDataPoint, TimeGranularity } from '@/features/chart/chart-entity'
+import { collapseSets, getSetCount } from '@/features/workout/workout-entity'
 import * as R from 'ramda'
 
 function toISOWeekKey(dateStr: string): string {
@@ -31,7 +32,8 @@ export function groupByGranularity(
   const result: ChartBarData[] = R.map(
     ([, entries]) => {
       const totalVolume = R.sum(R.map((e) => e.volume, entries))
-      const allSets = R.flatten(R.map((e) => e.sets, entries))
+      const allSets = collapseSets(R.flatten(R.map((e) => e.sets, entries)))
+      const setCount = R.sum(R.map((s) => getSetCount(s), allSets))
       const exerciseMap = R.reduce(
         (acc: Record<string, { name: string; sets: typeof entries[0]['sets'] }>, entry) => {
           return R.reduce(
@@ -51,11 +53,14 @@ export function groupByGranularity(
         {},
         entries,
       )
-      const exercises = R.toPairs(exerciseMap).map(([, v]) => v)
+      const exercises = R.toPairs(exerciseMap).map(([, v]) => {
+        const sets = collapseSets(v.sets)
+        return { name: v.name, sets, setCount: R.sum(R.map((s) => getSetCount(s), sets)) }
+      })
       return {
         date: entries[0].date,
         volume: totalVolume,
-        tooltipData: { sets: allSets, totalVolume },
+        tooltipData: { sets: allSets, totalVolume, setCount },
         exercises,
       }
     },
