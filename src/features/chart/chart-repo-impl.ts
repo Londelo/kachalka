@@ -5,11 +5,13 @@ import * as schema from '@/db/schema'
 import type { ChartRepository } from '@/features/chart/chart-repository'
 import type { ChartDataPoint, IntensitySplit, RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
 import { groupByGranularity } from '@/features/chart/chart-utils'
+import { calculateVolume } from '@/features/workout/workout-entity'
 import type { WorkoutSet } from '@/features/workout/types'
 
-// Unwraps Drizzle { value: ... } wrapper objects from JSON columns.
-// In production, Drizzle .select() queries return JSON columns as { value: T }
-// rather than plain values. This mirrors the pattern in workout-repo-impl.ts.
+// Both queries in this file project their columns. A projected JSON column can
+// arrive as a Drizzle { value: T } wrapper, as an already-parsed array, or as the
+// raw JSON text. The arrival shape is not guaranteed by Drizzle, so unwrapJson and
+// parseSets handle all three; these branches are defensive, not historical.
 function unwrapJson<T>(value: unknown): T {
   if (typeof value === 'object' && value !== null && 'value' in value) {
     return (value as { value: T }).value
@@ -31,7 +33,7 @@ export function mapRowToDataPoint(row: Record<string, unknown>): ChartDataPoint 
   const date = unwrapJson<string>(row.date)
   return {
     date,
-    volume: sets.reduce((t, s) => t + s.reps * s.weight, 0),
+    volume: calculateVolume(sets),
     sets,
     exercises: [{ name: exerciseName, sets }],
   }
@@ -120,7 +122,7 @@ export function createSqliteChartRepository(db: ReturnType<typeof Database>): Ch
 
     const volumes = rows.map((row: Record<string, unknown>) => {
       const sets = parseSets(row.sets)
-      return sets.reduce((t, s) => t + s.reps * s.weight, 0)
+      return calculateVolume(sets)
     })
 
     return volumes.length > 0 ? Math.max(...volumes) : 0
