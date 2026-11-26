@@ -61,7 +61,9 @@ describe('updateWorkoutUseCase', () => {
 
     const useCase = updateWorkoutUseCase(repo)
 
-    expect(() => useCase.execute(1, 1, [{ id: 's1', reps: 5, weight: -10 }])).toThrow('Weight must be non-negative')
+    // Assert the field name and the rule, not the whole sentence: the advice clause
+    // after the em dash is copy, and re-wording it must not break this test.
+    expect(() => useCase.execute(1, 1, [{ id: 's1', reps: 5, weight: -10 }])).toThrow(/Weight must be more than 0/)
     expect(repo.update).not.toHaveBeenCalled()
   })
 
