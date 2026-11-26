@@ -15,13 +15,36 @@ import {
   getExerciseChartData,
   getAllExerciseChartData,
 } from '@/features/chart/chart-server-actions'
-import type { RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
+import type { ChartDataPoint, RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
+import { calculateVolume, getSetCount } from '@/features/workout/workout-entity'
 
+// This mirrors the bar the chart chain actually hands back — `ChartBarData`, not
+// the `ChartDataPoint` the server action is annotated with. `getVolumeByDate`
+// returns `bar.exercises` verbatim (chart-repo-impl.ts:104), so each line here is
+// a `collapseSets` output that owns its own `count`, and each exercise carries the
+// server's own `setCount`. Declaring either field away is what let this file invent
+// its own arithmetic: the component could not reach a count it had not declared.
 type DataPoint = {
   date: string
   volume: number
   sets: { id: string; reps: number; weight: number }[]
-  exercises: { name: string; sets: { id: string; reps: number; weight: number }[] }[]
+  exercises: {
+    name: string
+    sets: { id: string; reps: number; weight: number; count?: number }[]
+    setCount: number
+  }[]
+}
+
+// Both chart actions are annotated `Promise<ChartDataPoint[]>`, and `ChartDataPoint`
+// denies that a set tally exists. The bytes disagree: this page always asks for a
+// granularity, so both actions take the grouped path, where `getVolumeByDate` hands
+// back `bar.exercises` verbatim (chart-repo-impl.ts:104) — `setCount` and each line's
+// `count` included. The annotation is the thing that is wrong, not the wire, so the
+// bridge is asserted here, once, rather than letting the modal fall back to arithmetic
+// of its own. It retires the moment chart-entity.ts declares `setCount` on the door
+// these actions use.
+function toBars(chartData: ChartDataPoint[] | null): DataPoint[] {
+  return (chartData ?? []) as DataPoint[]
 }
 
 function formatDate(dateStr: string): string {
@@ -44,9 +67,22 @@ function calcExerciseMetrics(exercises: DataPoint['exercises']): {
   maxWeight: number
 }[] {
   return exercises.map((ex) => {
-    const totalSets = ex.sets.length
-    const totalReps = ex.sets.reduce((sum, s) => sum + s.reps, 0)
-    const totalVolume = ex.sets.reduce((sum, s) => sum + s.reps * s.weight, 0)
+    // The set tally is the server's own — `getSetCount` over this exercise's lines
+    // at chart-utils.ts:68 — so the row and the bar can never disagree about how
+    // many sets a session held.
+    const totalSets = ex.setCount
+    // A line's reps are the reps of one set, so a line standing for three sets is
+    // three lots of them. `getSetCount` is the shared read rule that says so.
+    const totalReps = ex.sets.reduce((sum, s) => sum + getSetCount(s) * s.reps, 0)
+    // The one authored volume rule — the same call the bar's height is built from
+    // at chart-repo-impl.ts:41. This file used to keep a private product of reps and
+    // weight that had no idea `count` existed, so one session of 3 × 135kg × 5
+    // rendered 2,025 on the bar and 675 in the modal that bar opens.
+    //
+    // `selectedBar.volume` is not a substitute for this: a week or month bar groups
+    // every exercise under one bar, and that figure is the whole group's total, so
+    // one row of an ALL EXERCISES month would claim the volume of the entire month.
+    const totalVolume = calculateVolume(ex.sets)
     const maxWeight = ex.sets.length > 0 ? Math.max(...ex.sets.map((s) => s.weight)) : 0
     return { name: ex.name, totalSets, totalReps, totalVolume, maxWeight }
   })
@@ -86,14 +122,14 @@ export default function ProgressPage() {
         if (!selectedExerciseId) {
           const chartData = await getAllExerciseChartData(userId, range, granularity)
           if (!cancelled) {
-            setDataPoints(chartData ?? [])
+            setDataPoints(toBars(chartData))
             setLoading(false)
             end('progress')
           }
         } else {
           const chartData = await getExerciseChartData(userId, selectedExerciseId, range, granularity)
           if (!cancelled) {
-            setDataPoints(chartData ?? [])
+            setDataPoints(toBars(chartData))
             setLoading(false)
             end('progress')
           }
