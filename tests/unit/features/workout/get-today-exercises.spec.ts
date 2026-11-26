@@ -108,10 +108,12 @@ describe('getTodayExercisesUseCase', () => {
     const useCase = getTodayExercisesUseCase(routineRepo, workoutRepo, exerciseRepo)
     const result = useCase.execute(1, 0)
 
-    expect(result[0].lastLog).toEqual([
-      { weight: 225, reps: 10 },
-      { weight: 235, reps: 8 },
-      { weight: 225, reps: 10 },
+    // toStrictEqual, not toEqual: a legacy line carries no count key, so a stamped
+    // `count: 1` (or a dropped `id`) must fail here rather than be forgiven.
+    expect(result[0].lastLog).toStrictEqual([
+      { id: 's1', weight: 225, reps: 10, count: undefined },
+      { id: 's2', weight: 235, reps: 8, count: undefined },
+      { id: 's3', weight: 225, reps: 10, count: undefined },
     ])
   })
 
