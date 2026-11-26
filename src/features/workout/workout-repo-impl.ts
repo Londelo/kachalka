@@ -6,7 +6,7 @@ import type { WorkoutRepository } from '@/features/workout/workout-repository'
 import type { WorkoutLog, WorkoutSet } from '@/features/workout/types'
 import { and } from 'drizzle-orm'
 import * as R from 'ramda'
-import { calculateVolume } from '@/features/workout/workout-entity'
+import { calculateVolume, collapseSets } from '@/features/workout/workout-entity'
 
 function mapRowToWorkoutLog(row: Record<string, unknown>): WorkoutLog {
   // Drizzle JSON mode auto-parses JSON columns in .select() queries,
@@ -245,9 +245,11 @@ export function createSqliteWorkoutRepository(db: ReturnType<typeof Database>): 
           : Number(exerciseId)
 
         const setsValue = row.sets
-        // Drizzle JSON mode auto-parses JSON columns in .select() queries,
-        // so setsValue may already be an array (not a string).
-        // It may also be a Drizzle {value: ...} wrapper.
+        // The sets column is text('sets', { mode: 'json' }) (src/db/schema.ts:42) and create()
+        // and update() JSON.stringify it again, so the stored bytes are double-encoded. A
+        // projected select has been observed handing back all three shapes: a Drizzle
+        // { value: ... } wrapper, an already-parsed array, and raw JSON text. Every branch
+        // here is load-bearing; deleting one reintroduces a crash on real rows.
         let unwrappedSets: unknown
         if (typeof setsValue === 'object' && setsValue !== null && 'value' in setsValue) {
           unwrappedSets = (setsValue as { value: unknown }).value
@@ -257,6 +259,7 @@ export function createSqliteWorkoutRepository(db: ReturnType<typeof Database>): 
         const parsedSets = Array.isArray(unwrappedSets)
           ? (unwrappedSets as WorkoutSet[])
           : JSON.parse(unwrappedSets as string) as WorkoutSet[]
+        const collapsed = collapseSets(parsedSets)
 
         return {
           date: row.date as string,
@@ -265,8 +268,8 @@ export function createSqliteWorkoutRepository(db: ReturnType<typeof Database>): 
           exerciseName: typeof row.exerciseName === 'object' && row.exerciseName !== null && 'value' in row.exerciseName
             ? (row.exerciseName as { value: string }).value
             : (row.exerciseName as string),
-          sets: parsedSets,
-          volume: calculateVolume(parsedSets),
+          sets: collapsed,
+          volume: calculateVolume(collapsed),
         }
       }, rows)
 
