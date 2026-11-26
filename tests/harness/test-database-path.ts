@@ -52,7 +52,7 @@ export function resolveTestDatabasePath({
   }
 
   if (
-    isWithinDirectory(candidate, root) ||
+    isWithinDirectory(candidate, dataDirectory) ||
     isWithinDirectory(candidate, tempDirectory)
   ) {
     return candidate
@@ -60,6 +60,6 @@ export function resolveTestDatabasePath({
 
   throw new AppError(
     `Refusing to open "${candidate}": that database is not owned by this checkout. A unit ` +
-      `run may only open a database inside ${allowedRootsDescription(root, tempDirectory)}.`,
+      `run may only open a database inside ${allowedRootsDescription(dataDirectory, tempDirectory)}.`,
   )
 }
