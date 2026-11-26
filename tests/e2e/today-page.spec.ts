@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-import { ensureSchema, openE2eDatabase } from '../harness/e2e-database'
+import { ensureSchema, openE2eDatabase, wipeE2eData } from '../harness/e2e-database'
 import { getE2eBaseUrl } from './e2e-config'
 import { loginAsBruno } from './helpers'
 
@@ -60,13 +60,9 @@ function loggedSetsToday(exerciseId: number): { reps: number; weight: number }[]
 
 test.beforeEach(() => {
   ensureSchema(db, process.cwd())
+  wipeE2eData(db)
+  db.exec('DELETE FROM sqlite_sequence')
   db.prepare('INSERT OR REPLACE INTO users (id, name, is_active) VALUES (1, ?, ?)').run('Bruno', 1)
-  db.exec('DELETE FROM workout_logs WHERE user_id = 1')
-  db.exec('DELETE FROM user_routines WHERE user_id = 1')
-  db.exec('DELETE FROM exercises WHERE user_id = 1')
-  db.exec(
-    "DELETE FROM sqlite_sequence WHERE name IN ('users', 'exercises', 'workout_logs', 'user_routines')",
-  )
 })
 
 test('a typed set is persisted by the debounced save and comes back on the screen inside the configured window', async ({
