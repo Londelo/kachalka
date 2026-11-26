@@ -4,6 +4,8 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import * as schema from '@/db/schema'
 import { createSqliteWorkoutRepository } from '@/features/workout/workout-repo-impl'
 import type { WorkoutRepository } from '@/features/workout/workout-repository'
+import { getSetCount } from '@/features/workout/workout-entity'
+import type { WorkoutSet } from '@/features/workout/types'
 
 let db: Database.Database | undefined
 let repo: WorkoutRepository
@@ -406,5 +408,283 @@ describe('createSqliteWorkoutRepository', () => {
     expect(serialized[0].logs[0].id).toBe(1)
     expect(serialized[0].logs[0].exerciseName).toBe('Squat')
     expect(serialized[0].logs[0].volume).toBe(500)
+  })
+})
+
+const volumeOf = (sets: WorkoutSet[]): number =>
+  sets.reduce((total, line) => total + getSetCount(line) * line.reps * line.weight, 0)
+
+describe('findHistoryByDate — counted sets', () => {
+  let userId: number
+  let exerciseId: number
+
+  const seedUserAndExercise = (userName = 'Alice', exerciseName = 'Squat'): {
+    userId: number
+    exerciseId: number
+  } => {
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run(userName)
+    const exercise = db!
+      .prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)')
+      .run(exerciseName, user.lastInsertRowid!)
+    return {
+      userId: Number(user.lastInsertRowid),
+      exerciseId: Number(exercise.lastInsertRowid),
+    }
+  }
+
+  const insertRawSingleEncoded = (logUserId: number, logExerciseId: number, date: string, sets: WorkoutSet[]): void => {
+    db!
+      .prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)')
+      .run(logUserId, logExerciseId, date, JSON.stringify(sets))
+  }
+
+  beforeEach(() => {
+    resetDb()
+    const seeded = seedUserAndExercise()
+    userId = seeded.userId
+    exerciseId = seeded.exerciseId
+  })
+
+  afterEach(() => {
+    if (db) db.close()
+  })
+
+  const cases: {
+    name: string
+    sets: WorkoutSet[]
+    expectedLength: number
+    expectedCounts: number[]
+    expectedVolume: number
+  }[] = [
+    {
+      name: 'two identical counted lines',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 2 },
+        { id: 'b', reps: 5, weight: 100, count: 2 },
+      ],
+      expectedLength: 1,
+      expectedCounts: [4],
+      expectedVolume: 2000,
+    },
+    {
+      name: 'three identical counted lines accumulate past a pair',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 2 },
+        { id: 'b', reps: 5, weight: 100, count: 2 },
+        { id: 'c', reps: 5, weight: 100, count: 2 },
+      ],
+      expectedLength: 1,
+      expectedCounts: [6],
+      expectedVolume: 3000,
+    },
+    {
+      name: 'a counted line merged with a legacy line of the same work',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 2 },
+        { id: 'b', reps: 5, weight: 100 },
+      ],
+      expectedLength: 1,
+      expectedCounts: [3],
+      expectedVolume: 1500,
+    },
+    {
+      name: 'one counted line',
+      sets: [{ id: 'a', reps: 5, weight: 135, count: 3 }],
+      expectedLength: 1,
+      expectedCounts: [3],
+      expectedVolume: 2025,
+    },
+    {
+      name: 'a legacy line with no count key keeps its pre-change volume',
+      sets: [{ id: 'a', reps: 5, weight: 135 }],
+      expectedLength: 1,
+      expectedCounts: [1],
+      expectedVolume: 675,
+    },
+    {
+      name: 'a legacy line beside a differently-weighted counted line',
+      sets: [
+        { id: 'a', reps: 5, weight: 100 },
+        { id: 'b', reps: 3, weight: 80, count: 2 },
+      ],
+      expectedLength: 2,
+      expectedCounts: [1, 2],
+      expectedVolume: 980,
+    },
+    {
+      name: 'two 2.5 lines floor per line before summing, so the tally is 4 not 5',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 2.5 },
+        { id: 'b', reps: 5, weight: 100, count: 2.5 },
+      ],
+      expectedLength: 1,
+      expectedCounts: [4],
+      expectedVolume: 2000,
+    },
+    {
+      name: 'an explicit count of one',
+      sets: [{ id: 'a', reps: 5, weight: 100, count: 1 }],
+      expectedLength: 1,
+      expectedCounts: [1],
+      expectedVolume: 500,
+    },
+    {
+      name: 'lines sharing weight but not reps stay separate',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 2 },
+        { id: 'b', reps: 3, weight: 100, count: 2 },
+      ],
+      expectedLength: 2,
+      expectedCounts: [2, 2],
+      expectedVolume: 1600,
+    },
+    {
+      name: 'lines sharing reps but not weight stay separate',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 2 },
+        { id: 'b', reps: 5, weight: 110, count: 2 },
+      ],
+      expectedLength: 2,
+      expectedCounts: [2, 2],
+      expectedVolume: 2100,
+    },
+  ]
+
+  it.each(cases)(
+    'collapses to $expectedLength line(s) with counts $expectedCounts and volume $expectedVolume — $name',
+    ({ sets, expectedLength, expectedCounts, expectedVolume }) => {
+      repo.create({ userId, exerciseId, date: '2025-01-01', sets })
+
+      const log = repo.findHistoryByDate(userId)[0].logs[0]
+
+      expect(log.sets).toHaveLength(expectedLength)
+      expect(log.sets.map((line) => line.count)).toEqual(expectedCounts)
+      expect(log.volume).toBe(expectedVolume)
+      expect(log.volume).toBe(volumeOf(log.sets))
+    },
+  )
+
+  it('publishes the collapse tally on a legacy line, so count is the number 1 rather than absent', () => {
+    repo.create({ userId, exerciseId, date: '2025-01-01', sets: [{ id: 'a', reps: 5, weight: 135 }] })
+
+    const log = repo.findHistoryByDate(userId)[0].logs[0]
+
+    expect(log.volume).toBe(675)
+    expect(log.sets[0].count).toBe(1)
+    expect(typeof log.sets[0].count).toBe('number')
+    expect(Object.keys(log.sets[0]).sort()).toEqual(['count', 'id', 'reps', 'weight'])
+  })
+
+  it('parses the double-encoded column that repo.create writes, arriving as raw JSON text', () => {
+    repo.create({ userId, exerciseId, date: '2025-01-01', sets: [{ id: 'a', reps: 5, weight: 135, count: 3 }] })
+
+    const stored = db!.prepare('SELECT sets FROM workout_logs WHERE id = ?').get(1) as { sets: unknown }
+    expect(typeof stored.sets).toBe('string')
+
+    const log = repo.findHistoryByDate(userId)[0].logs[0]
+    expect(log.volume).toBe(2025)
+    expect(log.sets[0].count).toBe(3)
+  })
+
+  it('parses a pre-change row that arrives as an already-parsed array', () => {
+    insertRawSingleEncoded(userId, exerciseId, '2025-01-01', [
+      { id: 'a', reps: 5, weight: 100, count: 2 },
+      { id: 'b', reps: 5, weight: 100, count: 2 },
+    ])
+
+    const log = repo.findHistoryByDate(userId)[0].logs[0]
+
+    expect(log.sets).toHaveLength(1)
+    expect(log.sets[0].count).toBe(4)
+    expect(log.volume).toBe(2000)
+    expect(log.volume).toBe(volumeOf(log.sets))
+  })
+
+  it('stores the count verbatim in the column, one unwrap below the double-encoded surface', () => {
+    const input: WorkoutSet[] = [{ id: 'a', reps: 5, weight: 135, count: 3 }]
+    const created = repo.create({ userId, exerciseId, date: '2025-01-01', sets: input })
+
+    const stored = db!.prepare('SELECT sets FROM workout_logs WHERE id = ?').get(created.id) as { sets: string }
+    const oneLayerUnwrapped = JSON.parse(stored.sets) as unknown
+
+    expect(stored.sets).not.toBe(JSON.stringify(input))
+    expect(typeof oneLayerUnwrapped).toBe('string')
+    expect(oneLayerUnwrapped).toContain('"count":3')
+    expect((JSON.parse(oneLayerUnwrapped as string) as WorkoutSet[])[0].count).toBe(3)
+  })
+
+  it('survives a JSON round-trip with the collapsed count still a number', () => {
+    repo.create({
+      userId,
+      exerciseId,
+      date: '2025-01-01',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 2 },
+        { id: 'b', reps: 5, weight: 100, count: 2 },
+      ],
+    })
+
+    const history = repo.findHistoryByDate(userId)
+    const serialized = JSON.parse(JSON.stringify(history))
+
+    expect(serialized[0].logs[0].sets).toHaveLength(1)
+    expect(serialized[0].logs[0].sets[0].count).toBe(4)
+    expect(typeof serialized[0].logs[0].sets[0].count).toBe('number')
+    expect(serialized[0].logs[0].volume).toBe(2000)
+  })
+
+  it('groups two counted exercises under one date with their own volumes, sets and ids', () => {
+    const deadlift = db!
+      .prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)')
+      .run('Deadlift', userId)
+    const deadliftId = Number(deadlift.lastInsertRowid)
+
+    const squatLog = repo.create({
+      userId,
+      exerciseId,
+      date: '2025-01-01',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 2 },
+        { id: 'b', reps: 5, weight: 100, count: 2 },
+      ],
+    })
+    const deadliftLog = repo.create({
+      userId,
+      exerciseId: deadliftId,
+      date: '2025-01-01',
+      sets: [{ id: 'c', reps: 3, weight: 200, count: 4 }],
+    })
+
+    const history = repo.findHistoryByDate(userId)
+
+    expect(history).toHaveLength(1)
+    expect(history[0].date).toBe('2025-01-01')
+    expect(history[0].logs).toHaveLength(2)
+
+    const byName = Object.fromEntries(history[0].logs.map((log) => [log.exerciseName, log]))
+    expect(byName.Squat.id).toBe(squatLog.id)
+    expect(byName.Squat.sets).toHaveLength(1)
+    expect(byName.Squat.sets[0].count).toBe(4)
+    expect(byName.Squat.volume).toBe(2000)
+    expect(byName.Squat.volume).toBe(volumeOf(byName.Squat.sets))
+
+    expect(byName.Deadlift.id).toBe(deadliftLog.id)
+    expect(byName.Deadlift.sets).toHaveLength(1)
+    expect(byName.Deadlift.sets[0].count).toBe(4)
+    expect(byName.Deadlift.volume).toBe(2400)
+    expect(byName.Deadlift.volume).toBe(volumeOf(byName.Deadlift.sets))
+  })
+
+  it('returns an empty array for a user whose counted logs belong to somebody else', () => {
+    const other = seedUserAndExercise('Bob', 'Squat')
+    repo.create({
+      userId: other.userId,
+      exerciseId: other.exerciseId,
+      date: '2025-01-01',
+      sets: [{ id: 'a', reps: 5, weight: 135, count: 3 }],
+    })
+
+    expect(repo.findHistoryByDate(userId)).toEqual([])
+    expect(repo.findHistoryByDate(other.userId)[0].logs[0].volume).toBe(2025)
   })
 })
