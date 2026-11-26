@@ -55,15 +55,13 @@ function migrationFiles(migrationsDir: string): string[] {
   return files
 }
 
-export function ensureSchema(db: E2eDatabase): void {
+export function ensureSchema(db: E2eDatabase, checkoutRoot: string): void {
   const tableNames = existingTableNames(db)
   if (REQUIRED_TABLES.every((table) => tableNames.includes(table))) return
 
   // runMigrations() in src/db/migrate.ts is not imported: it falls back to the
-  // app's own db singleton and resolves its migrations from the app's cwd. The
-  // migrations are located from the checkout root here, never from this compiled
-  // test file's directory, so a worktree checkout builds its own schema.
-  const migrationsDir = path.join(path.resolve(process.cwd()), MIGRATIONS_DIRECTORY)
+  // app's own db singleton and resolves its migrations from the app's cwd.
+  const migrationsDir = path.join(path.resolve(checkoutRoot), MIGRATIONS_DIRECTORY)
 
   for (const file of migrationFiles(migrationsDir)) {
     const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8')

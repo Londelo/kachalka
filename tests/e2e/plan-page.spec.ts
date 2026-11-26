@@ -7,7 +7,7 @@ import { loginAsBruno } from './helpers'
 const BASE_URL = getE2eBaseUrl()
 
 const db = openE2eDatabase()
-ensureSchema(db)
+ensureSchema(db, process.cwd())
 
 wipeE2eData(db)
 db.exec('DELETE FROM sqlite_sequence')
@@ -48,7 +48,7 @@ function cleanupBruno(): void {
 // ============================================================================
 
 test.beforeEach(async ({ page }) => {
-  ensureSchema(db)
+  ensureSchema(db, process.cwd())
   // Ensure Bruno exists with id=1 (REPLACE handles re-creation after afterEach cleanup)
   db.prepare('INSERT OR REPLACE INTO users (id, name, is_active) VALUES (1, ?, ?)').run(
     'Bruno',

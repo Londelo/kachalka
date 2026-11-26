@@ -35,7 +35,7 @@ function open(rootOverride: string = root): E2eDatabase {
 
 function openWithSchema(rootOverride: string = root): E2eDatabase {
   const db = open(rootOverride)
-  ensureSchema(db)
+  ensureSchema(db, REPO_ROOT)
   return db
 }
 
@@ -245,7 +245,7 @@ describe('openE2eDatabase', () => {
 
     it('reads back through the trailing-separator root what the plain root wrote', () => {
       const writer = open()
-      ensureSchema(writer)
+      ensureSchema(writer, REPO_ROOT)
       seedFullGraph(writer)
 
       const reader = open(`${root}${path.sep}`)
@@ -296,7 +296,7 @@ describe('ensureSchema', () => {
       const db = open()
       expect(tableNames(db)).toEqual([])
 
-      ensureSchema(db)
+      ensureSchema(db, REPO_ROOT)
 
       expect(tableNames(db)).toEqual(expect.arrayContaining(REQUIRED_TABLES))
     })
@@ -307,7 +307,7 @@ describe('ensureSchema', () => {
       const db = openWithSchema()
       seedFullGraph(db)
 
-      ensureSchema(db)
+      ensureSchema(db, REPO_ROOT)
 
       expect(rowCount(db, 'users')).toBe(1)
       expect(rowCount(db, 'exercises')).toBe(1)
@@ -319,7 +319,7 @@ describe('ensureSchema', () => {
       const db = openWithSchema()
       const readdirSpy = vi.spyOn(fs, 'readdirSync')
 
-      ensureSchema(db)
+      ensureSchema(db, REPO_ROOT)
 
       expect(readdirSpy).not.toHaveBeenCalled()
     })
@@ -327,9 +327,9 @@ describe('ensureSchema', () => {
     it('is idempotent across repeated calls', () => {
       const db = open()
 
-      ensureSchema(db)
-      ensureSchema(db)
-      ensureSchema(db)
+      ensureSchema(db, REPO_ROOT)
+      ensureSchema(db, REPO_ROOT)
+      ensureSchema(db, REPO_ROOT)
 
       expect(tableNames(db)).toEqual(expect.arrayContaining(REQUIRED_TABLES))
       expect(tableNames(db).filter((name) => name === 'users')).toHaveLength(1)
@@ -346,7 +346,7 @@ describe('ensureSchema', () => {
 
         let caught: unknown
         try {
-          ensureSchema(db)
+          ensureSchema(db, REPO_ROOT)
         } catch (error) {
           caught = error
         }
@@ -364,7 +364,7 @@ describe('ensureSchema', () => {
       const db = openWithSchema()
       db.exec('DROP TABLE exercises')
 
-      expect(() => ensureSchema(db)).toThrow(/already exists/)
+      expect(() => ensureSchema(db, REPO_ROOT)).toThrow(/already exists/)
 
       expect(tableNames(db)).toEqual(expect.arrayContaining(REQUIRED_TABLES))
     })
@@ -373,7 +373,7 @@ describe('ensureSchema', () => {
       const db = openWithSchema()
       db.exec('DROP TABLE workout_logs')
 
-      expect(() => ensureSchema(db)).toThrow(/already exists/)
+      expect(() => ensureSchema(db, REPO_ROOT)).toThrow(/already exists/)
 
       expect(tableNames(db)).not.toContain('workout_logs')
     })
@@ -385,7 +385,7 @@ describe('ensureSchema', () => {
       db.exec('DROP TABLE workout_logs')
       db.pragma('foreign_keys = ON')
 
-      expect(() => ensureSchema(db)).toThrow(/already exists/)
+      expect(() => ensureSchema(db, REPO_ROOT)).toThrow(/already exists/)
 
       expect(rowCount(db, 'users')).toBe(1)
       expect(rowCount(db, 'exercises')).toBe(1)
@@ -400,7 +400,7 @@ describe('ensureSchema', () => {
       }
       expect(tableNames(db)).toEqual([])
 
-      ensureSchema(db)
+      ensureSchema(db, REPO_ROOT)
 
       expect(tableNames(db)).toEqual(expect.arrayContaining(REQUIRED_TABLES))
     })
@@ -409,7 +409,7 @@ describe('ensureSchema', () => {
   describe('the created tables', () => {
     it('accepts rows in foreign-key order across all four tables', () => {
       const db = open()
-      ensureSchema(db)
+      ensureSchema(db, REPO_ROOT)
 
       expect(() => seedFullGraph(db)).not.toThrow()
 
@@ -421,7 +421,7 @@ describe('ensureSchema', () => {
 
     it('rejects a child row whose parent does not exist', () => {
       const db = open()
-      ensureSchema(db)
+      ensureSchema(db, REPO_ROOT)
 
       expect(() =>
         db
@@ -435,7 +435,7 @@ describe('ensureSchema', () => {
 
     it('keeps the unique constraints the migrations declare', () => {
       const db = open()
-      ensureSchema(db)
+      ensureSchema(db, REPO_ROOT)
       const { userId, exerciseId } = seedFullGraph(db)
 
       expect(() =>
@@ -463,7 +463,7 @@ describe('ensureSchema', () => {
       })
 
       const db = open()
-      withCwd(markerRoot, () => ensureSchema(db))
+      withCwd(markerRoot, () => ensureSchema(db, markerRoot))
 
       expect(tableNames(db)).toContain('marker_table')
     })
@@ -478,7 +478,7 @@ describe('ensureSchema', () => {
       })
 
       const db = open()
-      withCwd(orderedRoot, () => ensureSchema(db))
+      withCwd(orderedRoot, () => ensureSchema(db, orderedRoot))
 
       const rows = db.prepare('SELECT label FROM ordered_probe ORDER BY rowid').all() as {
         label: string
@@ -497,7 +497,7 @@ describe('ensureSchema', () => {
       })
 
       const db = open()
-      withCwd(noisyRoot, () => ensureSchema(db))
+      withCwd(noisyRoot, () => ensureSchema(db, noisyRoot))
 
       expect(tableNames(db)).toEqual(expect.arrayContaining(REQUIRED_TABLES))
     })
@@ -513,7 +513,7 @@ describe('ensureSchema', () => {
       let caught: unknown
       withCwd(missingRoot, () => {
         try {
-          ensureSchema(db)
+          ensureSchema(db, missingRoot)
         } catch (error) {
           caught = error
         }
@@ -534,7 +534,7 @@ describe('ensureSchema', () => {
       let caught: unknown
       withCwd(emptyRoot, () => {
         try {
-          ensureSchema(db)
+          ensureSchema(db, emptyRoot)
         } catch (error) {
           caught = error
         }
@@ -552,7 +552,7 @@ describe('ensureSchema', () => {
       let caught: unknown
       withCwd(brokenRoot, () => {
         try {
-          ensureSchema(db)
+          ensureSchema(db, brokenRoot)
         } catch (error) {
           caught = error
         }
@@ -568,14 +568,14 @@ describe('ensureSchema', () => {
       fs.mkdirSync(missingRoot, { recursive: true })
       const db = openWithSchema()
 
-      expect(() => withCwd(missingRoot, () => ensureSchema(db))).not.toThrow()
+      expect(() => withCwd(missingRoot, () => ensureSchema(db, missingRoot))).not.toThrow()
     })
   })
 
   it('resolves migrations from the repository checkout the run was started in', () => {
     const db = open()
 
-    withCwd(REPO_ROOT, () => ensureSchema(db))
+    withCwd(REPO_ROOT, () => ensureSchema(db, REPO_ROOT))
 
     expect(tableNames(db)).toEqual(expect.arrayContaining(REQUIRED_TABLES))
     expect(indexNames(db)).toEqual(expect.arrayContaining(['users_name_unique', 'user_routine_unique']))
@@ -731,7 +731,7 @@ describe('the bootstrap as a whole', () => {
 
     expect(() => db.exec('DELETE FROM workout_logs')).toThrow(/no such table: workout_logs/)
 
-    ensureSchema(db)
+    ensureSchema(db, REPO_ROOT)
 
     expect(() => db.exec('DELETE FROM workout_logs')).not.toThrow()
   })

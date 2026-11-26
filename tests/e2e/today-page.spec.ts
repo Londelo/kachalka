@@ -7,7 +7,7 @@ import { loginAsBruno } from './helpers'
 const BASE_URL = getE2eBaseUrl()
 
 const db = openE2eDatabase()
-ensureSchema(db)
+ensureSchema(db, process.cwd())
 
 function todayUTCDate(): string {
   return new Date().toISOString().split('T')[0]
@@ -59,7 +59,7 @@ function loggedSetsToday(exerciseId: number): { reps: number; weight: number }[]
 }
 
 test.beforeEach(() => {
-  ensureSchema(db)
+  ensureSchema(db, process.cwd())
   db.prepare('INSERT OR REPLACE INTO users (id, name, is_active) VALUES (1, ?, ?)').run('Bruno', 1)
   db.exec('DELETE FROM workout_logs WHERE user_id = 1')
   db.exec('DELETE FROM user_routines WHERE user_id = 1')

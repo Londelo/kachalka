@@ -6,10 +6,10 @@ import { getE2eBaseUrl } from './e2e-config'
 const BASE_URL = getE2eBaseUrl()
 
 const db = openE2eDatabase()
-ensureSchema(db)
+ensureSchema(db, process.cwd())
 
 test.beforeEach(() => {
-  ensureSchema(db)
+  ensureSchema(db, process.cwd())
   wipeE2eData(db)
   db.exec('DELETE FROM sqlite_sequence')
 })

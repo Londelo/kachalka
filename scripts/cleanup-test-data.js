@@ -9,7 +9,7 @@ const { ensureSchema, openE2eDatabase, wipeE2eData } = require('../tests/harness
 const CHECKOUT_ROOT = path.join(__dirname, '..')
 
 const db = openE2eDatabase(CHECKOUT_ROOT)
-ensureSchema(db)
+ensureSchema(db, CHECKOUT_ROOT)
 wipeE2eData(db)
 db.exec(
   "DELETE FROM sqlite_sequence WHERE name IN ('users', 'exercises', 'workout_logs', 'user_routines')",
