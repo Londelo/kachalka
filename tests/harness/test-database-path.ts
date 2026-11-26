@@ -42,7 +42,8 @@ export function resolveTestDatabasePath({
     throw new AppError(
       `Refusing to open "${candidate}": that is the developer database, the file the ` +
         `developer's own dev server reads and writes. A unit run may only open a database ` +
-        `inside ${allowedRootsDescription(root, tempDirectory)}.`,
+        `inside ${allowedRootsDescription(root, tempDirectory)}. ` +
+        `Use "${path.join(dataDirectory, TEST_DATABASE_FILENAME)}" instead.`,
     )
   }
 
