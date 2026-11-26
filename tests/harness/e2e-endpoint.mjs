@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-const MAIN_CHECKOUT_PORT = 3111
+export const MAIN_CHECKOUT_PORT = 3111
 const WORKTREE_PORT_FLOOR = 4200
 const WORKTREE_PORT_CEILING = 4999
 const CLAUDE_DIRECTORY = '.claude'
@@ -16,8 +16,8 @@ const FNV_OFFSET_BASIS = 0x811c9dc5
 const FNV_PRIME = 0x01000193
 const AVALANCHE_MIX_A = 0x85ebca6b
 const AVALANCHE_MIX_B = 0xc2b2ae35
-const MIN_PORT = 1
-const MAX_PORT = 65535
+export const MIN_PORT = 1
+export const MAX_PORT = 65535
 const MIN_PID = 1
 const USAGE =
   'Usage: node tests/harness/e2e-endpoint.mjs port <checkoutRoot> | guard <port> <spawnedPid>'
@@ -80,11 +80,15 @@ function foldThroughHash(value) {
 }
 
 /**
- * @param {string} normalizedPath
+ * True when the checkout lives under a ".claude/worktrees" directory, which is
+ * what makes it a worktree of some other checkout rather than a checkout with a
+ * server of its own.
+ *
+ * @param {string} checkoutRoot Absolute path of the checkout.
  * @returns {boolean}
  */
-function hasWorktreeSegment(normalizedPath) {
-  const segments = normalizedPath.split(path.sep)
+export function isWorktreeCheckout(checkoutRoot) {
+  const segments = checkoutRoot.split(path.sep)
 
   for (let index = 0; index + 2 < segments.length; index += 1) {
     if (segments[index] === CLAUDE_DIRECTORY && segments[index + 1] === WORKTREES_DIRECTORY) {
@@ -97,7 +101,7 @@ function hasWorktreeSegment(normalizedPath) {
 
 /**
  * Picks the port the end-to-end suite runs on. The main checkout keeps the
- * historical 3111; a worktree checkout gets a port folded deterministically
+ * historical fixed port; a worktree checkout gets a port folded deterministically
  * from its own absolute path inside the 4200-4999 band.
  *
  * @param {string} checkoutRoot Absolute (or cwd-relative) path of the checkout.
@@ -110,7 +114,7 @@ export function deriveE2ePort(checkoutRoot) {
 
   const normalized = path.resolve(checkoutRoot)
 
-  if (!hasWorktreeSegment(normalized)) {
+  if (!isWorktreeCheckout(normalized)) {
     return MAIN_CHECKOUT_PORT
   }
 

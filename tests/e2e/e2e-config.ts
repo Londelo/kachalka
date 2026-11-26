@@ -1,10 +1,7 @@
 import path from 'node:path'
 
-const MAIN_CHECKOUT_DEFAULT_PORT = 3111
-const MIN_PORT = 1
-const MAX_PORT = 65535
-const CLAUDE_DIRECTORY = '.claude'
-const WORKTREES_DIRECTORY = 'worktrees'
+import { isWorktreeCheckout, MAIN_CHECKOUT_PORT, MAX_PORT, MIN_PORT } from '../harness/e2e-endpoint.mjs'
+
 const DIGITS_ONLY = /^\d+$/
 
 interface E2eEndpoint {
@@ -87,18 +84,6 @@ function parsePort(configured: string): E2eEndpoint {
   return { baseUrl: `http://localhost:${port}`, port }
 }
 
-function isWorktreeCheckout(checkoutRoot: string): boolean {
-  const segments = checkoutRoot.split(path.sep)
-
-  for (let index = 0; index + 2 < segments.length; index += 1) {
-    if (segments[index] === CLAUDE_DIRECTORY && segments[index + 1] === WORKTREES_DIRECTORY) {
-      return true
-    }
-  }
-
-  return false
-}
-
 function mainCheckoutDefault(checkoutRoot: string): E2eEndpoint {
   if (isWorktreeCheckout(checkoutRoot)) {
     throw new Error(
@@ -113,11 +98,11 @@ function mainCheckoutDefault(checkoutRoot: string): E2eEndpoint {
     defaultWarningEmitted = true
     console.warn(
       `[e2e-config] Neither E2E_BASE_URL nor PORT is set; using the built-in main-checkout default ` +
-        `port ${MAIN_CHECKOUT_DEFAULT_PORT} (http://localhost:${MAIN_CHECKOUT_DEFAULT_PORT}).`,
+        `port ${MAIN_CHECKOUT_PORT} (http://localhost:${MAIN_CHECKOUT_PORT}).`,
     )
   }
 
-  return { baseUrl: `http://localhost:${MAIN_CHECKOUT_DEFAULT_PORT}`, port: MAIN_CHECKOUT_DEFAULT_PORT }
+  return { baseUrl: `http://localhost:${MAIN_CHECKOUT_PORT}`, port: MAIN_CHECKOUT_PORT }
 }
 
 function resolveEndpoint(): E2eEndpoint {
