@@ -2,6 +2,12 @@ import { describe, it, expect } from 'vitest'
 import { groupByGranularity } from '@/features/chart/chart-utils'
 import type { ChartDataPoint, ChartBarData, TimeGranularity } from '@/features/chart/chart-entity'
 import type { WorkoutSet } from '@/features/workout/types'
+import { getSetCount } from '@/features/workout/workout-entity'
+
+// A fixture's exercise tally is derived the way the door produces it (chart-repo-impl.ts:43,
+// chart-utils.ts:68) — the sum of getSetCount over that exercise's own lines — never written
+// as a literal a drifted fixture could leave honest.
+const tally = (sets: WorkoutSet[]): number => sets.reduce((n, s) => n + getSetCount(s), 0)
 
 describe('groupByGranularity — session', () => {
   it('groups session data as-is: single date, summed volume', () => {
@@ -152,18 +158,20 @@ describe('groupByGranularity — volume summation', () => {
 
 describe('groupByGranularity — exercises merging', () => {
   it('merges exercises from multiple data points with concatenated sets', () => {
+    const benchLine: WorkoutSet = { id: 's1', reps: 10, weight: 100 }
+    const squatLine: WorkoutSet = { id: 's2', reps: 8, weight: 50 }
     const input: ChartDataPoint[] = [
       {
         date: '2025-01-01',
         volume: 300,
-        sets: [{ id: 's1', reps: 10, weight: 100 }],
-        exercises: [{ name: 'Bench Press', sets: [{ id: 's1', reps: 10, weight: 100 }] }],
+        sets: [benchLine],
+        exercises: [{ name: 'Bench Press', sets: [benchLine], setCount: tally([benchLine]) }],
       },
       {
         date: '2025-01-01',
         volume: 200,
-        sets: [{ id: 's2', reps: 8, weight: 50 }],
-        exercises: [{ name: 'Squat', sets: [{ id: 's2', reps: 8, weight: 50 }] }],
+        sets: [squatLine],
+        exercises: [{ name: 'Squat', sets: [squatLine], setCount: tally([squatLine]) }],
       },
     ]
 
@@ -215,7 +223,7 @@ describe('setCount — counted sets', () => {
     date,
     volume,
     sets,
-    exercises: [{ name: 'Squat', sets: [...sets] }],
+    exercises: [{ name: 'Squat', sets: [...sets], setCount: tally(sets) }],
   })
 
   const oneCountedLine = { id: 'a', reps: 5, weight: 100, count: 2 } satisfies WorkoutSet
@@ -296,7 +304,14 @@ describe('setCount — counted sets', () => {
 
   it('reports zero sets for a session with no set lines at all', () => {
     const result = groupByGranularity(
-      [{ date: '2025-01-01', volume: 0, sets: [], exercises: [{ name: 'Squat', sets: [] }] }],
+      [
+        {
+          date: '2025-01-01',
+          volume: 0,
+          sets: [],
+          exercises: [{ name: 'Squat', sets: [], setCount: tally([]) }],
+        },
+      ],
       'session',
     )
 
@@ -319,8 +334,18 @@ describe('setCount — counted sets', () => {
   it('sums the volumes it was handed rather than recomputing them from the sets', () => {
     const wrongSets: WorkoutSet[] = [{ id: 'a', reps: 1, weight: 1 }]
     const input: ChartDataPoint[] = [
-      { date: '2025-01-01', volume: 2025, sets: wrongSets, exercises: [{ name: 'Squat', sets: wrongSets }] },
-      { date: '2025-01-01', volume: 500, sets: [...wrongSets], exercises: [{ name: 'Squat', sets: [...wrongSets] }] },
+      {
+        date: '2025-01-01',
+        volume: 2025,
+        sets: wrongSets,
+        exercises: [{ name: 'Squat', sets: wrongSets, setCount: tally(wrongSets) }],
+      },
+      {
+        date: '2025-01-01',
+        volume: 500,
+        sets: [...wrongSets],
+        exercises: [{ name: 'Squat', sets: [...wrongSets], setCount: tally(wrongSets) }],
+      },
     ]
 
     const result = groupByGranularity(input, 'session')
@@ -331,24 +356,18 @@ describe('setCount — counted sets', () => {
   })
 
   it('counts each exercise on its own merged lines within one data point', () => {
+    const squatLine: WorkoutSet = { id: 'a', reps: 5, weight: 100, count: 3 }
+    const benchCounted: WorkoutSet = { id: 'b', reps: 5, weight: 60, count: 2 }
+    const benchUncounted: WorkoutSet = { id: 'c', reps: 5, weight: 60 }
+    const benchLines = [benchCounted, benchUncounted]
     const input: ChartDataPoint[] = [
       {
         date: '2025-01-01',
         volume: 2400,
-        sets: [
-          { id: 'a', reps: 5, weight: 100, count: 3 },
-          { id: 'b', reps: 5, weight: 60, count: 2 },
-          { id: 'c', reps: 5, weight: 60 },
-        ],
+        sets: [squatLine, ...benchLines],
         exercises: [
-          { name: 'Squat', sets: [{ id: 'a', reps: 5, weight: 100, count: 3 }] },
-          {
-            name: 'Bench',
-            sets: [
-              { id: 'b', reps: 5, weight: 60, count: 2 },
-              { id: 'c', reps: 5, weight: 60 },
-            ],
-          },
+          { name: 'Squat', sets: [squatLine], setCount: tally([squatLine]) },
+          { name: 'Bench', sets: benchLines, setCount: tally(benchLines) },
         ],
       },
     ]
@@ -370,13 +389,13 @@ describe('setCount — counted sets', () => {
         date: '2025-01-01',
         volume: 1000,
         sets: [countedLine],
-        exercises: [{ name: 'Squat', sets: [countedLine] }],
+        exercises: [{ name: 'Squat', sets: [countedLine], setCount: tally([countedLine]) }],
       },
       {
         date: '2025-01-01',
         volume: 1000,
         sets: [{ ...countedLine }],
-        exercises: [{ name: 'Squat', sets: [{ ...countedLine }] }],
+        exercises: [{ name: 'Squat', sets: [{ ...countedLine }], setCount: tally([{ ...countedLine }]) }],
       },
     ]
 
@@ -449,8 +468,8 @@ describe('setCount — counted sets', () => {
         volume: 2580,
         sets: topSets,
         exercises: [
-          { name: 'Squat', sets: squatSets },
-          { name: 'Bench', sets: benchSets },
+          { name: 'Squat', sets: squatSets, setCount: tally(squatSets) },
+          { name: 'Bench', sets: benchSets, setCount: tally(benchSets) },
         ],
       },
     ]
@@ -497,7 +516,7 @@ describe('groupByGranularity — one time group holding two exercises', () => {
     volume: number,
   ): ChartDataPoint => {
     const lines = ids.map((id) => countedLine(id))
-    return { date, volume, sets: lines, exercises: [{ name, sets: [...lines] }] }
+    return { date, volume, sets: lines, exercises: [{ name, sets: [...lines], setCount: tally(lines) }] }
   }
 
   const crossExerciseCases: {

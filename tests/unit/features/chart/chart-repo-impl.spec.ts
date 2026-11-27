@@ -36,7 +36,11 @@ describe('mapRowToDataPoint', () => {
 
     expect(result.date).toBe('2025-01-01')
     expect(result.volume).toBe(1000)
-    expect(result.exercises).toEqual([{ name: 'Bench Press', sets: [{ id: 's1', reps: 10, weight: 100 }] }])
+    // One uncounted line is one set: getSetCount over the row's own sets, the tally
+    // mapRowToDataPoint is required to publish alongside the volume it already got right.
+    expect(result.exercises).toEqual([
+      { name: 'Bench Press', sets: [{ id: 's1', reps: 10, weight: 100 }], setCount: 1 },
+    ])
   })
 })
 

@@ -77,7 +77,7 @@ describe('ChartDataPoint', () => {
       date: '2025-01-01',
       volume: 100,
       sets: [],
-      exercises: [{ name: 'Pull Up', sets: [] }],
+      exercises: [{ name: 'Pull Up', sets: [], setCount: 0 }],
     }
     expect(sample.exercises).toBeTypeOf('object')
     expect(sample.exercises[0].name).toBeTypeOf('string')
