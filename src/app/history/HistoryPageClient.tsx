@@ -3,17 +3,47 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getHistoryAction } from '@/features/workout/workout-server-actions'
+import { getSetCount } from '@/features/workout/workout-entity'
 import { useLoading } from '@/components/loading-context'
 
+// This mirrors what `findHistoryByDate` actually publishes (workout-repo-impl.ts:281):
+// the stored lines out verbatim, each owning its own `count`, beside a `volume` built
+// by `calculateVolume` off those same lines. The element type used to stop at
+// `{ id, reps, weight }`, which is what let this file count array elements instead of
+// reading the counts — `getSetCount(s)` would not even typecheck here, so the compiler
+// stayed green while the page reported one line of three sets as one set. The wire
+// always carried the field; only this declaration denied it.
 type HistoryEntry = {
   date: string
   logs: {
     id: number
     exerciseId: number
     exerciseName: string
-    sets: { id: string; reps: number; weight: number }[]
+    sets: { id: string; reps: number; weight: number; count?: number }[]
     volume: number
   }[]
+}
+
+/**
+ * How many sets a list of stored lines stands for.
+ *
+ * `getSetCount` is the shared read rule — a line with no usable count is one set — so
+ * a legacy row with no `count` tallies exactly as it did when this file counted
+ * elements: three uncounted lines still read 3.
+ */
+function calcSetTotal(sets: { count?: number }[]): number {
+  return sets.reduce((total, line) => total + getSetCount(line), 0)
+}
+
+/**
+ * How many reps a list of stored lines stands for.
+ *
+ * A line's `reps` are the reps of ONE set, so a line standing for three sets is three
+ * lots of them. Omitting the multiplier is what made a session of 3 × 135kg × 5 read
+ * 5 reps beside a volume of 2,025 — the two figures the same screen shows side by side.
+ */
+function calcRepTotal(sets: { reps: number; count?: number }[]): number {
+  return sets.reduce((total, line) => total + getSetCount(line) * line.reps, 0)
 }
 
 export default function HistoryPageClient() {
@@ -97,13 +127,15 @@ export default function HistoryPageClient() {
       {history.length > 0 && history.map((dateEntry, dateIdx) => {
         const sessionNum = dateIdx + 1
 
-        // Aggregate metrics across all exercises in this session
+        // Aggregate metrics across all exercises in this session.
+        //
+        // `totalVolume` already reads the server's own count-aware figure, and stays the
+        // single owner of volume on this page — no second formula is added beside it.
+        // SETS and REPS are now derived from the same lines the volume came from, by the
+        // same shared rule, so the three figures in this row can no longer disagree.
         const totalVolume = dateEntry.logs.reduce((sum, log) => sum + log.volume, 0)
-        const totalSets = dateEntry.logs.reduce((sum, log) => sum + log.sets.length, 0)
-        const totalReps = dateEntry.logs.reduce(
-          (sum, log) => sum + log.sets.reduce((s, set) => s + set.reps, 0),
-          0,
-        )
+        const totalSets = dateEntry.logs.reduce((sum, log) => sum + calcSetTotal(log.sets), 0)
+        const totalReps = dateEntry.logs.reduce((sum, log) => sum + calcRepTotal(log.sets), 0)
 
         return (
           <section key={dateEntry.date} id={`history-date-${dateEntry.date}`} className="mb-8 w-full">
@@ -122,8 +154,12 @@ export default function HistoryPageClient() {
               {/* Exercise list — each row is clickable */}
               <div className="flex flex-col gap-3">
                 {dateEntry.logs.map((log) => {
-                  const exerciseSets = log.sets.length
-                  const exerciseReps = log.sets.reduce((sum, s) => sum + s.reps, 0)
+                  // The same two rules as the session row above, applied to one exercise's
+                  // lines, so a row and the figure it sums into can never diverge.
+                  // `exerciseMaxWeight` is a per-line maximum, not a tally, so it is left
+                  // alone — a line standing for three sets of 135kg is still 135kg heavy.
+                  const exerciseSets = calcSetTotal(log.sets)
+                  const exerciseReps = calcRepTotal(log.sets)
                   const exerciseMaxWeight = calcIntensity(log.sets)
                   return (
                     <button
@@ -281,7 +317,7 @@ export default function HistoryPageClient() {
               <div className="flex-1 text-center">
                 <p className="font-label-mono text-label-mono uppercase text-secondary">SETS</p>
                 <p className="font-headline-md text-headline-md font-black text-on-surface">
-                  {selectedLog.log.sets.length}
+                  {calcSetTotal(selectedLog.log.sets)}
                 </p>
               </div>
               <div className="flex-1 text-center">
