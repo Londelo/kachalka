@@ -546,6 +546,19 @@ describe('journey 3 — the collapse journey', () => {
 })
 
 describe('journey 4 — the refusal journey', () => {
+  it('refuses an empty table by name, and stores nothing', () => {
+    let message = ''
+
+    try {
+      writeThroughTheRealPath([])
+    } catch (e) {
+      message = (e as Error).message
+    }
+
+    expect(message).toBe(EMPTY_TABLE_MESSAGE)
+    expect(storedRowCount()).toBe(0)
+  })
+
   it('refuses a count of 0 by name, never with the empty-array message, and stores nothing', () => {
     expect(() =>
       writeThroughTheRealPath([{ id: 'a', reps: 5, weight: 100, count: 0 }]),
@@ -694,15 +707,14 @@ describe('journey 7 — the single-owner bar', () => {
     expect(matchingLines('const v = weight * reps', /reps \* /, 'control')).toEqual([])
   })
 
-  it('leaves no second copy of the volume arithmetic anywhere under src/features', () => {
-    expect(offendersUnder(path.join(process.cwd(), 'src', 'features'), /reps \* /)).toEqual([])
+  it('leaves no second copy of the volume arithmetic anywhere under src', () => {
+    expect(offendersUnder(path.join(process.cwd(), 'src'), /reps \* /)).toEqual([])
   })
 
-  it('never uses sets.length as a set count under src/features', () => {
-    const nonGuardUses = offendersUnder(
-      path.join(process.cwd(), 'src', 'features'),
-      /sets\.length/,
-    ).filter((line) => !/sets\.length === 0/.test(line))
+  it('never uses sets.length as a set count anywhere under src', () => {
+    const nonGuardUses = offendersUnder(path.join(process.cwd(), 'src'), /sets\.length/).filter(
+      (line) => !/sets\.length\s*(===|>)\s*0/.test(line),
+    )
 
     expect(nonGuardUses).toEqual([])
   })
