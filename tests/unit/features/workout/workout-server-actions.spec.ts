@@ -605,24 +605,15 @@ const SURVIVING_BLOCKS = [
 ]
 
 describe('the removed workout update write path', () => {
-  it('does not export updateWorkoutAction', async () => {
-    const actions = (await import('@/features/workout/workout-server-actions')) as Record<
-      string,
-      unknown
-    >
+  it('exports exactly the four surviving actions', async () => {
+    const actions = await import('@/features/workout/workout-server-actions')
 
-    expect(actions).not.toHaveProperty('updateWorkoutAction')
-    expect(actions.updateWorkoutAction).toBeUndefined()
-  })
-
-  it('does not export deleteWorkoutAction', async () => {
-    const actions = (await import('@/features/workout/workout-server-actions')) as Record<
-      string,
-      unknown
-    >
-
-    expect(actions).not.toHaveProperty('deleteWorkoutAction')
-    expect(actions.deleteWorkoutAction).toBeUndefined()
+    expect(Object.keys(actions).sort()).toEqual([
+      'getHistoryAction',
+      'getTodayExercisesAction',
+      'getTodayWorkoutsAction',
+      'logWorkoutAction',
+    ])
   })
 
   it('refuses to resolve the removed specifier while its surviving sibling still resolves', async () => {
