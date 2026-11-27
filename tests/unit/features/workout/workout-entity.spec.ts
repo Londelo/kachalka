@@ -114,7 +114,7 @@ describe('validateSet', () => {
 
   it('names the reps field and tells the lifter what to do', () => {
     expect(repsMessage).toMatch(/reps/i)
-    expect(repsMessage).toMatch(/more than 0/i)
+    expect(repsMessage).toMatch(/at least 1/i)
     expect(repsMessage).toMatch(/remove the line/i)
   })
 

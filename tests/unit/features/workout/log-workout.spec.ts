@@ -123,7 +123,7 @@ describe('logWorkoutUseCase', () => {
 
   describe('refusal order — guard, then raw validation, then fold', () => {
     const WEIGHT_MSG = 'Weight must be more than 0 — enter the weight you lifted, or remove the line.'
-    const REPS_MSG = 'Reps must be more than 0 — enter how many reps you did, or remove the line.'
+    const REPS_MSG = 'Reps must be at least 1 — enter how many reps you did, or remove the line.'
     const COUNT_MSG = 'Set count must be at least 1 — enter how many sets you did, or leave it blank for one.'
     const EMPTY_MSG = 'Must log at least one set'
 

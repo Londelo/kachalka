@@ -599,7 +599,7 @@ describe('journey 4 — the refusal journey', () => {
       message = (e as Error).message
     }
 
-    expect(message).toMatch(/^Reps must be more than 0/)
+    expect(message).toMatch(/^Reps must be at least 1/)
     expect(message).not.toBe(EMPTY_TABLE_MESSAGE)
     expect(message.toLowerCase()).toContain('reps')
     expect(storedRowCount()).toBe(0)
