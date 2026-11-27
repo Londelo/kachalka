@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Page, Request, Response } from '@playwright/test'
 
 import { getTodayISO, jsDayToAppIndex } from '@/shared/utils/date'
 
@@ -98,7 +98,80 @@ function errorOf(page: Page, exerciseId: number) {
   return cardFor(page, exerciseId).locator('p.text-error')
 }
 
-async function signInAsBruno(page: Page): Promise<void> {
+// ── the mount-effect pre-fill, and why every keystroke below waits for it ─────
+//
+// The mount effect fires getTodayExercisesAction (today/page.tsx:220) and, inside
+// its .then, getTodayWorkoutsAction (:225) — whose .then calls the BARE
+// setExerciseSets at :236. A bare set replaces the whole Map, so a keystroke typed
+// before that continuation runs is discarded: getSets (:265) falls back to
+// defaultSet() (:27, weight 0), the second fill lands on the fresh set, and the
+// debounced save posts {weight: 0, reps: 5}. That clears the blank filter at :305
+// and dies in validateSet (workout-entity.ts:17-21), so no row is ever written —
+// and the case reads back `null` and looks like a broken write path when what
+// broke was a keystroke. Under full-suite load, with a cold dev compile ahead of
+// it, the window is wide enough to lose reproducibly.
+//
+// Nothing on the screen separates the two sides of that continuation. With no log
+// stored for today the pre-fill sets the Map to an empty Map, which is what it
+// already was, and viewModes 'current' is exactly what the ?? 'current' at :407
+// renders anyway. The network is the only observable boundary. Both actions POST
+// to /today and their Next-Action ids are per-build hashes, but their argument
+// lists are not: getTodayExercisesAction takes (userId, dayOfWeek) and
+// getTodayWorkoutsAction takes (userId) alone (workout-server-actions.ts:42,:71),
+// and the arguments travel as the JSON request body. The single-argument call is
+// therefore the strongest available proof that the pre-fill has been delivered.
+
+const BRUNO_USER_ID = 1
+
+interface SentSave {
+  exerciseId: number
+  date: string
+  sets: StoredSet[]
+}
+
+interface TodaySession {
+  page: Page
+  saves: SentSave[]
+  prefillResponses: Response[]
+}
+
+function actionArgsOf(request: Request): unknown[] | null {
+  if (request.method() !== 'POST') return null
+
+  const body = request.postData()
+  if (body === null) return null
+
+  try {
+    const args: unknown = JSON.parse(body)
+    return Array.isArray(args) ? args : null
+  } catch {
+    return null
+  }
+}
+
+function isWorkoutsPrefill(request: Request): boolean {
+  const args = actionArgsOf(request)
+  return args !== null && args.length === 1 && args[0] === BRUNO_USER_ID
+}
+
+function saveOf(request: Request): SentSave | null {
+  const args = actionArgsOf(request)
+  if (args === null || args.length !== 4) return null
+
+  const [userId, exerciseId, date, sets] = args
+  if (userId !== BRUNO_USER_ID) return null
+  if (typeof exerciseId !== 'number' || typeof date !== 'string' || !Array.isArray(sets)) {
+    return null
+  }
+
+  return {
+    exerciseId,
+    date,
+    sets: (sets as StoredSet[]).map((set) => ({ weight: set.weight, reps: set.reps })),
+  }
+}
+
+async function signInAsBruno(page: Page): Promise<TodaySession> {
   await loginAsBruno(page)
 
   // Without this cookie debouncedSave bails out at today/page.tsx:298 and nothing
@@ -109,21 +182,109 @@ async function signInAsBruno(page: Page): Promise<void> {
     'loginAsBruno must set kachalka.userId=1 before any save is relied upon',
   ).toBe(true)
 
+  const saves: SentSave[] = []
+  const prefillResponses: Response[] = []
+
+  // Both listeners are armed before the navigation: the mount effect fires the
+  // pre-fill the moment the page hydrates, so a listener armed after goto can
+  // already have missed the one response everything below waits on.
+  page.on('request', (request) => {
+    const save = saveOf(request)
+    if (save !== null) saves.push(save)
+  })
+  page.on('response', (response) => {
+    if (isWorkoutsPrefill(response.request())) prefillResponses.push(response)
+  })
+
   await page.goto(`${BASE_URL}/today`)
+
+  return { page, saves, prefillResponses }
+}
+
+// A macrotask round trip through the renderer's main thread. The response
+// arriving is only the network half of the pre-fill — the bare setExerciseSets at
+// :236 runs in the page's own .then, after the body is read on that thread — and
+// this puts every continuation already queued there ahead of the next keystroke.
+// It is a drain, not a sleep: it has no duration to tune, and it cannot mask a
+// slow save, because awaitStoredSets still owns that window.
+function drainPageMainThread(page: Page): Promise<unknown> {
+  return page.evaluate(
+    () => new Promise<void>((resolve) => setTimeout(() => setTimeout(resolve, 0), 0)),
+  )
+}
+
+async function awaitMountPrefill(session: TodaySession): Promise<void> {
+  await expect
+    .poll(() => session.prefillResponses.length, {
+      message:
+        'the mount effect never delivered getTodayWorkoutsAction, so the bare ' +
+        'setExerciseSets at today/page.tsx:236 is still unapplied and a keystroke ' +
+        'typed now would be silently discarded',
+    })
+    .toBeGreaterThan(0)
+
+  const delivered = session.prefillResponses[0]
+  expect(delivered?.status(), 'getTodayWorkoutsAction must answer').toBe(200)
+
+  await drainPageMainThread(session.page)
+}
+
+function savingIndicatorOf(page: Page, exerciseId: number) {
+  return cardFor(page, exerciseId).getByText('SAVING...', { exact: true })
+}
+
+async function awaitQuietCard(session: TodaySession, exerciseId: number): Promise<void> {
+  const { page } = session
+  await expect(cardFor(page, exerciseId)).toBeVisible()
+  await expect(weightInputOf(page, exerciseId)).toBeAttached()
+  await expect(savingIndicatorOf(page, exerciseId)).toHaveCount(0)
 }
 
 async function typeFirstSet(
-  page: Page,
+  session: TodaySession,
   exerciseId: number,
   weight: number,
   reps: number,
 ): Promise<void> {
+  const { page } = session
+
+  await awaitMountPrefill(session)
+  await awaitQuietCard(session, exerciseId)
+
   await weightInputOf(page, exerciseId).fill(String(weight))
+  await expect(weightInputOf(page, exerciseId)).toHaveValue(String(weight))
+
   await repsInputOf(page, exerciseId).fill(String(reps))
+  await expect(repsInputOf(page, exerciseId)).toHaveValue(String(reps))
+
+  // The weight is re-read after the second keystroke because the failure this file
+  // exists to keep honest once looked like a missing row and was in fact a lost
+  // keystroke: a pre-fill landing between the two fills silently reverted the
+  // weight to defaultSet()'s 0. Asserting it here names that at the keystroke
+  // instead of 15 seconds later as `Received: null`.
+  await expect(weightInputOf(page, exerciseId)).toHaveValue(String(weight))
+}
+
+async function changeWeight(
+  session: TodaySession,
+  exerciseId: number,
+  weight: number,
+): Promise<void> {
+  const { page } = session
+
+  await awaitMountPrefill(session)
+  await awaitQuietCard(session, exerciseId)
+
+  await weightInputOf(page, exerciseId).fill(String(weight))
+  await expect(weightInputOf(page, exerciseId)).toHaveValue(String(weight))
+}
+
+function savesFor(session: TodaySession, exerciseId: number): SentSave[] {
+  return session.saves.filter((save) => save.exerciseId === exerciseId)
 }
 
 async function awaitStoredSets(
-  page: Page,
+  session: TodaySession,
   exerciseId: number,
   expected: StoredSet[],
 ): Promise<void> {
@@ -132,6 +293,19 @@ async function awaitStoredSets(
       message: `the save never reached workout_logs for exercise ${exerciseId} on ${storedDate()}`,
     })
     .toEqual(expected)
+
+  // The poll above inspects only the stored row, so "no save ever fired" and "a
+  // save fired carrying something else" are the same failure there. Pin the
+  // payload the page actually put on the wire: the row counts as this keystroke's
+  // row only if the page sent this keystroke's sets.
+  const last = savesFor(session, exerciseId).at(-1)
+  expect(
+    last,
+    `no logWorkoutAction was ever sent for exercise ${exerciseId}, so the row in ` +
+      `workout_logs for it on ${storedDate()} was not written by this keystroke`,
+  ).toBeDefined()
+  expect(last?.date, 'the save went to the date the page stores under').toBe(storedDate())
+  expect(last?.sets).toEqual(expected)
 }
 
 test.beforeEach(() => {
@@ -146,11 +320,11 @@ test('a typed set reaches the database through the surviving write path as exact
 }) => {
   const exerciseA = seedExerciseScheduledToday('Write Path Alpha')
 
-  await signInAsBruno(page)
+  const session = await signInAsBruno(page)
 
   await expect(cardFor(page, exerciseA)).toBeVisible()
-  await typeFirstSet(page, exerciseA, 135, 5)
-  await awaitStoredSets(page, exerciseA, [{ weight: 135, reps: 5 }])
+  await typeFirstSet(session, exerciseA, 135, 5)
+  await awaitStoredSets(session, exerciseA, [{ weight: 135, reps: 5 }])
 
   expect(rowsFor(exerciseA)).toHaveLength(1)
   expect(storedSets(exerciseA)).toEqual([{ weight: 135, reps: 5 }])
@@ -159,14 +333,14 @@ test('a typed set reaches the database through the surviving write path as exact
 test('a re-save replaces the row rather than appending a second one', async ({ page }) => {
   const exerciseA = seedExerciseScheduledToday('Write Path Alpha')
 
-  await signInAsBruno(page)
+  const session = await signInAsBruno(page)
 
   await expect(cardFor(page, exerciseA)).toBeVisible()
-  await typeFirstSet(page, exerciseA, 135, 5)
-  await awaitStoredSets(page, exerciseA, [{ weight: 135, reps: 5 }])
+  await typeFirstSet(session, exerciseA, 135, 5)
+  await awaitStoredSets(session, exerciseA, [{ weight: 135, reps: 5 }])
 
-  await weightInputOf(page, exerciseA).fill('185')
-  await awaitStoredSets(page, exerciseA, [{ weight: 185, reps: 5 }])
+  await changeWeight(session, exerciseA, 185)
+  await awaitStoredSets(session, exerciseA, [{ weight: 185, reps: 5 }])
 
   // The repository's update() survived the deletion: a second write to the same
   // (user, exercise, date) replaced the row instead of creating another one.
@@ -181,17 +355,17 @@ test('a second exercise writes its own row and leaves the first untouched', asyn
   const exerciseA = seedExerciseScheduledToday('Write Path Alpha')
   const exerciseB = seedExerciseScheduledToday('Write Path Beta')
 
-  await signInAsBruno(page)
+  const session = await signInAsBruno(page)
 
   await expect(cardFor(page, exerciseA)).toBeVisible()
   await expect(cardFor(page, exerciseB)).toBeVisible()
 
-  await typeFirstSet(page, exerciseA, 135, 5)
-  await awaitStoredSets(page, exerciseA, [{ weight: 135, reps: 5 }])
+  await typeFirstSet(session, exerciseA, 135, 5)
+  await awaitStoredSets(session, exerciseA, [{ weight: 135, reps: 5 }])
   const alphaBefore = rawSetsJson(exerciseA)
 
-  await typeFirstSet(page, exerciseB, 95, 10)
-  await awaitStoredSets(page, exerciseB, [{ weight: 95, reps: 10 }])
+  await typeFirstSet(session, exerciseB, 95, 10)
+  await awaitStoredSets(session, exerciseB, [{ weight: 95, reps: 10 }])
 
   expect(rowsFor(exerciseB)).toHaveLength(1)
   expect(storedSets(exerciseB)).toEqual([{ weight: 95, reps: 10 }])
@@ -206,20 +380,20 @@ test('no second write path fired — the row inventory is exactly the exercises 
   const exerciseA = seedExerciseScheduledToday('Write Path Alpha')
   const exerciseB = seedExerciseScheduledToday('Write Path Beta')
 
-  await signInAsBruno(page)
+  const session = await signInAsBruno(page)
 
   await expect(cardFor(page, exerciseA)).toBeVisible()
-  await typeFirstSet(page, exerciseA, 135, 5)
-  await awaitStoredSets(page, exerciseA, [{ weight: 135, reps: 5 }])
+  await typeFirstSet(session, exerciseA, 135, 5)
+  await awaitStoredSets(session, exerciseA, [{ weight: 135, reps: 5 }])
 
   // The re-save belongs in this case: a resurrected second write path only
   // duplicates on the SECOND write, so an inventory taken after one write per
   // exercise would stay green while the upsert was appending rows.
-  await weightInputOf(page, exerciseA).fill('185')
-  await awaitStoredSets(page, exerciseA, [{ weight: 185, reps: 5 }])
+  await changeWeight(session, exerciseA, 185)
+  await awaitStoredSets(session, exerciseA, [{ weight: 185, reps: 5 }])
 
-  await typeFirstSet(page, exerciseB, 95, 10)
-  await awaitStoredSets(page, exerciseB, [{ weight: 95, reps: 10 }])
+  await typeFirstSet(session, exerciseB, 95, 10)
+  await awaitStoredSets(session, exerciseB, [{ weight: 95, reps: 10 }])
 
   const inventory = db
     .prepare(
@@ -267,10 +441,10 @@ test('the page still renders after the deletion — both cards, no error, no dev
 test('a rejected save surfaces on the card and writes no row', async ({ page }) => {
   const exerciseC = seedExerciseScheduledToday('Write Path Rejected')
 
-  await signInAsBruno(page)
+  const session = await signInAsBruno(page)
 
   await expect(cardFor(page, exerciseC)).toBeVisible()
-  await typeFirstSet(page, exerciseC, -10, 5)
+  await typeFirstSet(session, exerciseC, -10, 5)
 
   await expect(errorOf(page, exerciseC)).toBeVisible()
   await expect(errorOf(page, exerciseC)).not.toHaveText('')
