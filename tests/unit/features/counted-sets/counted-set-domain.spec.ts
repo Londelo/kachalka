@@ -157,6 +157,27 @@ function readDoor(sets: WorkoutSet[]): DoorReading {
   }
 }
 
+/**
+ * The War Logs session card's own two tallies, restated here from the one shared
+ * read rule so this file can pin the numbers the page renders without importing a
+ * client component.
+ *
+ * They are `calcSetTotal` (src/app/history/HistoryPageClient.tsx:34) and
+ * `calcRepTotal` (:45), and both are built on `getSetCount` — never on
+ * `sets.length`, never on a bare `reps`. A test that reached for those two
+ * expressions instead was asserting a formula the page no longer runs, which is
+ * how the count-blind page kept its green suite while the browser showed `SETS 1`
+ * for a session of three. Writing the tallies through `getSetCount` is what makes
+ * the assertions below able to fail.
+ */
+function calcSetTotal(lines: WorkoutSet[]): number {
+  return R.sum(R.map(getSetCount, lines))
+}
+
+function calcRepTotal(lines: WorkoutSet[]): number {
+  return R.sum(R.map((line) => getSetCount(line) * line.reps, lines))
+}
+
 async function countFromEveryReader(): Promise<Record<string, DoorReading>> {
   const byDateAndExercise = workoutRepo.findByDateAndExercise(userId, TODAY, exerciseId)
   const byUser = workoutRepo.findAllByUser(userId)
@@ -326,10 +347,20 @@ describe('journey 2 — legacy equivalence, the no-regression spine', () => {
     // test read tests/e2e/history-page.spec.ts as a string and checked three
     // literals appeared in it — unfailable, and blind to what the app renders. The
     // feature tier's real claim is the contract underneath the page: HistoryPageClient
-    // sums `log.volume`, `log.sets.length` and `set.reps` across the logs this door
-    // publishes, so pinning those three aggregates here is what proves the browser
-    // has the right numbers to render. The browser's own rendering is the e2e tier's
-    // claim, and tests/e2e/history-page.spec.ts:193-195 makes it green.
+    // sums `log.volume`, `calcSetTotal(log.sets)` and `calcRepTotal(log.sets)` across
+    // the logs this door publishes (src/app/history/HistoryPageClient.tsx:136-138), so
+    // pinning those three aggregates here is what proves the browser has the right
+    // numbers to render. The browser's own rendering is the e2e tier's claim, and
+    // tests/e2e/history-page.spec.ts:193-195 makes it green.
+    //
+    // This is the LEGACY half of that contract, and it is uncounted on purpose: three
+    // lines of identical work per exercise, no `count` key anywhere, so here line
+    // count happens to equal set count and reps-per-line happens to equal total reps.
+    // 6 and 54 are therefore right under either dialect, and this fixture alone can
+    // never tell them apart — which is exactly why it once certified a page that was
+    // counting lines. The counted session beside it is what makes these same three
+    // numbers falsifiable. Its values stay pinned at 4,560 / 6 / 54 because they are
+    // the numbers the pre-change page showed and the Playwright suite still expects.
     clearStoredLogs()
 
     // `exerciseId` is already this user's 'Bench Press' (resetDb); `exercises.name`
@@ -365,8 +396,84 @@ describe('journey 2 — legacy equivalence, the no-regression spine', () => {
 
     expect(session.logs).toHaveLength(2)
     expect(R.sum(R.map((log) => log.volume, session.logs))).toBe(4560)
-    expect(R.sum(R.map((log) => log.sets.length, session.logs))).toBe(6)
-    expect(R.sum(R.map((log) => R.sum(R.map((line) => line.reps, log.sets)), session.logs))).toBe(54)
+    expect(R.sum(R.map((log) => calcSetTotal(log.sets), session.logs))).toBe(6)
+    expect(R.sum(R.map((log) => calcRepTotal(log.sets), session.logs))).toBe(54)
+  })
+
+  it('publishes the same three aggregates for a counted session whose two lines stand for five sets, so the page has 4,040 / 5 / 46 to show', () => {
+    // The half of the contract the uncounted session above could never test, and the
+    // one the browser caught while this file did not. There, 6 sets and 54 reps are
+    // right whether a reader sums counts or counts lines, so a count-blind page was
+    // certified by it. Here the two dialects answer differently: two exercises, ONE
+    // stored line each, each line standing for several sets. One line carrying a count
+    // is precisely what the write path produces — it folds identical lines before it
+    // stores — and it is the shape the trace witnessed out of this very door
+    // (`[{id:'s1',reps:5,weight:135,count:3}]`, volume 2025).
+    //
+    // The first four assertions are the conjunction, and the conjunction is the point:
+    // ONE line, THREE sets, THIRTY reps, THREE THOUSAND volume, all four read off the
+    // same array the door handed back. Each one indicts a different thief, witnessed by
+    // mutation: a reader that counts lines reports 1 where 3 is right; one that reads
+    // `reps` once per line reports 10 where 30 is right; and a read path that stamps
+    // `count: 1` onto every line breaks the two tallies while `volume` — computed from
+    // the untouched lines — stays honest at 3000. That last one is the F1 shape itself
+    // (a bar of 2,025 beside a modal of 675), and it is why the volume is asserted in
+    // the same breath as the tallies rather than instead of them. The session sums below
+    // repeat the same test across both exercises, so a door that drops a log is caught too.
+    //
+    // What this fixture deliberately does NOT catch: a read that folds identically-stored
+    // lines. One line is already one line, so a faithful fold is a no-op here. That
+    // defect is owned by the three-identical-legacy-lines test above and by
+    // tests/unit/features/workout/workout-repo-impl.spec.ts; duplicating it here would
+    // only make this test fail for someone else's reason.
+    clearStoredLogs()
+
+    // `exerciseId` is already this user's 'Bench Press' (resetDb); `exercises.name`
+    // is unique, so the session's second exercise is the only one that needs minting.
+    const pressId = Number(
+      db
+        .prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)')
+        .run('Overhead Press', userId).lastInsertRowid,
+    )
+
+    // A raw INSERT rather than the write path, because this is a read test: the lines
+    // are stored in the shape a logged session already holds them, so the door is
+    // graded on a fold it did not perform itself.
+    db.prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)').run(
+      userId,
+      exerciseId,
+      TODAY,
+      JSON.stringify([{ id: 'c1', reps: 10, weight: 100, count: 3 }]),
+    )
+    db.prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)').run(
+      userId,
+      pressId,
+      TODAY,
+      JSON.stringify([{ id: 'c2', reps: 8, weight: 65, count: 2 }]),
+    )
+
+    const session = workoutRepo.findHistoryByDate(userId)[0]!
+    const bench = session.logs.find((log) => log.exerciseId === exerciseId)!
+
+    expect(bench.sets).toHaveLength(1)
+    expect(R.sum(R.map(getSetCount, bench.sets))).toBe(3)
+    expect(R.sum(R.map((line) => getSetCount(line) * line.reps, bench.sets))).toBe(30)
+    expect(bench.volume).toBe(3000)
+
+    // The second line, pinned verbatim: the session tallies below are the sum over
+    // both, so the one that is not the conjunction's own subject is pinned as stored
+    // bytes rather than trusted. Selected by `exerciseId`, not by position — this test
+    // is about how many sets arrived, not about which door row came first.
+    const press = session.logs.find((log) => log.exerciseId === pressId)!
+
+    expect(press.sets).toStrictEqual([{ id: 'c2', reps: 8, weight: 65, count: 2 }])
+
+    // The three figures the session card renders, across both exercises. Two lines
+    // carry five sets and forty-six reps; the count-blind page rendered 2 and 18 here.
+    expect(session.logs).toHaveLength(2)
+    expect(R.sum(R.map((log) => log.volume, session.logs))).toBe(4040)
+    expect(R.sum(R.map((log) => calcSetTotal(log.sets), session.logs))).toBe(5)
+    expect(R.sum(R.map((log) => calcRepTotal(log.sets), session.logs))).toBe(46)
   })
 })
 
