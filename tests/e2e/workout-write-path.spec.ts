@@ -212,6 +212,12 @@ test('no second write path fired — the row inventory is exactly the exercises 
   await typeFirstSet(page, exerciseA, 135, 5)
   await awaitStoredSets(page, exerciseA, [{ weight: 135, reps: 5 }])
 
+  // The re-save belongs in this case: a resurrected second write path only
+  // duplicates on the SECOND write, so an inventory taken after one write per
+  // exercise would stay green while the upsert was appending rows.
+  await weightInputOf(page, exerciseA).fill('185')
+  await awaitStoredSets(page, exerciseA, [{ weight: 185, reps: 5 }])
+
   await typeFirstSet(page, exerciseB, 95, 10)
   await awaitStoredSets(page, exerciseB, [{ weight: 95, reps: 10 }])
 
