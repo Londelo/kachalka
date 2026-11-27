@@ -5,11 +5,21 @@ import * as schema from '@/db/schema'
 import type { ChartRepository } from '@/features/chart/chart-repository'
 import type { ChartDataPoint, IntensitySplit, RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
 import { groupByGranularity } from '@/features/chart/chart-utils'
+import { calculateVolume, getSetCount } from '@/features/workout/workout-entity'
 import type { WorkoutSet } from '@/features/workout/types'
 
-// Unwraps Drizzle { value: ... } wrapper objects from JSON columns.
-// In production, Drizzle .select() queries return JSON columns as { value: T }
-// rather than plain values. This mirrors the pattern in workout-repo-impl.ts.
+// The arrival shape is decided by the bytes stored in the column, not by the query.
+// The column is text('sets', { mode: 'json' }) (src/db/schema.ts:42), so drizzle applies
+// exactly one JSON.parse on read: a row stored double-encoded — what create()/update()
+// write, since they JSON.stringify before drizzle stringifies again — comes back as raw
+// JSON text, and a row stored single-encoded, from before that write path, comes back as
+// an already-parsed array. Projection is not the variable: getVolumeByDate (projected +
+// innerJoin) and getPeakVolume (bare select) were both traced handing back both shapes.
+// The { value: T } wrapper branch is defensive, not load-bearing: no query in this file and no
+// caller in src/ ever hands these doors a wrapped row — drizzle hands plain values. The only
+// thing in the repo that does is the pair of "a Drizzle wrapper around ..." fixture cases in
+// tests/unit/features/chart/chart-repo-impl.spec.ts, which is the whole of its coverage. It
+// stays in case a future caller hands in a pre-wrapped row.
 function unwrapJson<T>(value: unknown): T {
   if (typeof value === 'object' && value !== null && 'value' in value) {
     return (value as { value: T }).value
@@ -31,9 +41,9 @@ export function mapRowToDataPoint(row: Record<string, unknown>): ChartDataPoint 
   const date = unwrapJson<string>(row.date)
   return {
     date,
-    volume: sets.reduce((t, s) => t + s.reps * s.weight, 0),
+    volume: calculateVolume(sets),
     sets,
-    exercises: [{ name: exerciseName, sets }],
+    exercises: [{ name: exerciseName, sets, setCount: sets.reduce((n, s) => n + getSetCount(s), 0) }],
   }
 }
 
@@ -120,7 +130,7 @@ export function createSqliteChartRepository(db: ReturnType<typeof Database>): Ch
 
     const volumes = rows.map((row: Record<string, unknown>) => {
       const sets = parseSets(row.sets)
-      return sets.reduce((t, s) => t + s.reps * s.weight, 0)
+      return calculateVolume(sets)
     })
 
     return volumes.length > 0 ? Math.max(...volumes) : 0

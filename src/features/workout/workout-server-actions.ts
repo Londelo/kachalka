@@ -49,10 +49,13 @@ export async function updateWorkoutAction(
 type ExerciseInfo = {
   exerciseId: number
   exerciseName: string
-  lastLog: { weight: number; reps: number }[] | null
+  lastLog: { id: string; weight: number; reps: number; count?: number }[] | null
 }
 
-export type TodayWorkouts = Record<number, { weight: number; reps: number }[]>
+export type TodayWorkouts = Record<
+  number,
+  { id: string; weight: number; reps: number; count?: number }[]
+>
 
 export async function getTodayExercisesAction(
   userId: number,
@@ -93,7 +96,12 @@ export async function getTodayWorkoutsAction(
     const logs = repo.findByDate(userId, today)
     const workouts: TodayWorkouts = {}
     for (const log of logs) {
-      workouts[log.exerciseId] = log.sets.map(s => ({ weight: s.weight, reps: s.reps }))
+      workouts[log.exerciseId] = log.sets.map(s => ({
+        id: s.id,
+        weight: s.weight,
+        reps: s.reps,
+        count: s.count,
+      }))
     }
     return { success: true, workouts }
   } catch (e) {

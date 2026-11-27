@@ -15,13 +15,11 @@ import {
   getExerciseChartData,
   getAllExerciseChartData,
 } from '@/features/chart/chart-server-actions'
-import type { RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
+import type { ChartDataPoint, RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
+import { calculateVolume, getSetCount } from '@/features/workout/workout-entity'
 
-type DataPoint = {
-  date: string
-  volume: number
-  sets: { id: string; reps: number; weight: number }[]
-  exercises: { name: string; sets: { id: string; reps: number; weight: number }[] }[]
+function toBars(chartData: ChartDataPoint[] | null): ChartDataPoint[] {
+  return chartData ?? []
 }
 
 function formatDate(dateStr: string): string {
@@ -36,7 +34,7 @@ function formatFullDate(dateStr: string): string {
   return `${DAYS[d.getDay()]}, ${String(d.getDate()).padStart(2, '0')} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
 }
 
-function calcExerciseMetrics(exercises: DataPoint['exercises']): {
+function calcExerciseMetrics(exercises: ChartDataPoint['exercises']): {
   name: string
   totalSets: number
   totalReps: number
@@ -44,9 +42,22 @@ function calcExerciseMetrics(exercises: DataPoint['exercises']): {
   maxWeight: number
 }[] {
   return exercises.map((ex) => {
-    const totalSets = ex.sets.length
-    const totalReps = ex.sets.reduce((sum, s) => sum + s.reps, 0)
-    const totalVolume = ex.sets.reduce((sum, s) => sum + s.reps * s.weight, 0)
+    // The set tally is the server's own — `getSetCount` over this exercise's lines
+    // at chart-utils.ts:68 — so the row and the bar can never disagree about how
+    // many sets a session held.
+    const totalSets = ex.setCount
+    // A line's reps are the reps of one set, so a line standing for three sets is
+    // three lots of them. `getSetCount` is the shared read rule that says so.
+    const totalReps = ex.sets.reduce((sum, s) => sum + getSetCount(s) * s.reps, 0)
+    // The one authored volume rule — the same call the bar's height is built from
+    // at chart-repo-impl.ts:41. This file used to keep a private product of reps and
+    // weight that had no idea `count` existed, so one session of 3 × 135kg × 5
+    // rendered 2,025 on the bar and 675 in the modal that bar opens.
+    //
+    // `selectedBar.volume` is not a substitute for this: a week or month bar groups
+    // every exercise under one bar, and that figure is the whole group's total, so
+    // one row of an ALL EXERCISES month would claim the volume of the entire month.
+    const totalVolume = calculateVolume(ex.sets)
     const maxWeight = ex.sets.length > 0 ? Math.max(...ex.sets.map((s) => s.weight)) : 0
     return { name: ex.name, totalSets, totalReps, totalVolume, maxWeight }
   })
@@ -62,9 +73,9 @@ export default function ProgressPage() {
   const [selectedExerciseName, setSelectedExerciseName] = useState<string>('')
   const [range, setRange] = useState<RangeFilter>('6M')
   const [granularity, setGranularity] = useState<TimeGranularity>('month')
-  const [dataPoints, setDataPoints] = useState<DataPoint[]>([])
+  const [dataPoints, setDataPoints] = useState<ChartDataPoint[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedBar, setSelectedBar] = useState<DataPoint | null>(null)
+  const [selectedBar, setSelectedBar] = useState<ChartDataPoint | null>(null)
 
   const { start, end } = useLoading()
 
@@ -86,14 +97,14 @@ export default function ProgressPage() {
         if (!selectedExerciseId) {
           const chartData = await getAllExerciseChartData(userId, range, granularity)
           if (!cancelled) {
-            setDataPoints(chartData ?? [])
+            setDataPoints(toBars(chartData))
             setLoading(false)
             end('progress')
           }
         } else {
           const chartData = await getExerciseChartData(userId, selectedExerciseId, range, granularity)
           if (!cancelled) {
-            setDataPoints(chartData ?? [])
+            setDataPoints(toBars(chartData))
             setLoading(false)
             end('progress')
           }
@@ -268,7 +279,7 @@ export default function ProgressPage() {
                     radius={[4, 4, 0, 0]}
                     onClick={(data) => {
                       if (data && data.payload) {
-                        setSelectedBar(data.payload as DataPoint)
+                        setSelectedBar(data.payload)
                       }
                     }}
                   />
