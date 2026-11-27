@@ -4,7 +4,6 @@ import {
   calculateVolume,
   getSetCount,
   collapseSets,
-  COUNT_TOO_SMALL,
   WorkoutLog,
 } from '@/features/workout/workout-entity'
 import type { WorkoutSet } from '@/features/workout/types'
@@ -248,34 +247,36 @@ describe('calculateVolume', () => {
     expect(calculateVolume(sets)).toBe(expected)
   })
 
-  const refusedCounts: { label: string; count: unknown }[] = [
-    { label: '0', count: 0 },
-    { label: '-2', count: -2 },
-    { label: '0.5, which floors to 0', count: 0.5 },
+  const unusableCounts: { label: string; count: unknown }[] = [
+    { label: '0, which the clamp lifts back to one', count: 0 },
+    { label: 'the negative -2', count: -2 },
+    { label: '0.5, which floors to 0 and is then lifted back to one', count: 0.5 },
     { label: 'NaN', count: NaN },
     { label: 'Infinity', count: Infinity },
   ]
 
-  it.each(refusedCounts)('refuses a line whose count is $label', ({ count }) => {
-    const total = () => calculateVolume([{ reps: 5, weight: 100, count: count as number }])
-
-    expect(total).toThrow(new Error(REFUSAL_MESSAGE))
+  it.each(unusableCounts)('charges one set for a line whose count is $label', ({ count }) => {
+    expect(calculateVolume([{ reps: 5, weight: 100, count: count as number }])).toBe(500)
   })
 
-  it('refuses the whole total when only a later line carries a bad count', () => {
-    const total = () =>
+  it('keeps every earlier line intact when only a later line carries an unusable count', () => {
+    expect(
       calculateVolume([
+        { reps: 5, weight: 100, count: 3 },
         { reps: 5, weight: 100 },
         { reps: 5, weight: 100, count: 0 },
-      ])
-
-    expect(total).toThrow(new Error(REFUSAL_MESSAGE))
+      ]),
+    ).toBe(2500)
   })
 
-  it('refuses a bad count with the very message the shared rule throws', () => {
-    const ruleMessage = messageThrownBy(() => getSetCount({ count: 0 }))
+  it('asks the shared rule how many sets a line is worth instead of counting the line itself', () => {
+    const line = { reps: 7, weight: 45, count: '3' } as unknown as {
+      reps: number
+      weight: number
+      count?: number
+    }
 
-    expect(() => calculateVolume([{ reps: 5, weight: 100, count: 0 }])).toThrow(ruleMessage)
+    expect(calculateVolume([line])).toBe(getSetCount(line) * 45 * 7)
   })
 })
 
@@ -286,12 +287,8 @@ function messageThrownBy(run: () => unknown): string {
     return (error as Error).message
   }
 
-  throw new Error('the shared rule was expected to throw and did not')
+  throw new Error('the write path was expected to throw and did not')
 }
-
-// The shared rule's own sentence, imported rather than re-spelled here: a second
-// literal in this file is how the hyphen/em-dash drift became load-bearing.
-const REFUSAL_MESSAGE = COUNT_TOO_SMALL
 
 describe('getSetCount', () => {
   const acceptedCases: { label: string; line: { count?: number }; expected: number }[] = [
@@ -314,36 +311,34 @@ describe('getSetCount', () => {
     expect(getSetCount(line)).toBe(expected)
   })
 
-  const refusedCases: { label: string; count: unknown }[] = [
-    { label: '0.5, which floors to 0', count: 0.5 },
+  const unusableCounts: { label: string; count: unknown }[] = [
     { label: '0', count: 0 },
-    { label: '-1', count: -1 },
-    { label: '-0.5, a legal HTML float that floors to 0', count: -0.5 },
+    { label: 'the negative -1', count: -1 },
+    { label: '0.5, which floors to 0', count: 0.5 },
+    { label: '-0.5, a legal HTML float that floors to -1', count: -0.5 },
     { label: 'NaN', count: NaN },
-    { label: 'Infinity', count: Infinity },
     { label: '-Infinity', count: -Infinity },
     { label: 'the non-numeric string "heavy"', count: 'heavy' },
-    { label: 'the numeric string "3", which Math.floor would accept', count: '3' },
-    { label: 'the boolean true, which Math.floor would read as 1', count: true },
+    {
+      label: 'the numeric string "3", which a coercing isFinite would have read as three',
+      count: '3',
+    },
+    { label: 'the boolean true', count: true },
   ]
 
-  it.each(refusedCases)('refuses the count $label', ({ count }) => {
-    const read = () => getSetCount({ count: count as number })
-
-    expect(read).toThrow(REFUSAL_MESSAGE)
+  it.each(unusableCounts)('reads one set for the unusable count $label', ({ count }) => {
+    expect(getSetCount({ count: count as number })).toBe(1)
   })
 
-  it.each(refusedCases)('tells the lifter what to do when the count is $label', ({ count }) => {
-    const read = () => getSetCount({ count: count as number })
-
-    expect(read).toThrow(/count/i)
-    expect(read).toThrow(/enter how many sets you did/i)
-    expect(read).toThrow(/leave it blank for one/i)
-    expect(read).not.toThrow('Must log at least one set')
+  it('reads one set for Infinity, which both Math.floor and the clamp would have let through', () => {
+    expect(getSetCount({ count: Infinity })).toBe(1)
   })
 
-  it('throws an Error instance, not a bare string', () => {
-    expect(() => getSetCount({ count: 0 })).toThrowError(Error)
+  it('leaves a stored line carrying a corrupt count exactly as it found it', () => {
+    const line = { count: '3' } as unknown as { count?: number }
+
+    expect(getSetCount(line)).toBe(1)
+    expect(line).toEqual({ count: '3' })
   })
 
   it('never stamps the default onto a line that carried no count', () => {
@@ -639,19 +634,18 @@ describe('collapseSets', () => {
     expect(collapseSets(once)).toStrictEqual(once)
   })
 
-  it('propagates the shared count rule refusal rather than swallowing it', () => {
-    const ruleMessage = messageThrownBy(() => getSetCount({ count: 0 }))
-
-    expect(() => collapseSets([{ id: 'a', reps: 5, weight: 100, count: 0 }])).toThrow(ruleMessage)
+  it('folds a lone line whose count is 0 to one set rather than refusing it', () => {
+    expect(collapseSets([{ id: 'a', reps: 5, weight: 100, count: 0 }])).toStrictEqual([
+      { id: 'a', reps: 5, weight: 100, count: 1 },
+    ])
   })
 
-  it('refuses the whole fold when only a later line carries an unusable count', () => {
-    const fold = () =>
+  it('folds the whole list when only a later line carries an unusable count', () => {
+    expect(
       collapseSets([
-        { id: 'a', reps: 5, weight: 100 },
-        { id: 'b', reps: 5, weight: 100, count: 0 },
-      ])
-
-    expect(fold).toThrow(REFUSAL_MESSAGE)
+        { id: 'a', reps: 5, weight: 100, count: 3 },
+        { id: 'b', reps: 5, weight: 100, count: NaN },
+      ]),
+    ).toStrictEqual([{ id: 'a', reps: 5, weight: 100, count: 4 }])
   })
 })
