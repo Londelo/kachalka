@@ -15,8 +15,11 @@ import type { WorkoutSet } from '@/features/workout/types'
 // JSON text, and a row stored single-encoded, from before that write path, comes back as
 // an already-parsed array. Projection is not the variable: getVolumeByDate (projected +
 // innerJoin) and getPeakVolume (bare select) were both traced handing back both shapes.
-// The { value: T } wrapper branch is the one no query in this file produces; it serves
-// direct callers that hand-build such a row.
+// The { value: T } wrapper branch is defensive, not load-bearing: no query in this file and no
+// caller in src/ ever hands these doors a wrapped row — drizzle hands plain values. The only
+// thing in the repo that does is the pair of "a Drizzle wrapper around ..." fixture cases in
+// tests/unit/features/chart/chart-repo-impl.spec.ts, which is the whole of its coverage. It
+// stays in case a future caller hands in a pre-wrapped row.
 function unwrapJson<T>(value: unknown): T {
   if (typeof value === 'object' && value !== null && 'value' in value) {
     return (value as { value: T }).value

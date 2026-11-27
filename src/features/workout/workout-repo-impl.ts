@@ -256,8 +256,10 @@ export function createSqliteWorkoutRepository(db: ReturnType<typeof Database>): 
         // not how this query is written: those double-encoded rows come back as raw JSON text,
         // and a row written before that write path — stored single-encoded — comes back as an
         // already-parsed array. This door projects and still sees both. The { value: ... }
-        // wrapper branch is the one no query here produces; it serves direct callers that
-        // hand-build such a row. Every branch stays load-bearing.
+        // wrapper branch below is defensive and unexercised: no query here and no caller in
+        // src/ or in the suite ever hands this door a wrapped row, so unlike the two branches
+        // after it — where deleting either one fails two browser tests — deleting this one
+        // fails nothing. It stays in case a future caller hands in a pre-wrapped row.
         let unwrappedSets: unknown
         if (typeof setsValue === 'object' && setsValue !== null && 'value' in setsValue) {
           unwrappedSets = (setsValue as { value: unknown }).value
