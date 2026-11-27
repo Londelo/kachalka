@@ -18,33 +18,8 @@ import {
 import type { ChartDataPoint, RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
 import { calculateVolume, getSetCount } from '@/features/workout/workout-entity'
 
-// This mirrors the bar the chart chain actually hands back — `ChartBarData`, not
-// the `ChartDataPoint` the server action is annotated with. `getVolumeByDate`
-// returns `bar.exercises` verbatim (chart-repo-impl.ts:104), so each line here is
-// a `collapseSets` output that owns its own `count`, and each exercise carries the
-// server's own `setCount`. Declaring either field away is what let this file invent
-// its own arithmetic: the component could not reach a count it had not declared.
-type DataPoint = {
-  date: string
-  volume: number
-  sets: { id: string; reps: number; weight: number }[]
-  exercises: {
-    name: string
-    sets: { id: string; reps: number; weight: number; count?: number }[]
-    setCount: number
-  }[]
-}
-
-// Both chart actions are annotated `Promise<ChartDataPoint[]>`, and `ChartDataPoint`
-// denies that a set tally exists. The bytes disagree: this page always asks for a
-// granularity, so both actions take the grouped path, where `getVolumeByDate` hands
-// back `bar.exercises` verbatim (chart-repo-impl.ts:104) — `setCount` and each line's
-// `count` included. The annotation is the thing that is wrong, not the wire, so the
-// bridge is asserted here, once, rather than letting the modal fall back to arithmetic
-// of its own. It retires the moment chart-entity.ts declares `setCount` on the door
-// these actions use.
-function toBars(chartData: ChartDataPoint[] | null): DataPoint[] {
-  return (chartData ?? []) as DataPoint[]
+function toBars(chartData: ChartDataPoint[] | null): ChartDataPoint[] {
+  return chartData ?? []
 }
 
 function formatDate(dateStr: string): string {
@@ -59,7 +34,7 @@ function formatFullDate(dateStr: string): string {
   return `${DAYS[d.getDay()]}, ${String(d.getDate()).padStart(2, '0')} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
 }
 
-function calcExerciseMetrics(exercises: DataPoint['exercises']): {
+function calcExerciseMetrics(exercises: ChartDataPoint['exercises']): {
   name: string
   totalSets: number
   totalReps: number
@@ -98,9 +73,9 @@ export default function ProgressPage() {
   const [selectedExerciseName, setSelectedExerciseName] = useState<string>('')
   const [range, setRange] = useState<RangeFilter>('6M')
   const [granularity, setGranularity] = useState<TimeGranularity>('month')
-  const [dataPoints, setDataPoints] = useState<DataPoint[]>([])
+  const [dataPoints, setDataPoints] = useState<ChartDataPoint[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedBar, setSelectedBar] = useState<DataPoint | null>(null)
+  const [selectedBar, setSelectedBar] = useState<ChartDataPoint | null>(null)
 
   const { start, end } = useLoading()
 
@@ -304,7 +279,7 @@ export default function ProgressPage() {
                     radius={[4, 4, 0, 0]}
                     onClick={(data) => {
                       if (data && data.payload) {
-                        setSelectedBar(data.payload as DataPoint)
+                        setSelectedBar(data.payload)
                       }
                     }}
                   />

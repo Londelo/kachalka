@@ -4,7 +4,7 @@ export type ChartDataPoint = {
   date: string
   volume: number
   sets: WorkoutSet[]
-  exercises: { name: string; sets: WorkoutSet[] }[]
+  exercises: { name: string; sets: WorkoutSet[]; setCount: number }[]
 }
 
 export type ChartBarData = {

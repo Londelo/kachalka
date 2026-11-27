@@ -5,7 +5,7 @@ import * as schema from '@/db/schema'
 import type { ChartRepository } from '@/features/chart/chart-repository'
 import type { ChartDataPoint, IntensitySplit, RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
 import { groupByGranularity } from '@/features/chart/chart-utils'
-import { calculateVolume } from '@/features/workout/workout-entity'
+import { calculateVolume, getSetCount } from '@/features/workout/workout-entity'
 import type { WorkoutSet } from '@/features/workout/types'
 
 // The arrival shape is decided by the bytes stored in the column, not by the query.
@@ -40,7 +40,7 @@ export function mapRowToDataPoint(row: Record<string, unknown>): ChartDataPoint 
     date,
     volume: calculateVolume(sets),
     sets,
-    exercises: [{ name: exerciseName, sets }],
+    exercises: [{ name: exerciseName, sets, setCount: sets.reduce((n, s) => n + getSetCount(s), 0) }],
   }
 }
 
