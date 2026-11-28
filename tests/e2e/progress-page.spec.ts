@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page, type Locator } from '@playwright/test'
 
 import { ensureSchema, openE2eDatabase, wipeE2eData } from '../harness/e2e-database'
 import { getE2eBaseUrl } from './e2e-config'
@@ -485,5 +485,235 @@ test('a counted session reads the same sets, reps and volume on the bar and in t
   await expect(
     modal.locator('p').filter({ hasText: 'TOTAL VOLUME' }).locator('..').locator('p').nth(1),
   ).toHaveText('2,025')
+})
+
+// Two calendar days that always share a month and always sit in the past, so a month
+// group is never split by the wall clock the suite runs against.
+function datesInOneMonth(): [string, string] {
+  const now = new Date()
+  const month = now.getUTCMonth()
+  const year = now.getUTCFullYear()
+  const key = month === 0 ? `${year - 1}-12` : `${year}-${String(month).padStart(2, '0')}`
+  return [`${key}-01`, `${key}-02`]
+}
+
+function breakdownRow(page: Page, modal: Locator, name: string): Locator {
+  return modal
+    .locator('[data-id="progress-exercise-row"]')
+    .filter({
+      has: page.locator('[data-id="progress-exercise-name"]', {
+        hasText: new RegExp(`^${name}$`),
+      }),
+    })
+}
+
+function tooltipFigure(page: Page, figure: 'sets' | 'reps' | 'volume'): Locator {
+  return page.locator(`[data-id="progress-tooltip-${figure}"]`)
+}
+
+// The feature's acceptance test. One stored line, performed three times: a reader that
+// ignores `count` calls it 1 set / 5 reps / 675, so every figure below is one the
+// count-blind path cannot produce. Asserted on the data-id hooks the frontend tickets
+// hung on the breakdown and the grand total, so the contract the epic tier targets is
+// the contract proved here.
+test('counted set line reads 2,025 on the bar and in the breakdown', async ({ page }) => {
+  const exerciseId = createExercises(['Bench Press'])[0]
+
+  createWorkoutLog(exerciseId, daysAgo(10), [{ id: 's1', reps: 5, weight: 135, count: 3 }])
+
+  await loginAsBruno(page)
+  await page.goto(`${BASE_URL}/progress`)
+  await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
+
+  await expect(page.locator('[id="progress-bar-chart"] .recharts-bar-rectangle')).toHaveCount(1)
+
+  await openBarModal(page)
+
+  const modal = page.locator('[id="progress-detail-modal"]')
+  const row = breakdownRow(page, modal, 'Bench Press')
+
+  await expect(row.locator('[data-id="progress-exercise-sets"]')).toHaveText('3 sets')
+  await expect(row.locator('[data-id="progress-exercise-reps"]')).toHaveText('15 reps')
+  await expect(row.locator('[data-id="progress-exercise-volume"]')).toHaveText('2,025 vol')
+  await expect(row.locator('[data-id="progress-exercise-max"]')).toHaveText('135 max lb')
+
+  // The grand total is selectedBar.volume — the same number the bar's height is drawn
+  // from — so 2,025 here and 2,025 in the row above is bar and breakdown agreeing.
+  await expect(modal.locator('[data-id="progress-total-volume"]')).toHaveText('2,025')
+})
+
+// The tooltip is the only place the set count reaches the screen before a click, and it
+// had no browser coverage at all before this test. The payload it renders is assembled
+// in the chart module and carried through the server action into page state.
+test('counted set line reports 3 sets in the chart tooltip', async ({ page }) => {
+  const exerciseId = createExercises(['Bench Press'])[0]
+
+  createWorkoutLog(exerciseId, daysAgo(10), [{ id: 's1', reps: 5, weight: 135, count: 3 }])
+
+  await loginAsBruno(page)
+  await page.goto(`${BASE_URL}/progress`)
+  await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
+
+  await expect(page.locator('[id="progress-bar-chart"]')).toBeVisible({ timeout: 10000 })
+  await page.locator('[id="progress-bar-chart"] .recharts-bar-rectangle').first().hover()
+
+  await expect(page.locator('[data-id="progress-tooltip"]')).toBeVisible()
+  await expect(tooltipFigure(page, 'sets')).toHaveText('3 sets')
+  await expect(tooltipFigure(page, 'reps')).toHaveText('15 reps')
+  await expect(tooltipFigure(page, 'volume')).toHaveText('2,025')
+})
+
+// The tooltip is mounted over the bars, so it must not steal the hover contract the
+// existing `modal does not open on hover` test protects: the panel appears, the
+// breakdown does not.
+test('hovering a bar shows the tooltip but still does not open the modal', async ({ page }) => {
+  const exerciseId = createExercises(['Bench Press'])[0]
+
+  createWorkoutLog(exerciseId, daysAgo(10), [{ id: 's1', reps: 5, weight: 135, count: 3 }])
+
+  await loginAsBruno(page)
+  await page.goto(`${BASE_URL}/progress`)
+  await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
+
+  await expect(page.locator('[id="progress-bar-chart"]')).toBeVisible({ timeout: 10000 })
+  await page.locator('[id="progress-bar-chart"] .recharts-bar-rectangle').first().hover()
+
+  await expect(page.locator('[data-id="progress-tooltip"]')).toBeVisible()
+  await expect(page.locator('[id="progress-detail-modal"]')).not.toBeVisible()
+})
+
+// The companion of the hover case: the tooltip sits between the pointer and the bar and
+// must not intercept the click that opens the breakdown.
+test('clicking a bar still opens the modal with the tooltip mounted', async ({ page }) => {
+  const exerciseId = createExercises(['Bench Press'])[0]
+
+  createWorkoutLog(exerciseId, daysAgo(10), [{ id: 's1', reps: 5, weight: 135, count: 3 }])
+
+  await loginAsBruno(page)
+  await page.goto(`${BASE_URL}/progress`)
+  await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
+
+  await expect(page.locator('[id="progress-bar-chart"]')).toBeVisible({ timeout: 10000 })
+
+  const bar = page.locator('[id="progress-bar-chart"] .recharts-bar-rectangle').first()
+  await bar.hover()
+  await expect(page.locator('[data-id="progress-tooltip"]')).toBeVisible()
+
+  await bar.click()
+
+  const modal = page.locator('[id="progress-detail-modal"]')
+  await expect(modal).toBeVisible({ timeout: 5000 })
+  await expect(modal.locator('[data-id="progress-total-volume"]')).toHaveText('2,025')
+})
+
+// The no-migration guarantee: rows written before the count field existed must keep the
+// figures they had. These are the numbers the pre-count suite asserted, restated on the
+// hooks so a count-blind reader and a count-aware reader are forced to agree here.
+test('legacy session with no count field renders today’s figures unchanged', async ({ page }) => {
+  const exerciseId = createExercises(['Bench Press'])[0]
+
+  createWorkoutLog(exerciseId, daysAgo(10), [
+    { id: 's1', reps: 5, weight: 135 },
+    { id: 's2', reps: 3, weight: 155 },
+  ])
+
+  await loginAsBruno(page)
+  await page.goto(`${BASE_URL}/progress`)
+  await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
+
+  await openBarModal(page)
+
+  const modal = page.locator('[id="progress-detail-modal"]')
+  const row = breakdownRow(page, modal, 'Bench Press')
+
+  await expect(row.locator('[data-id="progress-exercise-sets"]')).toHaveText('2 sets')
+  await expect(row.locator('[data-id="progress-exercise-reps"]')).toHaveText('8 reps')
+  await expect(row.locator('[data-id="progress-exercise-volume"]')).toHaveText('1,140 vol')
+  await expect(row.locator('[data-id="progress-exercise-max"]')).toHaveText('155 max lb')
+  await expect(modal.locator('[data-id="progress-total-volume"]')).toHaveText('1,140')
+})
+
+// One session holding both shapes at once: the uncounted line must still read one set
+// while the counted line reads two, in the same row.
+test('mixed legacy and counted lines in one session', async ({ page }) => {
+  const exerciseId = createExercises(['Bench Press'])[0]
+
+  createWorkoutLog(exerciseId, daysAgo(10), [
+    { id: 's1', reps: 5, weight: 135 },
+    { id: 's2', reps: 3, weight: 155, count: 2 },
+  ])
+
+  await loginAsBruno(page)
+  await page.goto(`${BASE_URL}/progress`)
+  await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
+
+  await openBarModal(page)
+
+  const modal = page.locator('[id="progress-detail-modal"]')
+  const row = breakdownRow(page, modal, 'Bench Press')
+
+  await expect(row.locator('[data-id="progress-exercise-sets"]')).toHaveText('3 sets')
+  await expect(row.locator('[data-id="progress-exercise-reps"]')).toHaveText('11 reps')
+  await expect(row.locator('[data-id="progress-exercise-volume"]')).toHaveText('1,605 vol')
+  await expect(modal.locator('[data-id="progress-total-volume"]')).toHaveText('1,605')
+})
+
+// The count has to survive the aggregation hop, not just the read hop: two sessions
+// folded into one month bar, both counts credited into one breakdown row.
+test('month granularity credits set counts across sessions', async ({ page }) => {
+  const exerciseId = createExercises(['Bench Press'])[0]
+  const [firstDate, secondDate] = datesInOneMonth()
+
+  createWorkoutLog(exerciseId, firstDate, [{ id: 's1', reps: 5, weight: 135, count: 3 }])
+  createWorkoutLog(exerciseId, secondDate, [{ id: 's2', reps: 3, weight: 155, count: 2 }])
+
+  await loginAsBruno(page)
+  await page.goto(`${BASE_URL}/progress`)
+  await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
+
+  await page.getByRole('button', { name: 'month' }).click()
+  await expect(page.getByText('VOLUME BY MONTH')).toBeVisible()
+
+  await expect(page.locator('[id="progress-bar-chart"] .recharts-bar-rectangle')).toHaveCount(1)
+
+  await openBarModal(page)
+
+  const modal = page.locator('[id="progress-detail-modal"]')
+  const row = breakdownRow(page, modal, 'Bench Press')
+
+  await expect(row.locator('[data-id="progress-exercise-sets"]')).toHaveText('5 sets')
+  await expect(row.locator('[data-id="progress-exercise-reps"]')).toHaveText('21 reps')
+  await expect(row.locator('[data-id="progress-exercise-volume"]')).toHaveText('2,955 vol')
+  await expect(modal.locator('[data-id="progress-total-volume"]')).toHaveText('2,955')
+})
+
+// The cross-layer contract in ALL mode: the grand total is the bar's own aggregate and
+// the rows are the per-exercise aggregates, built on two different paths through the
+// chart module. They must add up, or a bar disagrees with its own breakdown.
+test('grand total equals the sum of the per-exercise breakdown volumes', async ({ page }) => {
+  const ids = createExercises(['Bench Press', 'Squat'])
+
+  const sessionDate = daysAgo(10)
+  createWorkoutLog(ids[0], sessionDate, [{ id: 's1', reps: 5, weight: 135, count: 3 }])
+  createWorkoutLog(ids[1], sessionDate, [{ id: 's2', reps: 5, weight: 100, count: 2 }])
+
+  await loginAsBruno(page)
+  await page.goto(`${BASE_URL}/progress`)
+  await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
+
+  await expect(page.locator('[id="progress-exercise-selector"] select option')).toHaveCount(3)
+
+  await openBarModal(page)
+
+  const modal = page.locator('[id="progress-detail-modal"]')
+  const bench = breakdownRow(page, modal, 'Bench Press')
+  const squat = breakdownRow(page, modal, 'Squat')
+
+  await expect(bench.locator('[data-id="progress-exercise-volume"]')).toHaveText('2,025 vol')
+  await expect(bench.locator('[data-id="progress-exercise-sets"]')).toHaveText('3 sets')
+  await expect(squat.locator('[data-id="progress-exercise-volume"]')).toHaveText('1,000 vol')
+  await expect(squat.locator('[data-id="progress-exercise-sets"]')).toHaveText('2 sets')
+
+  await expect(modal.locator('[data-id="progress-total-volume"]')).toHaveText('3,025')
 })
 

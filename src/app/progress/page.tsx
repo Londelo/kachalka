@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+  Tooltip,
 } from 'recharts'
 import {
   getExercisesWithLogsAction,
@@ -16,7 +17,8 @@ import {
   getAllExerciseChartData,
 } from '@/features/chart/chart-server-actions'
 import type { ChartDataPoint, RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
-import { calculateVolume, getSetCount } from '@/features/workout/workout-entity'
+import { calcExerciseMetrics } from './utils'
+import ProgressTooltip from './progress-tooltip'
 
 function toBars(chartData: ChartDataPoint[] | null): ChartDataPoint[] {
   return chartData ?? []
@@ -32,35 +34,6 @@ function formatFullDate(dateStr: string): string {
   const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
   const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
   return `${DAYS[d.getDay()]}, ${String(d.getDate()).padStart(2, '0')} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
-}
-
-function calcExerciseMetrics(exercises: ChartDataPoint['exercises']): {
-  name: string
-  totalSets: number
-  totalReps: number
-  totalVolume: number
-  maxWeight: number
-}[] {
-  return exercises.map((ex) => {
-    // The set tally is the server's own — `getSetCount` over this exercise's lines
-    // at chart-utils.ts:68 — so the row and the bar can never disagree about how
-    // many sets a session held.
-    const totalSets = ex.setCount
-    // A line's reps are the reps of one set, so a line standing for three sets is
-    // three lots of them. `getSetCount` is the shared read rule that says so.
-    const totalReps = ex.sets.reduce((sum, s) => sum + getSetCount(s) * s.reps, 0)
-    // The one authored volume rule — the same call the bar's height is built from
-    // at chart-repo-impl.ts:41. This file used to keep a private product of reps and
-    // weight that had no idea `count` existed, so one session of 3 × 135kg × 5
-    // rendered 2,025 on the bar and 675 in the modal that bar opens.
-    //
-    // `selectedBar.volume` is not a substitute for this: a week or month bar groups
-    // every exercise under one bar, and that figure is the whole group's total, so
-    // one row of an ALL EXERCISES month would claim the volume of the entire month.
-    const totalVolume = calculateVolume(ex.sets)
-    const maxWeight = ex.sets.length > 0 ? Math.max(...ex.sets.map((s) => s.weight)) : 0
-    return { name: ex.name, totalSets, totalReps, totalVolume, maxWeight }
-  })
 }
 
 function formatVolume(v: number): string {
@@ -283,6 +256,7 @@ export default function ProgressPage() {
                       }
                     }}
                   />
+                  <Tooltip content={<ProgressTooltip />} cursor={false} isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -313,18 +287,22 @@ export default function ProgressPage() {
               {/* Exercise rows */}
               <div className="mb-6 flex flex-col gap-2">
                 {calcExerciseMetrics(selectedBar.exercises).map((ex) => (
-                  <div key={ex.name} className="border-4 border-on-surface bg-surface-container p-3 neo-shadow">
-                    <div className="font-headline-sm font-black uppercase text-on-surface">
+                  <div
+                    key={ex.name}
+                    data-id="progress-exercise-row"
+                    className="border-4 border-on-surface bg-surface-container p-3 neo-shadow"
+                  >
+                    <div data-id="progress-exercise-name" className="font-headline-sm font-black uppercase text-on-surface">
                       {ex.name}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-label-bold text-label-bold text-on-surface">
-                      <span>{ex.totalSets} sets</span>
+                      <span data-id="progress-exercise-sets">{ex.totalSets} sets</span>
                       <span className="text-secondary">·</span>
-                      <span>{ex.totalReps} reps</span>
+                      <span data-id="progress-exercise-reps">{ex.totalReps} reps</span>
                       <span className="text-secondary">·</span>
-                      <span>{ex.totalVolume.toLocaleString()} vol</span>
+                      <span data-id="progress-exercise-volume">{ex.totalVolume.toLocaleString()} vol</span>
                       <span className="text-secondary">·</span>
-                      <span className="ml-auto text-primary">{ex.maxWeight} max lb</span>
+                      <span data-id="progress-exercise-max" className="ml-auto text-primary">{ex.maxWeight} max lb</span>
                     </div>
                   </div>
                 ))}
@@ -333,7 +311,7 @@ export default function ProgressPage() {
               {/* Grand total footer */}
               <div className="border-t-4 border-on-surface pt-4 text-center">
                 <p className="font-label-mono text-label-mono uppercase text-secondary">TOTAL VOLUME</p>
-                <p className="font-headline-md text-headline-md font-black text-primary">
+                <p data-id="progress-total-volume" className="font-headline-md text-headline-md font-black text-primary">
                   {selectedBar.volume.toLocaleString()}
                 </p>
               </div>
