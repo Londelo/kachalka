@@ -3,6 +3,33 @@ import { logWorkoutUseCase } from '@/features/workout/log-workout'
 import type { WorkoutRepository } from '@/features/workout/workout-repository'
 import type { WorkoutSet } from '@/features/workout/types'
 
+// The one spelling, in this file, of each refusal this use case can hand back.
+// Both blocks that pin these sentences read them from here, so neither can drift
+// away from the other — the loose one surviving a change to the strict one is
+// exactly what two copies of a sentence allow.
+//
+// Every fixture that reaches a per-line refusal is a one-line card, so the
+// position log-workout.ts:16 hands validateSet (index + 1) is always 1. The
+// `Line 1: ` prefix is part of the message the lifter is told — a card paints
+// one error string for several lines — so it is part of what these cases pin.
+// EMPTY_MSG is the empty-array guard’s own sentence, not a line’s: bare.
+const WEIGHT_MSG = 'Line 1: Weight must be more than 0 — enter the weight you lifted, or remove the line.'
+const REPS_MSG = 'Line 1: Reps must be at least 1 — enter how many reps you did, or remove the line.'
+const COUNT_MSG = 'Line 1: Set count must be at least 1 — enter how many sets you did, or leave it blank for one.'
+const EMPTY_MSG = 'Must log at least one set'
+
+// The exact-message dialect: the message itself is the thing under test, so a
+// case reads the thrown string and compares it whole. Never a substring match —
+// that passes with or without the prefix the sentences above carry.
+function thrownMessage(run: () => unknown): string {
+  try {
+    run()
+  } catch (error) {
+    return (error as Error).message
+  }
+  throw new Error('Expected the use case to throw, but it returned normally.')
+}
+
 function makeRepo(overrides?: Partial<WorkoutRepository>) {
   return {
     findById: vi.fn(),
@@ -98,7 +125,7 @@ describe('logWorkoutUseCase', () => {
     const repo = makeRepo()
     const useCase = logWorkoutUseCase(repo)
 
-    expect(() => useCase.execute(1, 5, '2025-01-01', [])).toThrow('Must log at least one set')
+    expect(() => useCase.execute(1, 5, '2025-01-01', [])).toThrow(EMPTY_MSG)
     expect(repo.findByDateAndExercise).not.toHaveBeenCalled()
     expect(repo.create).not.toHaveBeenCalled()
   })
@@ -107,7 +134,7 @@ describe('logWorkoutUseCase', () => {
     const repo = makeRepo()
     const useCase = logWorkoutUseCase(repo)
 
-    expect(() => useCase.execute(1, 5, '2025-01-01', [{ id: 's1', reps: 5, weight: -10 }])).toThrow('Weight must be more than 0 — enter the weight you lifted, or remove the line.')
+    expect(thrownMessage(() => useCase.execute(1, 5, '2025-01-01', [{ id: 's1', reps: 5, weight: -10 }]))).toBe(WEIGHT_MSG)
     expect(repo.create).not.toHaveBeenCalled()
   })
 
@@ -143,23 +170,9 @@ describe('logWorkoutUseCase', () => {
   })
 
   describe('refusal order — guard, then raw validation, then fold', () => {
-    // Every fixture below is a one-line card, so the position log-workout.ts:16
-    // hands validateSet (index + 1) is always 1 — the prefix is part of the
-    // message the lifter is told, so it is part of what these cases pin.
-    // EMPTY_MSG is the empty-array guard’s own sentence, not a line’s: bare.
-    const WEIGHT_MSG = 'Line 1: Weight must be more than 0 — enter the weight you lifted, or remove the line.'
-    const REPS_MSG = 'Line 1: Reps must be at least 1 — enter how many reps you did, or remove the line.'
-    const COUNT_MSG = 'Line 1: Set count must be at least 1 — enter how many sets you did, or leave it blank for one.'
-    const EMPTY_MSG = 'Must log at least one set'
-
-    function thrownMessage(run: () => unknown): string {
-      try {
-        run()
-      } catch (error) {
-        return (error as Error).message
-      }
-      throw new Error('Expected the use case to throw, but it returned normally.')
-    }
+    // The sentences these cases pin, and why they carry the `Line 1: ` prefix,
+    // live with the constants at the top of the file. Every fixture below is a
+    // one-line card, so the position is always 1.
 
     function untouchedRepo(repo: any) {
       expect(repo.findByDateAndExercise).not.toHaveBeenCalled()
