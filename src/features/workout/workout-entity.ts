@@ -76,8 +76,38 @@ export function calculateRepTotal(sets: { reps: number; count?: number }[]): num
   return sets.reduce((total, line) => total + getSetCount(line) * line.reps, 0)
 }
 
-export function collapseSets(sets: WorkoutSet[]): WorkoutSet[] {
-  const folded = new Map<string, { first: WorkoutSet; count: number }>()
+/**
+ * The three figures the fold is defined over, and nothing else.
+ *
+ * A stored line is a `WorkoutSet` and carries an `id`; a line read out for a
+ * read-only view may carry no `id` at all. Both are the same work to the fold,
+ * so the fold is typed against this subset and each entry point below decides
+ * what its own callers get back.
+ */
+export type CollapsibleSet = {
+  weight: number
+  reps: number
+  count?: number
+}
+
+/** A folded line: the figures of the first line of its group, count summed. */
+export type CollapsedSet = {
+  weight: number
+  reps: number
+  count: number
+}
+
+/**
+ * The fold itself, shared by both entry points below so there is exactly one
+ * spelling of it: one line per distinct `weight,reps` pair, in order of first
+ * appearance, its count the sum of every matching line's `getSetCount`.
+ *
+ * It groups and sums and judges nothing — `validateSet` is the write path's
+ * judge — and it hands back the surviving line by reference inside its own
+ * freshly built wrapper, so the lines it was handed are never touched.
+ */
+function foldByWork<T extends CollapsibleSet>(sets: T[]): Array<{ first: T; count: number }> {
+  const folded = new Map<string, { first: T; count: number }>()
 
   for (const line of sets) {
     const key = `${line.weight},${line.reps}`
@@ -90,10 +120,34 @@ export function collapseSets(sets: WorkoutSet[]): WorkoutSet[] {
     }
   }
 
-  return [...folded.values()].map(({ first, count }) => ({
+  return [...folded.values()]
+}
+
+/**
+ * Stored lines in, stored lines out: each folded line wears the id of the line
+ * that survived its group, which is what lets a keyed list update that row
+ * instead of remounting it.
+ */
+export function collapseSets(sets: WorkoutSet[]): WorkoutSet[] {
+  return foldByWork(sets).map(({ first, count }) => ({
     id: first.id,
     reps: first.reps,
     weight: first.weight,
+    count,
+  }))
+}
+
+/**
+ * The same fold for lines that never had an id — a read-only view's rows, say.
+ *
+ * Nothing here invents one and nothing here asks for one: the caller gets the
+ * three figures and the summed count, which is the whole of what a view with no
+ * save path can render.
+ */
+export function collapseSetFigures(sets: CollapsibleSet[]): CollapsedSet[] {
+  return foldByWork(sets).map(({ first, count }) => ({
+    weight: first.weight,
+    reps: first.reps,
     count,
   }))
 }

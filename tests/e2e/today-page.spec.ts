@@ -77,12 +77,14 @@ test('a typed set is persisted by the debounced save and comes back on the scree
   await expect(card).toBeVisible()
   await expect(card.getByRole('heading', { name: 'Debounce Probe' })).toBeVisible()
 
-  const weightInput = card.locator('input[type="number"]').first()
-  const repsInput = card.locator('input[type="number"]').nth(1)
+  const weightInput = card.getByLabel('Weight in pounds for Debounce Probe')
+  const repsInput = card.getByLabel('Reps for Debounce Probe')
+  const countInput = card.getByLabel('Set count for Debounce Probe')
 
   const startedAt = Date.now()
   await weightInput.fill('135')
   await repsInput.fill('5')
+  await countInput.fill('1')
 
   await expect
     .poll(() => loggedSetsToday(exerciseId), {
