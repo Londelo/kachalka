@@ -155,6 +155,16 @@ function seedExerciseScheduledToday(name: string): number {
   return seedExerciseScheduledInZone(name, appDayIndexInZone(MACHINE_ZONE))
 }
 
+type SeededLine = { id: string; weight: number; reps: number; count: number }
+
+// The pre-fill door reads on the SERVER's local day, so a row meant to come back
+// into the card as an already-numbered line has to be written on that day.
+function seedSavedSet(exerciseId: number, date: string, sets: SeededLine[]): void {
+  db.prepare(
+    'INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)',
+  ).run(BRUNO_USER_ID, exerciseId, date, JSON.stringify(sets))
+}
+
 // ── the page ──────────────────────────────────────────────────────────────────
 
 function cardOf(page: Page, exerciseId: number) {
@@ -167,6 +177,14 @@ function errorOf(page: Page, exerciseId: number) {
 
 function rowIdsOf(page: Page, exerciseId: number) {
   return page.locator(`[data-id^="set-count-${exerciseId}-"]`)
+}
+
+// The keyed identity of each row on the card, read off the data-id the shell puts
+// there. A row that comes back under a different one was unmounted and remounted.
+function rowIdValuesOf(page: Page, exerciseId: number): Promise<string[]> {
+  return rowIdsOf(page, exerciseId).evaluateAll((elements) =>
+    elements.map((element) => element.getAttribute('data-id') ?? ''),
+  )
 }
 
 function inputOf(page: Page, exerciseId: number, name: string, field: 'count' | 'weight' | 'reps', index = 0) {
@@ -319,9 +337,12 @@ type RowValues = { count: string; weight: string; reps: string }
 // Nothing is asserted between the keystrokes: the keystroke that completes a
 // duplicate pair destroys the row it was typed into, so an assertion aimed at
 // that row would be aiming at an element the page has already folded away. What
-// the page holds after the typing is expectRowValues' job, and it is the same
-// guard — a keystroke swallowed by the mount pre-fill shows up there as a field
-// that never took the text.
+// the page holds after the typing is expectRowValues' job, and it guards the
+// mount pre-fill — a keystroke discarded by it shows up there as a field that
+// never took the text. It does NOT guard a character swallowed between two
+// characters: fill() hands the whole string over in one input event, so there is
+// no between-two-characters for it to lose one in. The keystroke journey at the
+// foot of this file is the only guard for that.
 async function typeSet(
   session: TodaySession,
   exerciseId: number,
@@ -654,4 +675,131 @@ test.describe('the save lands on the local day', () => {
       'a row on the server day means the page stamped the server clock, not the browser',
     ).toHaveLength(0)
   })
+})
+
+// ── the keystroke journey ─────────────────────────────────────────────────────
+//
+// Every journey above types through fill(), and fill() is not a hand: it assigns
+// el.value wholesale, dispatches one input event, never focuses, never puts a caret
+// anywhere, and finishes before React re-renders — so it cannot be unmounted
+// mid-string, because by the time anything could remount the row the string is
+// already in. The failures this feature actually has all live between two
+// characters: a collapse that answers with a fresh row id, or a render that mints a
+// fresh blank draft, unmounts the input under the caret and the character in flight
+// goes with it; a control that will not accept the key at all never lets the
+// character in to begin with. A suite built on fill() is green on all of those
+// pages.
+//
+// KEYSTROKE_DELAY_MS is what makes the observation possible. A character has to
+// arrive after React has committed the one before it, because a remount that lands
+// after the burst has ended is a remount no character was standing on. 60ms is well
+// past a commit of this card, and a five-character burst still sits inside one
+// 500ms debounce window, so each field below is written by the single save its last
+// keystroke armed.
+
+const KEYSTROKE_DELAY_MS = 60
+
+test('a set typed one character at a time keeps the caret and stores every character', async ({
+  page,
+}) => {
+  const numberedId = seedExerciseScheduledToday('Keystroke Numbered')
+  const blankId = seedExerciseScheduledToday('Keystroke Blank')
+  const letterId = seedExerciseScheduledToday('Keystroke Letter')
+  seedSavedSet(numberedId, MACHINE_LOCAL_DATE, [
+    { id: 'keystroke-numbered-row', weight: 135, reps: 5, count: 3 },
+  ])
+
+  const session = await signInAsBruno(page)
+
+  await expect(cardOf(page, numberedId)).toBeVisible()
+  await expect(cardOf(page, blankId)).toBeVisible()
+  await expect(cardOf(page, letterId)).toBeVisible()
+  await awaitMountPrefill(session)
+  await awaitQuietCard(session, numberedId, 1)
+  await awaitQuietCard(session, blankId, 1)
+  await awaitQuietCard(session, letterId, 1)
+
+  // The two rows below are the two ways the page comes by the row under the caret:
+  // this one arrives numbered from the pre-fill, so every keystroke runs a collapse
+  // over the row being typed into; the other is a card with no saved set at all, so
+  // the page has to produce that row itself. Both are captured before the first
+  // keystroke: an id that comes back different is a row that was unmounted and
+  // remounted under the caret, and the character in flight went with it.
+  const numberedRowIds = await rowIdValuesOf(page, numberedId)
+  const blankRowIds = await rowIdValuesOf(page, blankId)
+
+  // The SET field of the numbered row, because it is the one field that leaves the
+  // row collapsible the whole way through — a weight or a reps keystroke takes the
+  // row in and out of the collapse's reach mid-burst.
+  const numberedCount = inputOf(page, numberedId, 'Keystroke Numbered', 'count')
+  await numberedCount.click()
+  await numberedCount.press('End')
+  await numberedCount.pressSequentially('12', { delay: KEYSTROKE_DELAY_MS })
+
+  await expect(numberedCount).toBeFocused()
+  await expect(numberedCount).toHaveValue('312')
+  expect(
+    await rowIdValuesOf(page, numberedId),
+    'the numbered row the lifter typed into came back under a different id, so the ' +
+      'collapse remounted it mid-keystroke',
+  ).toEqual(numberedRowIds)
+
+  await awaitStoredSets(session, numberedId, BROWSER_LOCAL_DATE, [
+    { weight: 135, reps: 5, count: 312 },
+  ])
+
+  // SET first, on the row the page had to make: once weight and reps are both
+  // numbers the collapse starts rewriting this field, and a count typed into a '1'
+  // the page wrote is not the count a lifter typed into an empty field.
+  const blankCount = inputOf(page, blankId, 'Keystroke Blank', 'count')
+  await blankCount.click()
+  await blankCount.pressSequentially('2', { delay: KEYSTROKE_DELAY_MS })
+  await expect(blankCount).toBeFocused()
+  await expect(blankCount).toHaveValue('2')
+
+  // A half plate, typed the way a hand types it: the dot has to survive being its
+  // own keystroke, sitting between two runs of digits while a collapse commits
+  // after each one.
+  const blankWeight = inputOf(page, blankId, 'Keystroke Blank', 'weight')
+  await blankWeight.click()
+  await blankWeight.pressSequentially('225.5', { delay: KEYSTROKE_DELAY_MS })
+  await expect(blankWeight).toBeFocused()
+  await expect(blankWeight).toHaveValue('225.5')
+
+  const blankReps = inputOf(page, blankId, 'Keystroke Blank', 'reps')
+  await blankReps.click()
+  await blankReps.pressSequentially('8', { delay: KEYSTROKE_DELAY_MS })
+  await expect(blankReps).toBeFocused()
+  await expect(blankReps).toHaveValue('8')
+
+  // The keystroke that made this row collapsible is the one the collapse answers
+  // to: it rewrites the SET field, and it has to rewrite it to what was typed.
+  await expect(blankCount).toHaveValue('2')
+
+  expect(
+    await rowIdValuesOf(page, blankId),
+    'the row the page produced for a card with no saved set came back under a ' +
+      'different id, so a render reminted it mid-keystroke',
+  ).toEqual(blankRowIds)
+
+  await awaitStoredSets(session, blankId, BROWSER_LOCAL_DATE, [
+    { weight: 225.5, reps: 8, count: 2 },
+  ])
+
+  // The last leg types a character a hand can press and a number control will not
+  // accept, and it belongs here rather than beside the junk journey above for one
+  // reason stated in that journey's own comment: fill() cannot deliver a letter to
+  // a number field, so that journey proves the refusal with '1e3' — a string a
+  // number control does hand over. A build that slipped back to type="number"
+  // therefore keeps all seven of them green while the browser eats every letter
+  // typed into the card. Nothing but a real key event, and the character still on
+  // screen afterwards, says which control is underneath.
+  //
+  // The character reaching the field is all this asserts. That the field then
+  // refuses out loud and writes no row is the junk journey's claim, proved once.
+  const letterWeight = inputOf(page, letterId, 'Keystroke Letter', 'weight')
+  await letterWeight.click()
+  await letterWeight.pressSequentially('95x', { delay: KEYSTROKE_DELAY_MS })
+  await expect(letterWeight).toBeFocused()
+  await expect(letterWeight).toHaveValue('95x')
 })
