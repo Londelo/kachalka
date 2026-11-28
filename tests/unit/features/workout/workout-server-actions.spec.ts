@@ -1,6 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const mockDb = {}
+
+const mockDateModule = vi.hoisted(() => ({
+  getTodayLocalDate: vi.fn(),
+}))
 
 const mockWorkoutRepo = {
   findById: vi.fn(),
@@ -92,6 +96,15 @@ vi.mock('@/features/workout/get-workout-history', () => ({
 vi.mock('@/features/workout/get-user-volume', () => ({
   getUserVolumeUseCase: vi.fn(() => mockGetUserVolume),
 }))
+
+vi.mock('@/shared/utils/date', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/shared/utils/date')>()
+  return {
+    ...actual,
+    getTodayISO: vi.fn(actual.getTodayISO),
+    getTodayLocalDate: mockDateModule.getTodayLocalDate,
+  }
+})
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -382,6 +395,84 @@ describe('getTodayWorkoutsAction', () => {
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Unknown error')
+  })
+})
+
+describe('getTodayWorkoutsAction — which calendar day it asks for', () => {
+  const LOCAL_SENTINEL = '2026-11-25'
+  const OTHER_LOCAL_SENTINEL = '2027-03-07'
+  const FROZEN_UTC_INSTANT = '2026-11-27T23:30:00.000Z'
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('asks the repository for exactly the day getTodayLocalDate returned', async () => {
+    mockDateModule.getTodayLocalDate.mockReturnValue(LOCAL_SENTINEL)
+    mockWorkoutRepo.findByDate.mockReturnValue([])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.success).toBe(true)
+    expect(mockWorkoutRepo.findByDate).toHaveBeenCalledTimes(1)
+    expect(mockWorkoutRepo.findByDate).toHaveBeenCalledWith(1, LOCAL_SENTINEL)
+  })
+
+  it('never asks the repository for the UTC calendar day', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(FROZEN_UTC_INSTANT))
+    const utcToday = new Date().toISOString().split('T')[0]
+    mockDateModule.getTodayLocalDate.mockReturnValue(LOCAL_SENTINEL)
+    mockWorkoutRepo.findByDate.mockReturnValue([])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    await getTodayWorkoutsAction(1)
+
+    expect(utcToday).not.toBe(LOCAL_SENTINEL)
+    expect(mockWorkoutRepo.findByDate).toHaveBeenCalledWith(1, LOCAL_SENTINEL)
+    expect(mockWorkoutRepo.findByDate).not.toHaveBeenCalledWith(1, utcToday)
+  })
+
+  it('forwards a different sentinel verbatim rather than recomputing a date', async () => {
+    mockDateModule.getTodayLocalDate.mockReturnValue(OTHER_LOCAL_SENTINEL)
+    mockWorkoutRepo.findByDate.mockReturnValue([])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    await getTodayWorkoutsAction(1)
+
+    expect(mockWorkoutRepo.findByDate).toHaveBeenCalledWith(1, OTHER_LOCAL_SENTINEL)
+  })
+
+  it('never reads the UTC helper getTodayISO', async () => {
+    mockDateModule.getTodayLocalDate.mockReturnValue(LOCAL_SENTINEL)
+    mockWorkoutRepo.findByDate.mockReturnValue([])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    await getTodayWorkoutsAction(1)
+    const dateModule = await import('@/shared/utils/date')
+
+    expect(dateModule.getTodayISO).not.toHaveBeenCalled()
+  })
+
+  it('reads the local clock exactly once per invocation', async () => {
+    mockDateModule.getTodayLocalDate.mockReturnValue(LOCAL_SENTINEL)
+    mockWorkoutRepo.findByDate.mockReturnValue([])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    await getTodayWorkoutsAction(1)
+
+    expect(mockDateModule.getTodayLocalDate).toHaveBeenCalledTimes(1)
+  })
+
+  it('forwards the user id untouched as the first argument', async () => {
+    mockDateModule.getTodayLocalDate.mockReturnValue(LOCAL_SENTINEL)
+    mockWorkoutRepo.findByDate.mockReturnValue([])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    await getTodayWorkoutsAction(42)
+
+    expect(mockWorkoutRepo.findByDate).toHaveBeenCalledWith(42, LOCAL_SENTINEL)
   })
 })
 
