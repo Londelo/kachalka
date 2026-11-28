@@ -22,7 +22,7 @@ type ExerciseItem = {
 
 type ViewMode = 'past' | 'current'
 
-const DEBOUNCE_MS = 500
+const DEBOUNCE_MS = 5000
 
 const FIELD_LABELS: Record<SetDraftField, string> = {
   weight: 'WEIGHT',
