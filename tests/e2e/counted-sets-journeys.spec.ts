@@ -378,6 +378,36 @@ async function openProgressFor(page: Page, exerciseName: string) {
   return bar
 }
 
+// Every journey below walks into a route the dev server this run started has never
+// seen, and in `next dev` the first hit on a route compiles it inside the request
+// that asked — a cold /progress pulls in 2271 modules, recharts among them. That
+// compile is paid out of the test's own 15s budget (playwright.config.ts), so the
+// drawer click lands, Next prints `○ Compiling /progress ...`, and `toHaveURL` at
+// walkTo expires on /history while the route is still building. Nothing on screen is
+// wrong; the budget simply never accounted for a compile.
+//
+// So the routes are compiled here, once, before any journey starts, and the budget
+// stays what it is: it is the thing that makes a genuinely slow journey fail loudly,
+// and inflating it globally would hide exactly the journeys this file exists to
+// prove. A journey that still legitimately needs more than one window says so itself
+// with test.setTimeout.
+const ROUTES_TO_WARM = ['/today', '/history', '/progress', '/plan']
+
+test.beforeAll(async ({ request }) => {
+  // A hook inherits the test budget, and four first-time compiles do not fit in one
+  // save window on a cold .next. This lifts the hook alone — test.setTimeout inside a
+  // beforeAll moves the hook's timeout and leaves every journey below on the 15s it
+  // was sized with, which is the number that makes a slow journey fail loudly.
+  test.setTimeout(60_000)
+
+  for (const route of ROUTES_TO_WARM) {
+    const response = await request.get(`${BASE_URL}${route}`)
+    // A warming step that quietly answered 500 would leave every journey downstream
+    // to time out somewhere else, so the warm itself has to be proved.
+    expect(response.status(), `warming GET ${route} must answer`).toBe(200)
+  }
+})
+
 test.beforeEach(() => {
   ensureSchema(db, process.cwd())
   wipeE2eData(db)
