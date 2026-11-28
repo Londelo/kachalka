@@ -3,7 +3,7 @@
 import type { ChartDataPoint } from '@/features/chart/chart-entity'
 import type { WorkoutSet } from '@/features/workout/types'
 import { calculateVolume } from '@/features/workout/workout-entity'
-import { calcExerciseMetrics, countTotalSets } from './utils'
+import { countTotalReps, countTotalSets } from './utils'
 
 export type ProgressTooltipProps = {
   active?: boolean
@@ -33,7 +33,7 @@ export default function ProgressTooltip({ active, payload, label }: ProgressTool
 
   const sets = readableLines(point.sets)
   const totalSets = countTotalSets(sets)
-  const totalReps = calcExerciseMetrics([{ name: '', sets }])[0].totalReps
+  const totalReps = countTotalReps(sets)
   const totalVolume = calculateVolume(sets)
   const date = point.date ?? label ?? ''
 
