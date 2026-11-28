@@ -1,25 +1,19 @@
 // Wipe ALL test data — deletes everything from all tables.
 // Called by Playwright tests and codegen to ensure a clean database.
+// This runs before the dev server starts, so it builds the schema rather than assuming it.
 
-const Database = require('better-sqlite3')
 const path = require('path')
 
-const dbPath = path.join(__dirname, '..', 'data', 'kachalka.db')
-const db = new Database(dbPath)
-db.pragma('foreign_keys = ON')
+const { ensureSchema, openE2eDatabase, wipeE2eData } = require('../tests/harness/e2e-database.ts')
 
-const tables = db
-  .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('workout_logs','user_routines','exercises','users')")
-  .all()
-  .map((r) => r.name)
+const CHECKOUT_ROOT = path.join(__dirname, '..')
 
-if (tables.length > 0) {
-  db.exec("DELETE FROM workout_logs")
-  db.exec("DELETE FROM user_routines")
-  db.exec("DELETE FROM exercises")
-  db.exec("DELETE FROM users")
-  db.exec("DELETE FROM sqlite_sequence WHERE name IN ('users', 'exercises', 'workout_logs', 'user_routines')")
-}
+const db = openE2eDatabase(CHECKOUT_ROOT)
+ensureSchema(db, CHECKOUT_ROOT)
+wipeE2eData(db)
+db.exec(
+  "DELETE FROM sqlite_sequence WHERE name IN ('users', 'exercises', 'workout_logs', 'user_routines')",
+)
 
 db.close()
 console.log('All test data wiped.')

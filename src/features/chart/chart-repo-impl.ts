@@ -5,11 +5,15 @@ import * as schema from '@/db/schema'
 import type { ChartRepository } from '@/features/chart/chart-repository'
 import type { ChartDataPoint, IntensitySplit, RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
 import { groupByGranularity } from '@/features/chart/chart-utils'
-import type { WorkoutSet } from '@/features/workout/types'
+import {
+  calculateSetCount,
+  calculateVolume,
+  decodeStoredSets,
+} from '@/features/workout/workout-entity'
 
-// Unwraps Drizzle { value: ... } wrapper objects from JSON columns.
-// In production, Drizzle .select() queries return JSON columns as { value: T }
-// rather than plain values. This mirrors the pattern in workout-repo-impl.ts.
+// The { value: T } wrapper branch is defensive, not load-bearing: no query in this file and no
+// caller in src/ ever hands these doors a wrapped name or date — drizzle hands plain values. It
+// stays in case a future caller hands in a pre-wrapped row.
 function unwrapJson<T>(value: unknown): T {
   if (typeof value === 'object' && value !== null && 'value' in value) {
     return (value as { value: T }).value
@@ -17,23 +21,15 @@ function unwrapJson<T>(value: unknown): T {
   return value as T
 }
 
-function parseSets(value: unknown): WorkoutSet[] {
-  const unwrapped = unwrapJson<unknown>(value)
-  if (Array.isArray(unwrapped)) {
-    return unwrapped as WorkoutSet[]
-  }
-  return JSON.parse(unwrapped as string) as WorkoutSet[]
-}
-
 export function mapRowToDataPoint(row: Record<string, unknown>): ChartDataPoint {
-  const sets = parseSets(row.sets)
+  const sets = decodeStoredSets(row.sets)
   const exerciseName = unwrapJson<string>(row.exerciseName)
   const date = unwrapJson<string>(row.date)
   return {
     date,
-    volume: sets.reduce((t, s) => t + s.reps * s.weight, 0),
+    volume: calculateVolume(sets),
     sets,
-    exercises: [{ name: exerciseName, sets }],
+    exercises: [{ name: exerciseName, sets, setCount: calculateSetCount(sets) }],
   }
 }
 
@@ -119,8 +115,8 @@ export function createSqliteChartRepository(db: ReturnType<typeof Database>): Ch
     }
 
     const volumes = rows.map((row: Record<string, unknown>) => {
-      const sets = parseSets(row.sets)
-      return sets.reduce((t, s) => t + s.reps * s.weight, 0)
+      const sets = decodeStoredSets(row.sets)
+      return calculateVolume(sets)
     })
 
     return volumes.length > 0 ? Math.max(...volumes) : 0

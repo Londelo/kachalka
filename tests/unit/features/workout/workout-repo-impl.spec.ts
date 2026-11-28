@@ -4,6 +4,8 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import * as schema from '@/db/schema'
 import { createSqliteWorkoutRepository } from '@/features/workout/workout-repo-impl'
 import type { WorkoutRepository } from '@/features/workout/workout-repository'
+import { getSetCount } from '@/features/workout/workout-entity'
+import type { WorkoutSet } from '@/features/workout/types'
 
 let db: Database.Database | undefined
 let repo: WorkoutRepository
@@ -406,5 +408,395 @@ describe('createSqliteWorkoutRepository', () => {
     expect(serialized[0].logs[0].id).toBe(1)
     expect(serialized[0].logs[0].exerciseName).toBe('Squat')
     expect(serialized[0].logs[0].volume).toBe(500)
+  })
+})
+
+const volumeOf = (sets: WorkoutSet[]): number =>
+  sets.reduce((total, line) => total + getSetCount(line) * line.reps * line.weight, 0)
+
+/**
+ * The two tallies the War Logs page derives for itself: `HistoryPageClient` sums
+ * `log.sets.length` for SETS and `set.reps` for REPS. Neither is a door output —
+ * each is arithmetic the page runs over the lines this door publishes — so both are
+ * correct only while the door hands back one line per set the lifter actually
+ * logged. A door that folds identical lines on the way out keeps `volumeOf` exact
+ * (calculateVolume multiplies by the folded tally) and silently reports `SETS 1`
+ * for three sets of ten, which is the defect these two helpers exist to make
+ * unfailable at the door rather than downstream in the page.
+ */
+const tallyOf = (sets: WorkoutSet[]): number =>
+  sets.reduce((total, line) => total + getSetCount(line), 0)
+
+const repsOf = (sets: WorkoutSet[]): number =>
+  sets.reduce((total, line) => total + line.reps, 0)
+
+describe('findHistoryByDate — counted sets', () => {
+  let userId: number
+  let exerciseId: number
+
+  const seedUserAndExercise = (userName = 'Alice', exerciseName = 'Squat'): {
+    userId: number
+    exerciseId: number
+  } => {
+    const user = db!.prepare('INSERT INTO users (name) VALUES (?)').run(userName)
+    const exercise = db!
+      .prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)')
+      .run(exerciseName, user.lastInsertRowid!)
+    return {
+      userId: Number(user.lastInsertRowid),
+      exerciseId: Number(exercise.lastInsertRowid),
+    }
+  }
+
+  const insertRawSingleEncoded = (logUserId: number, logExerciseId: number, date: string, sets: WorkoutSet[]): void => {
+    db!
+      .prepare('INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)')
+      .run(logUserId, logExerciseId, date, JSON.stringify(sets))
+  }
+
+  beforeEach(() => {
+    resetDb()
+    const seeded = seedUserAndExercise()
+    userId = seeded.userId
+    exerciseId = seeded.exerciseId
+  })
+
+  afterEach(() => {
+    if (db) db.close()
+  })
+
+  /**
+   * The read contract, one row per shape the column can hold.
+   *
+   * `findHistoryByDate` is a read door, so what it publishes is what was stored:
+   * every line, in order, each owning its own `count`, and no `count` key on a line
+   * the lifter never gave one. Folding is the write path's rule (`log-workout.ts`
+   * collapses before it stores) and this door runs after it, so a fold here would
+   * fold twice — and, unlike the write, it would fold data it never authored.
+   *
+   * `expectedVolume` is unchanged from the folded era on every row: `calculateVolume`
+   * multiplies each line by its own tally, so it is fold-invariant. The volume was
+   * never the number at risk; the line count was.
+   */
+  const cases: {
+    name: string
+    sets: WorkoutSet[]
+    expectedVolume: number
+  }[] = [
+    {
+      name: 'two identical counted lines stay two lines, each keeping its own tally',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 2 },
+        { id: 'b', reps: 5, weight: 100, count: 2 },
+      ],
+      expectedVolume: 2000,
+    },
+    {
+      name: 'three identical counted lines stay three lines rather than accumulating into one',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 2 },
+        { id: 'b', reps: 5, weight: 100, count: 2 },
+        { id: 'c', reps: 5, weight: 100, count: 2 },
+      ],
+      expectedVolume: 3000,
+    },
+    {
+      name: 'a counted line beside a legacy line of the same work stays two lines',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 2 },
+        { id: 'b', reps: 5, weight: 100 },
+      ],
+      expectedVolume: 1500,
+    },
+    {
+      name: 'one counted line keeps its count',
+      sets: [{ id: 'a', reps: 5, weight: 135, count: 3 }],
+      expectedVolume: 2025,
+    },
+    {
+      name: 'a legacy line with no count key keeps its pre-change volume',
+      sets: [{ id: 'a', reps: 5, weight: 135 }],
+      expectedVolume: 675,
+    },
+    {
+      name: 'a legacy line beside a differently-weighted counted line',
+      sets: [
+        { id: 'a', reps: 5, weight: 100 },
+        { id: 'b', reps: 3, weight: 80, count: 2 },
+      ],
+      expectedVolume: 980,
+    },
+    {
+      name: 'two 2.5 lines floor per line before summing, so the volume prices 4 sets not 5',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 2.5 },
+        { id: 'b', reps: 5, weight: 100, count: 2.5 },
+      ],
+      expectedVolume: 2000,
+    },
+    {
+      name: 'an explicit count of one',
+      sets: [{ id: 'a', reps: 5, weight: 100, count: 1 }],
+      expectedVolume: 500,
+    },
+    {
+      name: 'lines sharing weight but not reps stay separate',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 2 },
+        { id: 'b', reps: 3, weight: 100, count: 2 },
+      ],
+      expectedVolume: 1600,
+    },
+    {
+      name: 'lines sharing reps but not weight stay separate',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 2 },
+        { id: 'b', reps: 5, weight: 110, count: 2 },
+      ],
+      expectedVolume: 2100,
+    },
+  ]
+
+  it.each(cases)(
+    'publishes every stored line and a volume of $expectedVolume — $name',
+    ({ sets, expectedVolume }) => {
+      // Snapshotted before the write: `repo.create` takes this very array by
+      // reference, so comparing the door's output against `sets` afterwards would
+      // let a writer that folded in place grade its own homework.
+      const written = structuredClone(sets)
+      repo.create({ userId, exerciseId, date: '2025-01-01', sets })
+
+      const log = repo.findHistoryByDate(userId)[0].logs[0]
+
+      // toStrictEqual, not toEqual: an absent `count` and a `count: undefined` are
+      // two different promises about a legacy line, and only this matcher tells them apart.
+      expect(log.sets).toStrictEqual(written)
+      expect(log.volume).toBe(expectedVolume)
+      expect(log.volume).toBe(volumeOf(log.sets))
+    },
+  )
+
+  it('hands a legacy run of three identical uncounted lines back as three lines, so the page tallies 3 sets and 30 reps', () => {
+    // The fixture the browser caught and the suite did not. The write path folds
+    // identical lines before it stores, so a row holding three of them can only be
+    // legacy data — precisely the three uncounted `{ reps: 10, weight: 100 }` lines
+    // tests/e2e/history-page.spec.ts writes for one session. A door that folded them
+    // priced the session correctly (3,000 either way) while War Logs rendered
+    // `SETS 1 / REPS 10` for three sets of ten. Volume cannot see this defect; only
+    // the line count and the reps sum can, which is why both are asserted here.
+    insertRawSingleEncoded(userId, exerciseId, '2025-01-01', [
+      { id: 's1', reps: 10, weight: 100 },
+      { id: 's2', reps: 10, weight: 100 },
+      { id: 's3', reps: 10, weight: 100 },
+    ])
+
+    const log = repo.findHistoryByDate(userId)[0].logs[0]
+
+    expect(log.sets).toStrictEqual([
+      { id: 's1', reps: 10, weight: 100 },
+      { id: 's2', reps: 10, weight: 100 },
+      { id: 's3', reps: 10, weight: 100 },
+    ])
+    expect(log.sets.every((line) => !('count' in line))).toBe(true)
+
+    // The three numbers the page shows for this session, all derived from these lines.
+    expect(tallyOf(log.sets)).toBe(3)
+    expect(log.sets.length).toBe(3)
+    expect(repsOf(log.sets)).toBe(30)
+    expect(log.volume).toBe(3000)
+  })
+
+  it('leaves a legacy line un-stamped — the door invents no count the lifter never entered', () => {
+    const created = repo.create({
+      userId,
+      exerciseId,
+      date: '2025-01-01',
+      sets: [{ id: 'a', reps: 5, weight: 135 }],
+    })
+
+    // Witness at the column first: the stored bytes carry no count either, so the
+    // door cannot plead that it was merely reading one back.
+    const stored = db!.prepare('SELECT sets FROM workout_logs WHERE id = ?').get(created.id) as {
+      sets: string
+    }
+    expect(JSON.parse(JSON.parse(stored.sets) as string)).toStrictEqual([
+      { id: 'a', reps: 5, weight: 135 },
+    ])
+
+    const log = repo.findHistoryByDate(userId)[0].logs[0]
+
+    expect(log.volume).toBe(675)
+    expect('count' in log.sets[0]).toBe(false)
+    expect(Object.keys(log.sets[0]).sort()).toEqual(['id', 'reps', 'weight'])
+    expect(tallyOf(log.sets)).toBe(1)
+  })
+
+  it('parses the double-encoded column that repo.create writes, arriving as raw JSON text', () => {
+    repo.create({ userId, exerciseId, date: '2025-01-01', sets: [{ id: 'a', reps: 5, weight: 135, count: 3 }] })
+
+    const stored = db!.prepare('SELECT sets FROM workout_logs WHERE id = ?').get(1) as { sets: unknown }
+    expect(typeof stored.sets).toBe('string')
+
+    const log = repo.findHistoryByDate(userId)[0].logs[0]
+    expect(log.volume).toBe(2025)
+    expect(log.sets[0].count).toBe(3)
+  })
+
+  it('parses a pre-change row that arrives as an already-parsed array', () => {
+    insertRawSingleEncoded(userId, exerciseId, '2025-01-01', [
+      { id: 'a', reps: 5, weight: 100, count: 2 },
+      { id: 'b', reps: 5, weight: 100, count: 2 },
+    ])
+
+    const log = repo.findHistoryByDate(userId)[0].logs[0]
+
+    // The arrival branch under test is the already-parsed array, not the fold: both
+    // stored lines come back, each still owning its own tally of 2.
+    expect(log.sets).toStrictEqual([
+      { id: 'a', reps: 5, weight: 100, count: 2 },
+      { id: 'b', reps: 5, weight: 100, count: 2 },
+    ])
+    expect(log.volume).toBe(2000)
+    expect(log.volume).toBe(volumeOf(log.sets))
+  })
+
+  it('stores the count verbatim in the column, one unwrap below the double-encoded surface', () => {
+    const input: WorkoutSet[] = [{ id: 'a', reps: 5, weight: 135, count: 3 }]
+    const created = repo.create({ userId, exerciseId, date: '2025-01-01', sets: input })
+
+    const stored = db!.prepare('SELECT sets FROM workout_logs WHERE id = ?').get(created.id) as { sets: string }
+    const oneLayerUnwrapped = JSON.parse(stored.sets) as unknown
+
+    expect(stored.sets).not.toBe(JSON.stringify(input))
+    expect(typeof oneLayerUnwrapped).toBe('string')
+    expect(oneLayerUnwrapped).toContain('"count":3')
+    expect((JSON.parse(oneLayerUnwrapped as string) as WorkoutSet[])[0].count).toBe(3)
+  })
+
+  it('survives a JSON round-trip with each line still owning its own numeric count', () => {
+    repo.create({
+      userId,
+      exerciseId,
+      date: '2025-01-01',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 2 },
+        { id: 'b', reps: 5, weight: 100, count: 2 },
+      ],
+    })
+
+    const history = repo.findHistoryByDate(userId)
+    const serialized = JSON.parse(JSON.stringify(history))
+
+    // The server action serialises this payload to the browser, so a tally that
+    // arrived as a string, or that the fold had merged into a single line, would
+    // only surface after the wire. Both lines, both tallies, still numbers.
+    expect(serialized[0].logs[0].sets).toStrictEqual([
+      { id: 'a', reps: 5, weight: 100, count: 2 },
+      { id: 'b', reps: 5, weight: 100, count: 2 },
+    ])
+    expect(serialized[0].logs[0].sets.map((line: WorkoutSet) => typeof line.count)).toEqual([
+      'number',
+      'number',
+    ])
+    expect(serialized[0].logs[0].volume).toBe(2000)
+  })
+
+  it('groups two counted exercises under one date with their own volumes, sets and ids', () => {
+    const deadlift = db!
+      .prepare('INSERT INTO exercises (name, user_id) VALUES (?, ?)')
+      .run('Deadlift', userId)
+    const deadliftId = Number(deadlift.lastInsertRowid)
+
+    const squatLog = repo.create({
+      userId,
+      exerciseId,
+      date: '2025-01-01',
+      sets: [
+        { id: 'a', reps: 5, weight: 100, count: 2 },
+        { id: 'b', reps: 5, weight: 100, count: 2 },
+      ],
+    })
+    const deadliftLog = repo.create({
+      userId,
+      exerciseId: deadliftId,
+      date: '2025-01-01',
+      sets: [{ id: 'c', reps: 3, weight: 200, count: 4 }],
+    })
+
+    const history = repo.findHistoryByDate(userId)
+
+    expect(history).toHaveLength(1)
+    expect(history[0].date).toBe('2025-01-01')
+    expect(history[0].logs).toHaveLength(2)
+
+    const byName = Object.fromEntries(history[0].logs.map((log) => [log.exerciseName, log]))
+    expect(byName.Squat.id).toBe(squatLog.id)
+    expect(byName.Squat.sets).toStrictEqual([
+      { id: 'a', reps: 5, weight: 100, count: 2 },
+      { id: 'b', reps: 5, weight: 100, count: 2 },
+    ])
+    expect(byName.Squat.volume).toBe(2000)
+    expect(byName.Squat.volume).toBe(volumeOf(byName.Squat.sets))
+
+    expect(byName.Deadlift.id).toBe(deadliftLog.id)
+    expect(byName.Deadlift.sets).toHaveLength(1)
+    expect(byName.Deadlift.sets[0].count).toBe(4)
+    expect(byName.Deadlift.volume).toBe(2400)
+    expect(byName.Deadlift.volume).toBe(volumeOf(byName.Deadlift.sets))
+  })
+
+  it('returns an empty array for a user whose counted logs belong to somebody else', () => {
+    const other = seedUserAndExercise('Bob', 'Squat')
+    repo.create({
+      userId: other.userId,
+      exerciseId: other.exerciseId,
+      date: '2025-01-01',
+      sets: [{ id: 'a', reps: 5, weight: 135, count: 3 }],
+    })
+
+    expect(repo.findHistoryByDate(userId)).toEqual([])
+    expect(repo.findHistoryByDate(other.userId)[0].logs[0].volume).toBe(2025)
+  })
+
+  it('publishes the very lines every other read door publishes for the same stored bytes', () => {
+    // The isolation claim, stated at the door. `findById`, `findByDate`,
+    // `findByDateAndExercise`, `findAllByUser` and `findLatestForExercise` all map
+    // their row through `mapRowToWorkoutLog` and hand the stored array straight back;
+    // this door alone builds its payload by hand, which is precisely how it came to
+    // fold while none of the others did. One fixture, one column, six doors.
+    //
+    // The fixture is the shape that makes the doors come apart if any of them folds:
+    // three uncounted lines of identical work (a fold merges them into one) beside a
+    // counted line of different work (a fold leaves it alone).
+    const stored: WorkoutSet[] = [
+      { id: 's1', reps: 10, weight: 100 },
+      { id: 's2', reps: 10, weight: 100 },
+      { id: 's3', reps: 10, weight: 100 },
+      { id: 's4', reps: 8, weight: 60, count: 2 },
+    ]
+    const created = repo.create({ userId, exerciseId, date: '2025-01-01', sets: stored })
+
+    const otherDoors = {
+      findById: repo.findById(created.id)!.sets,
+      findByDate: repo.findByDate(userId, '2025-01-01')[0].sets,
+      findByDateAndExercise: repo.findByDateAndExercise(userId, '2025-01-01', exerciseId)!.sets,
+      findAllByUser: repo.findAllByUser(userId)[0].sets,
+      findLatestForExercise: repo.findLatestForExercise(userId, exerciseId)!.sets,
+    }
+
+    // Asserted first and on its own: the five untouched doors still say four lines,
+    // so the fixture is sound and any fold reported below can only have come from
+    // the door under test.
+    expect(otherDoors).toStrictEqual({
+      findById: stored,
+      findByDate: stored,
+      findByDateAndExercise: stored,
+      findAllByUser: stored,
+      findLatestForExercise: stored,
+    })
+
+    const historyLog = repo.findHistoryByDate(userId)[0].logs[0]
+    expect(historyLog.sets).toStrictEqual(stored)
+    expect(historyLog.volume).toBe(volumeOf(stored))
   })
 })

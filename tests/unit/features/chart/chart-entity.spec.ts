@@ -12,12 +12,12 @@ describe('ChartBarData', () => {
     const sample: ChartBarData = {
       date: '2025-01-01',
       volume: 200,
-      tooltipData: { sets: [], totalVolume: 0 },
+      tooltipData: { sets: [], totalVolume: 0, setCount: 0 },
       exercises: [],
     }
     expect(sample.date).toBe('2025-01-01')
     expect(sample.volume).toBe(200)
-    expect(sample.tooltipData).toEqual({ sets: [], totalVolume: 0 })
+    expect(sample.tooltipData).toEqual({ sets: [], totalVolume: 0, setCount: 0 })
   })
 
   it('requires date to be a string', () => {
@@ -39,7 +39,7 @@ describe('ChartBarData', () => {
     const withTooltip: ChartBarData = {
       date: '2025-01-01',
       volume: 100,
-      tooltipData: { sets: [], totalVolume: 0 },
+      tooltipData: { sets: [], totalVolume: 0, setCount: 0 },
       exercises: [],
     }
     expect(withTooltip.tooltipData).toBeDefined()
@@ -55,7 +55,7 @@ describe('ChartBarData', () => {
     const sample: ChartBarData = {
       date: '2025-01-01',
       volume: 100,
-      exercises: [{ name: 'Pull Up', sets: [] }],
+      exercises: [{ name: 'Pull Up', sets: [], setCount: 0 }],
     }
     expect(sample.exercises).toBeTypeOf('object')
     expect(sample.exercises[0].name).toBeTypeOf('string')
@@ -77,7 +77,7 @@ describe('ChartDataPoint', () => {
       date: '2025-01-01',
       volume: 100,
       sets: [],
-      exercises: [{ name: 'Pull Up', sets: [] }],
+      exercises: [{ name: 'Pull Up', sets: [], setCount: 0 }],
     }
     expect(sample.exercises).toBeTypeOf('object')
     expect(sample.exercises[0].name).toBeTypeOf('string')

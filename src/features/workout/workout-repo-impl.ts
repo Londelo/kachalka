@@ -6,15 +6,10 @@ import type { WorkoutRepository } from '@/features/workout/workout-repository'
 import type { WorkoutLog, WorkoutSet } from '@/features/workout/types'
 import { and } from 'drizzle-orm'
 import * as R from 'ramda'
-import { calculateVolume } from '@/features/workout/workout-entity'
+import { calculateVolume, decodeStoredSets } from '@/features/workout/workout-entity'
 
 function mapRowToWorkoutLog(row: Record<string, unknown>): WorkoutLog {
-  // Drizzle JSON mode auto-parses JSON columns in .select() queries,
-  // so row.sets may already be an array (not a string).
-  const setsValue = row.sets
-  const parsedSets = Array.isArray(setsValue)
-    ? (setsValue as WorkoutSet[])
-    : JSON.parse(setsValue as string) as WorkoutSet[]
+  const parsedSets = decodeStoredSets(row.sets)
 
   return {
     id: Number(row.id),
@@ -244,19 +239,11 @@ export function createSqliteWorkoutRepository(db: ReturnType<typeof Database>): 
           ? (exerciseId as { value: number }).value
           : Number(exerciseId)
 
-        const setsValue = row.sets
-        // Drizzle JSON mode auto-parses JSON columns in .select() queries,
-        // so setsValue may already be an array (not a string).
-        // It may also be a Drizzle {value: ...} wrapper.
-        let unwrappedSets: unknown
-        if (typeof setsValue === 'object' && setsValue !== null && 'value' in setsValue) {
-          unwrappedSets = (setsValue as { value: unknown }).value
-        } else {
-          unwrappedSets = setsValue
-        }
-        const parsedSets = Array.isArray(unwrappedSets)
-          ? (unwrappedSets as WorkoutSet[])
-          : JSON.parse(unwrappedSets as string) as WorkoutSet[]
+        // Read door: the stored lines go back out exactly as they came in, as every other read
+        // here returns them. The fold is the write path's rule (log-workout.ts collapses before
+        // it stores); folding again on the way out would hand a reader one line for what the user
+        // logged as several, and stamp a synthesised count onto a legacy line that has none.
+        const parsedSets = decodeStoredSets(row.sets)
 
         return {
           date: row.date as string,

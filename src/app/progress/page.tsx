@@ -9,19 +9,19 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+  Tooltip,
 } from 'recharts'
 import {
   getExercisesWithLogsAction,
   getExerciseChartData,
   getAllExerciseChartData,
 } from '@/features/chart/chart-server-actions'
-import type { RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
+import type { ChartDataPoint, RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
+import { calcExerciseMetrics } from './utils'
+import ProgressTooltip from './progress-tooltip'
 
-type DataPoint = {
-  date: string
-  volume: number
-  sets: { id: string; reps: number; weight: number }[]
-  exercises: { name: string; sets: { id: string; reps: number; weight: number }[] }[]
+function toBars(chartData: ChartDataPoint[] | null): ChartDataPoint[] {
+  return chartData ?? []
 }
 
 function formatDate(dateStr: string): string {
@@ -36,22 +36,6 @@ function formatFullDate(dateStr: string): string {
   return `${DAYS[d.getDay()]}, ${String(d.getDate()).padStart(2, '0')} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
 }
 
-function calcExerciseMetrics(exercises: DataPoint['exercises']): {
-  name: string
-  totalSets: number
-  totalReps: number
-  totalVolume: number
-  maxWeight: number
-}[] {
-  return exercises.map((ex) => {
-    const totalSets = ex.sets.length
-    const totalReps = ex.sets.reduce((sum, s) => sum + s.reps, 0)
-    const totalVolume = ex.sets.reduce((sum, s) => sum + s.reps * s.weight, 0)
-    const maxWeight = ex.sets.length > 0 ? Math.max(...ex.sets.map((s) => s.weight)) : 0
-    return { name: ex.name, totalSets, totalReps, totalVolume, maxWeight }
-  })
-}
-
 function formatVolume(v: number): string {
   return v.toLocaleString('en-US')
 }
@@ -62,9 +46,9 @@ export default function ProgressPage() {
   const [selectedExerciseName, setSelectedExerciseName] = useState<string>('')
   const [range, setRange] = useState<RangeFilter>('6M')
   const [granularity, setGranularity] = useState<TimeGranularity>('month')
-  const [dataPoints, setDataPoints] = useState<DataPoint[]>([])
+  const [dataPoints, setDataPoints] = useState<ChartDataPoint[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedBar, setSelectedBar] = useState<DataPoint | null>(null)
+  const [selectedBar, setSelectedBar] = useState<ChartDataPoint | null>(null)
 
   const { start, end } = useLoading()
 
@@ -86,14 +70,14 @@ export default function ProgressPage() {
         if (!selectedExerciseId) {
           const chartData = await getAllExerciseChartData(userId, range, granularity)
           if (!cancelled) {
-            setDataPoints(chartData ?? [])
+            setDataPoints(toBars(chartData))
             setLoading(false)
             end('progress')
           }
         } else {
           const chartData = await getExerciseChartData(userId, selectedExerciseId, range, granularity)
           if (!cancelled) {
-            setDataPoints(chartData ?? [])
+            setDataPoints(toBars(chartData))
             setLoading(false)
             end('progress')
           }
@@ -268,10 +252,11 @@ export default function ProgressPage() {
                     radius={[4, 4, 0, 0]}
                     onClick={(data) => {
                       if (data && data.payload) {
-                        setSelectedBar(data.payload as DataPoint)
+                        setSelectedBar(data.payload)
                       }
                     }}
                   />
+                  <Tooltip content={<ProgressTooltip />} cursor={false} isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -302,18 +287,22 @@ export default function ProgressPage() {
               {/* Exercise rows */}
               <div className="mb-6 flex flex-col gap-2">
                 {calcExerciseMetrics(selectedBar.exercises).map((ex) => (
-                  <div key={ex.name} className="border-4 border-on-surface bg-surface-container p-3 neo-shadow">
-                    <div className="font-headline-sm font-black uppercase text-on-surface">
+                  <div
+                    key={ex.name}
+                    data-id="progress-exercise-row"
+                    className="border-4 border-on-surface bg-surface-container p-3 neo-shadow"
+                  >
+                    <div data-id="progress-exercise-name" className="font-headline-sm font-black uppercase text-on-surface">
                       {ex.name}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-label-bold text-label-bold text-on-surface">
-                      <span>{ex.totalSets} sets</span>
+                      <span data-id="progress-exercise-sets">{ex.totalSets} sets</span>
                       <span className="text-secondary">·</span>
-                      <span>{ex.totalReps} reps</span>
+                      <span data-id="progress-exercise-reps">{ex.totalReps} reps</span>
                       <span className="text-secondary">·</span>
-                      <span>{ex.totalVolume.toLocaleString()} vol</span>
+                      <span data-id="progress-exercise-volume">{ex.totalVolume.toLocaleString()} vol</span>
                       <span className="text-secondary">·</span>
-                      <span className="ml-auto text-primary">{ex.maxWeight} max lb</span>
+                      <span data-id="progress-exercise-max" className="ml-auto text-primary">{ex.maxWeight} max lb</span>
                     </div>
                   </div>
                 ))}
@@ -322,7 +311,7 @@ export default function ProgressPage() {
               {/* Grand total footer */}
               <div className="border-t-4 border-on-surface pt-4 text-center">
                 <p className="font-label-mono text-label-mono uppercase text-secondary">TOTAL VOLUME</p>
-                <p className="font-headline-md text-headline-md font-black text-primary">
+                <p data-id="progress-total-volume" className="font-headline-md text-headline-md font-black text-primary">
                   {selectedBar.volume.toLocaleString()}
                 </p>
               </div>

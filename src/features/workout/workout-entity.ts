@@ -2,18 +2,213 @@ import type { WorkoutSet, WorkoutLog } from '@/features/workout/types'
 
 export { WorkoutLog }
 
-export function validateSet(set: WorkoutSet): void {
-  if (set.weight < 0) {
-    throw new Error('Weight must be non-negative')
+/**
+ * The one authored sentence behind the rule "a count must be at least 1".
+ *
+ * Every place that enforces or reports that rule reads it from here, so a
+ * lifter never sees two spellings of one instruction. The em dash matches the
+ * weight and reps messages below — the punctuation is part of the message the
+ * user acts on, not decoration.
+ */
+export const COUNT_TOO_SMALL =
+  'Set count must be at least 1 — enter how many sets you did, or leave it blank for one.'
+
+/**
+ * The one authored predicate behind the sentence above: is this a count the
+ * lifter cannot mean?
+ *
+ * `validateSet` is the only thing that refuses, but the fold's door has to ask
+ * the same question before it folds: a line whose own count is below the
+ * minimum must never join a group, because the group's sum swallows the digit
+ * the lifter typed and the refusal below never gets to fire. Both doors read
+ * the answer here, so the client owns no copy of it.
+ *
+ * Absent and null are not below the minimum — a line with no count is a line
+ * with one set, which is `getSetCount`'s contract, not a refusal.
+ */
+export function isCountBelowMinimum(count: number | null | undefined): boolean {
+  return (
+    count !== undefined &&
+    count !== null &&
+    (!Number.isFinite(count) || Math.floor(count) < 1)
+  )
+}
+
+/**
+ * The write path's judge: throws, because a lifter is standing at an input box
+ * and can act on the advice.
+ *
+ * `lineNumber` is the 1-based position of the line being judged, and the caller
+ * that walks a card's lines owns it — a card renders one error string for the
+ * whole exercise, so without the position a refusal on a multi-line card names
+ * the field and leaves the lifter to guess which line to fix. Absent it, the
+ * message is the bare sentence, which is the whole of the message where no line
+ * is in question.
+ */
+export function validateSet(set: WorkoutSet, lineNumber?: number): void {
+  const where = lineNumber === undefined ? '' : `Line ${lineNumber}: `
+
+  if (!Number.isFinite(set.weight) || set.weight <= 0) {
+    throw new Error(
+      `${where}Weight must be more than 0 — enter the weight you lifted, or remove the line.`,
+    )
   }
 
-  if (set.reps < 1) {
-    throw new Error('Reps must be at least 1')
+  if (!Number.isFinite(set.reps) || set.reps < 1) {
+    throw new Error(
+      `${where}Reps must be at least 1 — enter how many reps you did, or remove the line.`,
+    )
+  }
+
+  if (isCountBelowMinimum(set.count)) {
+    throw new Error(`${where}${COUNT_TOO_SMALL}`)
   }
 }
 
-export function calculateVolume(sets: { reps: number; weight: number }[]): number {
-  return sets.reduce((total, set) => total + set.reps * set.weight, 0)
+/**
+ * The shared read rule: a line with no usable count is one set.
+ *
+ * Total by contract — it never throws. Every reader in the system reaches it
+ * through `calculateVolume` or `collapseSets` (both chart doors, the history
+ * door, the Today wire, the repo read doors), and not one of those doors has a
+ * person standing there to fix a bad row. A stored `count` of `0`, `"3"`, `NaN`
+ * or `-1` — any of which an older build, a seed script, or a hand-edited
+ * database can leave behind — must therefore read as one set, not take the War
+ * Logs page, the Today page and the Force Progression chart down together with
+ * a message telling the lifter to "enter how many sets you did" on a screen
+ * with no input box.
+ *
+ * Rejecting an illegal count is the write path's job and belongs there: see
+ * `validateSet`, which throws where a lifter can act on the advice. Surfacing a
+ * genuinely corrupt stored row is the shell's job, where it can be logged and
+ * reported — never this accessor's.
+ */
+export function getSetCount(line: { count?: number }): number {
+  const { count } = line
+
+  // `typeof` rejects a numeric string a hand-edited row can carry (and narrows
+  // for the compiler); `Number.isFinite` rejects NaN and both infinities, and
+  // answers false for absent, null and every other non-number.
+  if (typeof count !== 'number' || !Number.isFinite(count)) {
+    return 1
+  }
+
+  return Math.max(1, Math.floor(count))
+}
+
+/**
+ * The one decoder for the stored `sets` column, shared by every read door.
+ *
+ * The column is `text('sets', { mode: 'json' })` (src/db/schema.ts:42) and the
+ * write path JSON.stringify's the lines before drizzle stringifies them again,
+ * so the stored bytes are double-encoded and drizzle applies exactly one
+ * `JSON.parse` on read. What is stored therefore decides the arrival shape, not
+ * how the query is written: a double-encoded row comes back as raw JSON text and
+ * a row written before that path — stored single-encoded — comes back as an
+ * already-parsed array. Every read door was traced handing back both shapes,
+ * which is why all of them call here and none of them tests the shape itself.
+ *
+ * The `{ value: T }` wrapper branch is defensive, not load-bearing: no query in
+ * src/ and no caller in src/ hands a door a wrapped row — drizzle hands plain
+ * values. The only thing in the repo that does is the pair of "a Drizzle wrapper
+ * around ..." fixture cases in tests/unit/features/chart/chart-repo-impl.spec.ts,
+ * which is the whole of its coverage. It stays in case a future caller hands one in.
+ */
+export function decodeStoredSets(value: unknown): WorkoutSet[] {
+  const unwrapped =
+    typeof value === 'object' && value !== null && 'value' in value
+      ? (value as { value: unknown }).value
+      : value
+
+  return (Array.isArray(unwrapped) ? unwrapped : JSON.parse(unwrapped as string)) as WorkoutSet[]
+}
+
+export function calculateVolume(sets: { reps: number; weight: number; count?: number }[]): number {
+  return sets.reduce((total, line) => total + getSetCount(line) * line.weight * line.reps, 0)
+}
+
+export function calculateSetCount(sets: { count?: number }[]): number {
+  return sets.reduce((total, line) => total + getSetCount(line), 0)
+}
+
+export function calculateRepTotal(sets: { reps: number; count?: number }[]): number {
+  return sets.reduce((total, line) => total + getSetCount(line) * line.reps, 0)
+}
+
+/**
+ * The three figures the fold is defined over, and nothing else.
+ *
+ * A stored line is a `WorkoutSet` and carries an `id`; a line read out for a
+ * read-only view may carry no `id` at all. Both are the same work to the fold,
+ * so the fold is typed against this subset and each entry point below decides
+ * what its own callers get back.
+ */
+export type CollapsibleSet = {
+  weight: number
+  reps: number
+  count?: number
+}
+
+/** A folded line: the figures of the first line of its group, count summed. */
+export type CollapsedSet = {
+  weight: number
+  reps: number
+  count: number
+}
+
+/**
+ * The fold itself, shared by both entry points below so there is exactly one
+ * spelling of it: one line per distinct `weight,reps` pair, in order of first
+ * appearance, its count the sum of every matching line's `getSetCount`.
+ *
+ * It groups and sums and judges nothing — `validateSet` is the write path's
+ * judge — and it hands back the surviving line by reference inside its own
+ * freshly built wrapper, so the lines it was handed are never touched.
+ */
+function foldByWork<T extends CollapsibleSet>(sets: T[]): Array<{ first: T; count: number }> {
+  const folded = new Map<string, { first: T; count: number }>()
+
+  for (const line of sets) {
+    const key = `${line.weight},${line.reps}`
+    const seen = folded.get(key)
+
+    if (seen) {
+      seen.count += getSetCount(line)
+    } else {
+      folded.set(key, { first: line, count: getSetCount(line) })
+    }
+  }
+
+  return [...folded.values()]
+}
+
+/**
+ * Stored lines in, stored lines out: each folded line wears the id of the line
+ * that survived its group, which is what lets a keyed list update that row
+ * instead of remounting it.
+ */
+export function collapseSets(sets: WorkoutSet[]): WorkoutSet[] {
+  return foldByWork(sets).map(({ first, count }) => ({
+    id: first.id,
+    reps: first.reps,
+    weight: first.weight,
+    count,
+  }))
+}
+
+/**
+ * The same fold for lines that never had an id — a read-only view's rows, say.
+ *
+ * Nothing here invents one and nothing here asks for one: the caller gets the
+ * three figures and the summed count, which is the whole of what a view with no
+ * save path can render.
+ */
+export function collapseSetFigures(sets: CollapsibleSet[]): CollapsedSet[] {
+  return foldByWork(sets).map(({ first, count }) => ({
+    weight: first.weight,
+    reps: first.reps,
+    count,
+  }))
 }
 
 export function createEmptyLog(
