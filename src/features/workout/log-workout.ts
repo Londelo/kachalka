@@ -13,9 +13,7 @@ export function logWorkoutUseCase(repo: WorkoutRepository) {
         throw new Error('Must log at least one set')
       }
 
-      for (const set of sets) {
-        validateSet(set)
-      }
+      sets.forEach((set, index) => validateSet(set, index + 1))
 
       const collapsed = collapseSets(sets)
 

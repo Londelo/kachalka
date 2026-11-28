@@ -13,22 +13,35 @@ export { WorkoutLog }
 export const COUNT_TOO_SMALL =
   'Set count must be at least 1 — enter how many sets you did, or leave it blank for one.'
 
-export function validateSet(set: WorkoutSet): void {
+/**
+ * The write path's judge: throws, because a lifter is standing at an input box
+ * and can act on the advice.
+ *
+ * `lineNumber` is the 1-based position of the line being judged, and the caller
+ * that walks a card's lines owns it — a card renders one error string for the
+ * whole exercise, so without the position a refusal on a multi-line card names
+ * the field and leaves the lifter to guess which line to fix. Absent it, the
+ * message is the bare sentence, which is the whole of the message where no line
+ * is in question.
+ */
+export function validateSet(set: WorkoutSet, lineNumber?: number): void {
+  const where = lineNumber === undefined ? '' : `Line ${lineNumber}: `
+
   if (!Number.isFinite(set.weight) || set.weight <= 0) {
     throw new Error(
-      'Weight must be more than 0 — enter the weight you lifted, or remove the line.',
+      `${where}Weight must be more than 0 — enter the weight you lifted, or remove the line.`,
     )
   }
 
   if (!Number.isFinite(set.reps) || set.reps < 1) {
     throw new Error(
-      'Reps must be at least 1 — enter how many reps you did, or remove the line.',
+      `${where}Reps must be at least 1 — enter how many reps you did, or remove the line.`,
     )
   }
 
   if (set.count !== undefined && set.count !== null) {
     if (!Number.isFinite(set.count) || Math.floor(set.count) < 1) {
-      throw new Error(COUNT_TOO_SMALL)
+      throw new Error(`${where}${COUNT_TOO_SMALL}`)
     }
   }
 }
