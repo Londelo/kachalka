@@ -49,34 +49,24 @@ function toCollapsedDraft(line: WorkoutSet): SetDraft {
  * therefore stays under the caret instead of sliding to the bottom of the card
  * mid-word.
  *
- * The answer arrives as one row per group in order of the group's first
- * appearance, so the group a row opens is always the next answer unread, and
- * reading the two lists side by side is what lines each collapsed row up with
- * the position its group began at.
- *
- * Identity is carried in, never minted: `collapseSets` hands back the first
- * line of each group, so a collapsed row wears the id the row that survives
- * went in with, and the shell's keyed list updates it instead of remounting it.
+ * Which row speaks for its group is said by id, never by figure: `collapseSets`
+ * hands back one row per group wearing the id of the row that opened it.
+ * Identity is therefore carried in, never minted — a collapsed row wears the id
+ * of the row that survives it, which is what lets the shell's keyed list update
+ * that row instead of remounting it.
  */
 export function collapseSetDrafts(drafts: SetDraft[]): SetDraft[] {
-  const groups = collapseSets(drafts.filter(isNumberedSetDraft).map(toRuleLine))
-  const positioned: SetDraft[] = []
+  const collapsedById = new Map(
+    collapseSets(drafts.filter(isNumberedSetDraft).map(toRuleLine)).map((line) => [
+      line.id,
+      toCollapsedDraft(line),
+    ]),
+  )
 
-  let nextGroup = 0
+  return drafts.flatMap((draft) => {
+    if (!isNumberedSetDraft(draft)) return [draft]
 
-  for (const draft of drafts) {
-    if (!isNumberedSetDraft(draft)) {
-      positioned.push(draft)
-      continue
-    }
-
-    const group = groups[nextGroup]
-
-    if (group && group.weight === draft.weight && group.reps === draft.reps) {
-      nextGroup += 1
-      positioned.push(toCollapsedDraft(group))
-    }
-  }
-
-  return positioned
+    const collapsed = collapsedById.get(draft.id)
+    return collapsed === undefined ? [] : [collapsed]
+  })
 }
