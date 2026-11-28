@@ -531,7 +531,7 @@ export default function TodayPage() {
                   drafts={drafts}
                   saving={saving}
                   error={error}
-                  invalidFields={[]}
+                  invalidFields={invalidFields}
                   onToggleView={() => handleToggleView(exercise.exerciseId)}
                   onAddSet={() => handleAddSet(exercise.exerciseId)}
                   onRemoveSet={(index) => handleRemoveSet(exercise.exerciseId, index)}
