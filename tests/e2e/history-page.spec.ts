@@ -425,35 +425,53 @@ function modalFigure(modal: Locator, label: 'VOLUME' | 'MAX LB') {
   return modal.locator('p').filter({ hasText: new RegExp(`^${label}$`) }).locator('..').locator('p').nth(1)
 }
 
-test('one counted line of 5 reps at 135 lb is one modal row reading COUNT 3 and feeds every tally on the screen', async ({
+// The base suite's counted fixture is one line on one exercise, so every figure on that
+// screen is the same number three times over and no assertion can tell a per-log reading
+// from a per-day one. This fixture is the pair that separates them: two counted logs on
+// one day, deliberately different in count, reps and weight.
+test('two counted lines logged the same day keep their own row figures and their own modal summary', async ({
   page,
 }) => {
-  const [exerciseId] = createExercises(['Deadlift'])
-  assignExercise(exerciseId, 4)
-  createWorkoutLog(exerciseId, '2026-07-03', [{ id: 's1', reps: 5, weight: 135, count: 3 }], 'production')
+  const [deadliftId, pressId] = createExercises(['Deadlift', 'Overhead Press'])
+  assignExercise(deadliftId, 4) // Friday
+  assignExercise(pressId, 4) // Friday
+  createWorkoutLog(deadliftId, '2026-07-03', [{ id: 's1', reps: 5, weight: 135, count: 3 }], 'production')
+  createWorkoutLog(pressId, '2026-07-03', [{ id: 's1', reps: 8, weight: 95, count: 2 }], 'production')
 
   await loginAsBruno(page)
   await page.goto(`${BASE_URL}/history`)
   await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
 
-  await expect(dayFigure(page, '2026-07-03', 'volume')).toHaveText('2,025')
-  await expect(dayFigure(page, '2026-07-03', 'sets')).toHaveText('3')
-  await expect(dayFigure(page, '2026-07-03', 'reps')).toHaveText('15')
+  // The day block is the only place the two lines may meet: 3 + 2 sets, 15 + 16 reps,
+  // 2,025 + 1,520 volume.
+  await expect(dayFigure(page, '2026-07-03', 'volume')).toHaveText('3,545')
+  await expect(dayFigure(page, '2026-07-03', 'sets')).toHaveText('5')
+  await expect(dayFigure(page, '2026-07-03', 'reps')).toHaveText('31')
 
-  const row = exerciseRow(page, 'Deadlift')
-  await expect(rowFigure(row, 'sets')).toHaveText('3')
-  // A reader counting array elements instead of counts reports 5 here, not 15.
-  await expect(rowFigure(row, 'reps')).toHaveText('15')
+  // Each row carries its own log's figures. A row reading the day tally — or either
+  // other log's — answers 5 sets and 31 reps here, and the single-line base fixture
+  // cannot see that, because there the two agree.
+  const deadlift = exerciseRow(page, 'Deadlift')
+  await expect(rowFigure(deadlift, 'sets')).toHaveText('3')
+  await expect(rowFigure(deadlift, 'reps')).toHaveText('15')
 
-  await row.click()
+  const press = exerciseRow(page, 'Overhead Press')
+  await expect(rowFigure(press, 'sets')).toHaveText('2')
+  // A reader counting array elements instead of counts reports 8 here, not 16.
+  await expect(rowFigure(press, 'reps')).toHaveText('16')
+
+  // The modal opens over the pressed log alone: one stored line is one row however many
+  // sets that line stands for, and the summary bar reads that log's 2 sets and 1,520 lb,
+  // not the day's 5 and 3,545.
+  await press.click()
   const modal = page.locator('#history-set-detail-modal')
   await expect(modal).toBeVisible()
 
   await expect(modal.locator('[data-id="history-modal-set-row-0"]')).toBeVisible()
   await expect(modal.locator('[data-id="history-modal-set-row-1"]')).toHaveCount(0)
-  await expect(modal.locator('[data-id="history-modal-set-count-0"]')).toHaveText(/^COUNT:\s*3$/)
-  await expect(modal.locator('[data-id="history-modal-sets"]')).toHaveText('3')
-  await expect(modalFigure(modal, 'VOLUME')).toHaveText('2,025')
+  await expect(modal.locator('[data-id="history-modal-set-count-0"]')).toHaveText(/^COUNT:\s*2$/)
+  await expect(modal.locator('[data-id="history-modal-sets"]')).toHaveText('2')
+  await expect(modalFigure(modal, 'VOLUME')).toHaveText('1,520')
 })
 
 test('a day holding one legacy line and one counted line tallies four sets, twenty-five reps and 3,025 volume', async ({
