@@ -141,11 +141,7 @@ function ExerciseCard({
               role="listitem"
               data-id={`past-session-line-${exercise.exerciseId}-${line.weight}-${line.reps}`}
               className="flex items-center gap-3"
-              aria-label={
-                line.count +
-                (line.count === 1 ? ' set' : ' sets') +
-                ' at ' + line.weight + ' pounds for ' + line.reps + ' reps'
-              }
+              aria-label={`${line.count} ${line.count === 1 ? 'set' : 'sets'} at ${line.weight} pounds for ${line.reps} reps`}
             >
               <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background p-2 gap-2">
                 <span className="font-label-mono text-label-mono text-secondary">SET:</span>
