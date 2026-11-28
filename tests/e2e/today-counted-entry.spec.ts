@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import type { Page, Request, Response } from '@playwright/test'
 
-import { jsDayToAppIndex } from '@/shared/utils/date'
+import { jsDayToAppIndex, getTodayLocalDate } from '@/shared/utils/date'
 
 import { ensureSchema, openE2eDatabase, wipeE2eData } from '../harness/e2e-database'
 import { getE2eBaseUrl } from './e2e-config'
@@ -807,4 +807,146 @@ test('a set typed one character at a time keeps the caret and stores every chara
   await letterWeight.pressSequentially('95x', { delay: KEYSTROKE_DELAY_MS })
   await expect(letterWeight).toBeFocused()
   await expect(letterWeight).toHaveValue('95x')
+})
+
+// ── the emptied card ──────────────────────────────────────────────────────────
+//
+// A card's other exit from a save is not a save. When every line on it has been
+// cleared, saveExercise() (today/page.tsx:452) finds no saveable draft left and
+// deletes the day's row instead, spending the logId the mount pre-fill handed it
+// out of getTodayWorkoutsAction's logIds. That handoff — a row in the database, its
+// id carried across the wire into the page, the page choosing delete over write, the
+// row gone from SQLite rather than present with an empty set list — is what none of
+// the journeys above reaches: every one of them ends with a row written, never with
+// one removed. A build that let the emptied card skip the delete would leave this
+// file green and leave the lifter's day holding sets they erased on screen.
+
+// The page stamps a save with getTodayLocalDate() (today/page.tsx:472) and reads the
+// pre-fill back on the same helper server-side (workout-server-actions.ts:86). This
+// journey is about the delete, not the clock, so it names the day with the very
+// helper the page writes with: a day the page wrote is the day it looks for. The
+// clock journeys above deliberately judge the page against dateInZone instead — that
+// distance is what lets them accuse the page of stamping the wrong clock, and it is
+// exactly what is unwanted here, where a date that disagreed with the page's own
+// would make the row look deleted when it was only ever filed somewhere else.
+const PAGE_LOCAL_DATE = getTodayLocalDate()
+
+// deleteWorkoutAction(userId, logId) and getTodayExercisesAction(userId, dayOfWeek)
+// both POST a two-argument list whose first entry is the user, so the arity that
+// tells the save and the pre-fill apart cannot tell the delete and the exercise
+// re-fetch apart. The seeded row's id does: it sits far outside the 0-6 a day of the
+// week can be, so a two-argument action naming it can only be the delete.
+const EMPTIED_CARD_LOG_ID = 9001
+
+function seedSavedLogWithRowId(
+  exerciseId: number,
+  date: string,
+  rowId: number,
+  sets: SeededLine[],
+): void {
+  db.prepare(
+    'INSERT INTO workout_logs (id, user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?, ?)',
+  ).run(rowId, BRUNO_USER_ID, exerciseId, date, JSON.stringify(sets))
+}
+
+function deleteOf(request: Request, logId: number): boolean {
+  const args = actionArgsOf(request)
+  return args !== null && args.length === 2 && args[0] === BRUNO_USER_ID && args[1] === logId
+}
+
+// The pre-fill is what fills a card, so a card read as empty before its pre-fill
+// answer has landed is empty in the only sense that matters to nobody: the mount
+// effect has not been given the chance to say otherwise. Every emptiness below is
+// asserted behind this, and the reload in particular has to wait for its own answer
+// — a page that re-created the deleted row would look identical to one still showing
+// the pre-mount fallback rows.
+async function awaitPrefillAnswers(session: TodaySession, count: number): Promise<void> {
+  await expect
+    .poll(() => session.prefillResponses.length, {
+      message:
+        `fewer than ${count} getTodayWorkoutsAction answers arrived, so the card is ` +
+        `still wearing the pre-mount fallback rows and an emptiness asserted now is ` +
+        `an emptiness the page was never asked about`,
+    })
+    .toBeGreaterThanOrEqual(count)
+
+  await drainPageMainThread(session.page)
+}
+
+test('emptying every line off a card deletes that day\'s row, and it stays gone after a reload', async ({
+  page,
+}) => {
+  const exerciseId = seedExerciseScheduledToday('Emptied Card')
+  seedSavedLogWithRowId(exerciseId, PAGE_LOCAL_DATE, EMPTIED_CARD_LOG_ID, [
+    { id: 'emptied-card-row', weight: 135, reps: 5, count: 3 },
+  ])
+
+  const session = await signInAsBruno(page)
+
+  const deletes: number[] = []
+  page.on('request', (request) => {
+    if (deleteOf(request, EMPTIED_CARD_LOG_ID)) deletes.push(EMPTIED_CARD_LOG_ID)
+  })
+
+  await expect(cardOf(page, exerciseId)).toBeVisible()
+  await awaitMountPrefill(session)
+  await awaitQuietCard(session, exerciseId, 1)
+
+  // The set the lifter is about to erase has to be on screen first. It is this
+  // pre-fill that hands the page the logId the delete runs on, so a card that never
+  // received the saved set would have nothing to delete — and a journey that
+  // started from such a card would be watching a no-op pass for a delete.
+  await expectRowValues(page, exerciseId, 'Emptied Card', {
+    count: '3',
+    weight: '135',
+    reps: '5',
+  })
+  expect(rowsFor(exerciseId, PAGE_LOCAL_DATE)).toHaveLength(1)
+
+  // WEIGHT and REPS go first: the instant either stops being a number the row leaves
+  // the collapse's reach, so no collapse rewrite lands on a field between two
+  // clears. Nothing is asserted between them — a save armed by the first clear still
+  // has the other two to wait for, and one 500ms window covers the burst.
+  for (const field of ['weight', 'reps', 'count'] as const) {
+    await inputOf(page, exerciseId, 'Emptied Card', field).fill('')
+  }
+
+  // The row is still there, blank: clearing a card is not removing a line, and the
+  // page has to keep the line the lifter is standing on.
+  await expect(rowIdsOf(page, exerciseId)).toHaveCount(1)
+  await expectRowValues(page, exerciseId, 'Emptied Card', { count: '', weight: '', reps: '' })
+
+  // The truth is in SQLite, not on the card: a page that saved an empty set list
+  // would leave this card looking exactly as clean.
+  await expect
+    .poll(() => rowsFor(exerciseId, PAGE_LOCAL_DATE).length, {
+      message:
+        `the workout_logs row for exercise ${exerciseId} on ${PAGE_LOCAL_DATE} never ` +
+        `went away — the emptied card saved an empty set list, or skipped the delete ` +
+        `altogether and left the sets the lifter cleared sitting on their day`,
+    })
+    .toBe(0)
+
+  expect(
+    deletes,
+    `the row is gone but deleteWorkoutAction(${BRUNO_USER_ID}, ${EMPTIED_CARD_LOG_ID}) ` +
+      `was never sent, so something other than the page's emptied-card branch removed it`,
+  ).toHaveLength(1)
+
+  await expect(errorOf(page, exerciseId)).toHaveCount(0)
+  await expect(cardOf(page, exerciseId).getByText('SAVING...', { exact: true })).toHaveCount(0)
+
+  await page.reload()
+  await expect(cardOf(page, exerciseId)).toBeVisible()
+  await awaitPrefillAnswers(session, 2)
+
+  await expect(rowIdsOf(page, exerciseId)).toHaveCount(1)
+  await expectRowValues(page, exerciseId, 'Emptied Card', { count: '', weight: '', reps: '' })
+  await expect(errorOf(page, exerciseId)).toHaveCount(0)
+
+  expect(
+    rowsFor(exerciseId, PAGE_LOCAL_DATE),
+    'a row came back for the emptied card once the page re-read the day, so the ' +
+      'delete only moved the row out of view instead of off the day',
+  ).toHaveLength(0)
 })
