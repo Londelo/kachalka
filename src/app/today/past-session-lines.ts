@@ -1,5 +1,4 @@
-import type { WorkoutSet } from '@/features/workout/types'
-import { collapseSets, getSetCount } from '@/features/workout/workout-entity'
+import { collapseSetFigures } from '@/features/workout/workout-entity'
 
 export type PastSessionSourceLine = {
   weight: number
@@ -21,17 +20,13 @@ function hasRenderableFigures(line: PastSessionSourceLine): boolean {
   return Number.isFinite(line.weight) && Number.isFinite(line.reps)
 }
 
-function toDisplayLine(line: WorkoutSet): PastSessionLine {
-  return { weight: line.weight, reps: line.reps, count: getSetCount(line) }
-}
-
 /**
  * Turns the previous session's stored lines into the read-only rows the past
  * session region renders.
  *
- * Folding belongs to `collapseSets` alone: this function sums nothing, sorts
- * nothing, and supplies no count of its own. A line that arrives without a
- * `count` key is handed over without one, so the domain's own "no count means
+ * Folding belongs to `collapseSetFigures` alone: this function sums nothing,
+ * sorts nothing, and supplies no count of its own. A line that arrives without
+ * a `count` key is handed over without one, so the domain's own "no count means
  * one set" rule is what produces the number on the row.
  *
  * What is decided here is only which lines reach the rule. A line carrying no
@@ -49,5 +44,5 @@ export function buildPastSessionLines(
     (line) => carriesFigures(line) && hasRenderableFigures(line),
   )
 
-  return collapseSets(survivors as WorkoutSet[]).map(toDisplayLine)
+  return collapseSetFigures(survivors)
 }
