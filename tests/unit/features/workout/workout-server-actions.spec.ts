@@ -380,6 +380,7 @@ describe('getTodayWorkoutsAction — counted sets', () => {
     expect(result).toEqual({
       success: true,
       workouts: { 5: [{ id: 's1', weight: 135, reps: 5, count: 3 }] },
+      logIds: { 5: 1 },
     })
   })
 
@@ -474,6 +475,50 @@ describe('getTodayWorkoutsAction — counted sets', () => {
       { id: 's2', weight: 95, reps: 8, count: undefined },
       { id: 's3', weight: 60, reps: 2, count: 1 },
     ])
+  })
+
+  // Log ids (11, 27) share no value with any exercise id (5, 9) or set id ('s1'..'s3'),
+  // so a wrong key, a swapped pairing, or a set id written where the log id belongs all fail this pin.
+  it('maps each exercise id to its own log id from the same read, while its rows carry set ids', async () => {
+    mockWorkoutRepo.findByDate.mockReturnValue([
+      {
+        id: 11,
+        userId: 1,
+        exerciseId: 5,
+        date: '2025-01-01',
+        sets: [{ id: 's1', reps: 5, weight: 135, count: 3 }],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+      {
+        id: 27,
+        userId: 1,
+        exerciseId: 9,
+        date: '2025-01-01',
+        sets: [
+          { id: 's2', reps: 8, weight: 95, count: 2 },
+          { id: 's3', reps: 1, weight: 60 },
+        ],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result).toEqual({
+      success: true,
+      workouts: {
+        5: [{ id: 's1', weight: 135, reps: 5, count: 3 }],
+        9: [
+          { id: 's2', weight: 95, reps: 8, count: 2 },
+          { id: 's3', weight: 60, reps: 1, count: undefined },
+        ],
+      },
+      logIds: { 5: 11, 9: 27 },
+    })
+    expect(mockWorkoutRepo.findByDate).toHaveBeenCalledTimes(1)
   })
 
   it('lets the later log win the key when two logs share one exercise id', async () => {
