@@ -405,9 +405,13 @@ export default function TodayPage() {
 
   async function refreshExercises(userId: number): Promise<void> {
     const dayOfWeek = jsDayToAppIndex(new Date().getDay())
-    const exRes = await getTodayExercisesAction(userId, dayOfWeek)
-    if (exRes.success && exRes.exercises) {
-      setExercises(exRes.exercises)
+    try {
+      const exRes = await getTodayExercisesAction(userId, dayOfWeek)
+      if (exRes.success && exRes.exercises) {
+        setExercises(exRes.exercises)
+      }
+    } catch {
+      // a re-fetch runs after the write already landed; the list keeps its last good load
     }
   }
 
@@ -418,17 +422,23 @@ export default function TodayPage() {
   ): Promise<void> {
     markSaving(exerciseId, true)
 
-    const res = await deleteWorkoutAction(userId, logId)
+    try {
+      const res = await deleteWorkoutAction(userId, logId)
 
-    markSaving(exerciseId, false)
+      if (!res.success) {
+        setCardError(exerciseId, res.error ?? 'Failed to delete workout')
+        return
+      }
 
-    if (!res.success) {
-      setCardError(exerciseId, res.error ?? 'Failed to delete workout')
+      savedLogIdsRef.current.delete(exerciseId)
+      clearCardError(exerciseId)
+    } catch (e) {
+      setCardError(exerciseId, e instanceof Error ? e.message : 'Failed to delete workout')
       return
+    } finally {
+      markSaving(exerciseId, false)
     }
 
-    savedLogIdsRef.current.delete(exerciseId)
-    clearCardError(exerciseId)
     await refreshExercises(userId)
   }
 
@@ -455,25 +465,30 @@ export default function TodayPage() {
 
     markSaving(exerciseId, true)
 
-    const res = await logWorkoutAction(
-      userId,
-      exerciseId,
-      getTodayLocalDate(),
-      saveable.map(toWorkoutSet),
-    )
+    try {
+      const res = await logWorkoutAction(
+        userId,
+        exerciseId,
+        getTodayLocalDate(),
+        saveable.map(toWorkoutSet),
+      )
 
-    markSaving(exerciseId, false)
+      if (!res.success) {
+        setCardError(exerciseId, res.error ?? 'Failed to save workout')
+        return
+      }
 
-    if (!res.success) {
-      setCardError(exerciseId, res.error ?? 'Failed to save workout')
+      if (res.log) {
+        savedLogIdsRef.current.set(exerciseId, res.log.id)
+      }
+
+      clearCardError(exerciseId)
+    } catch (e) {
+      setCardError(exerciseId, e instanceof Error ? e.message : 'Failed to save workout')
       return
+    } finally {
+      markSaving(exerciseId, false)
     }
-
-    if (res.log) {
-      savedLogIdsRef.current.set(exerciseId, res.log.id)
-    }
-
-    clearCardError(exerciseId)
 
     await refreshExercises(userId)
   }
