@@ -169,7 +169,7 @@ function ExerciseCard({
                   <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
                     <span className="font-label-mono text-label-mono text-secondary">SET:</span>
                     <input
-                      type="number"
+                      type="text"
                       inputMode="decimal"
                       value={draft.raw.count}
                       onChange={(e) => onFieldChange(index, 'count', e.target.value)}
@@ -184,7 +184,7 @@ function ExerciseCard({
                   <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
                     <span className="font-label-mono text-label-mono text-secondary">LB:</span>
                     <input
-                      type="number"
+                      type="text"
                       inputMode="decimal"
                       value={draft.raw.weight}
                       onChange={(e) => onFieldChange(index, 'weight', e.target.value)}
@@ -199,7 +199,7 @@ function ExerciseCard({
                   <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
                     <span className="font-label-mono text-label-mono text-secondary">REPS:</span>
                     <input
-                      type="number"
+                      type="text"
                       inputMode="decimal"
                       value={draft.raw.reps}
                       onChange={(e) => onFieldChange(index, 'reps', e.target.value)}
