@@ -4,7 +4,6 @@ import { getDatabase } from '@/config/db'
 import { createSqliteWorkoutRepository } from '@/features/workout/workout-repo-impl'
 import { createSqliteRoutineRepository } from '@/features/routine/routine-repo-impl'
 import { logWorkoutUseCase } from '@/features/workout/log-workout'
-import { updateWorkoutUseCase } from '@/features/workout/update-workout'
 import { getTodayExercisesUseCase } from '@/features/workout/get-today-exercises'
 import { getWorkoutHistoryUseCase } from '@/features/workout/get-workout-history'
 import { getUserVolumeUseCase } from '@/features/workout/get-user-volume'
@@ -22,23 +21,6 @@ export async function logWorkoutAction(
     const repo = createSqliteWorkoutRepository(db)
     const useCase = logWorkoutUseCase(repo)
     const log = useCase.execute(userId, exerciseId, date, sets)
-    return { success: true, log }
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'Unknown error'
-    return { success: false, error: message }
-  }
-}
-
-export async function updateWorkoutAction(
-  logId: number,
-  userId: number,
-  sets: WorkoutSet[],
-): Promise<{ success: boolean; log?: WorkoutLog; error?: string }> {
-  try {
-    const db = getDatabase()
-    const repo = createSqliteWorkoutRepository(db)
-    const useCase = updateWorkoutUseCase(repo)
-    const log = useCase.execute(logId, userId, sets)
     return { success: true, log }
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error'

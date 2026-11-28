@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const mockDb = {}
 
@@ -28,10 +28,6 @@ const mockRoutineRepo = {
 }
 
 const mockLogWorkout = {
-  execute: vi.fn(),
-}
-
-const mockUpdateWorkout = {
   execute: vi.fn(),
 }
 
@@ -77,10 +73,6 @@ vi.mock('@/features/workout/log-workout', () => ({
   logWorkoutUseCase: vi.fn(() => mockLogWorkout),
 }))
 
-vi.mock('@/features/workout/update-workout', () => ({
-  updateWorkoutUseCase: vi.fn(() => mockUpdateWorkout),
-}))
-
 vi.mock('@/features/workout/get-today-exercises', () => ({
   getTodayExercisesUseCase: vi.fn(() => mockGetTodayExercises),
 }))
@@ -96,10 +88,20 @@ vi.mock('@/features/workout/get-user-volume', () => ({
 beforeEach(() => {
   vi.clearAllMocks()
   mockLogWorkout.execute.mockReset()
-  mockUpdateWorkout.execute.mockReset()
   mockGetTodayExercises.execute.mockReset()
   mockGetWorkoutHistory.execute.mockReset()
   mockGetUserVolume.execute.mockReset()
+})
+
+const executedCases: string[] = []
+const executedByBlock = new Map<string, number>()
+
+afterEach(() => {
+  const { currentTestName } = expect.getState()
+  if (typeof currentTestName !== 'string') return
+  executedCases.push(currentTestName)
+  const block = currentTestName.split(' > ')[0]
+  executedByBlock.set(block, (executedByBlock.get(block) ?? 0) + 1)
 })
 
 describe('logWorkoutAction', () => {
@@ -161,55 +163,6 @@ describe('logWorkoutAction', () => {
 
     expect(result.success).toBe(false)
     expect(result.error).toBe('Unknown error')
-  })
-})
-
-describe('updateWorkoutAction', () => {
-  it('returns success on valid update', async () => {
-    mockUpdateWorkout.execute.mockReturnValue(mockLog)
-
-    const { updateWorkoutAction } = await import('@/features/workout/workout-server-actions')
-    const result = await updateWorkoutAction(1, 1, [{ id: 's1', reps: 5, weight: 110 }])
-
-    expect(result.success).toBe(true)
-    expect(result.log).toEqual(mockLog)
-    expect(result.error).toBeUndefined()
-  })
-
-  it('returns failure when log not found', async () => {
-    mockUpdateWorkout.execute.mockImplementation(() => {
-      throw new Error('Workout log not found')
-    })
-
-    const { updateWorkoutAction } = await import('@/features/workout/workout-server-actions')
-    const result = await updateWorkoutAction(999, 1, [{ id: 's1', reps: 5, weight: 100 }])
-
-    expect(result.success).toBe(false)
-    expect(result.error).toBe('Workout log not found')
-  })
-
-  it('returns failure when not the owner', async () => {
-    mockUpdateWorkout.execute.mockImplementation(() => {
-      throw new Error('Only the owner can update this workout log')
-    })
-
-    const { updateWorkoutAction } = await import('@/features/workout/workout-server-actions')
-    const result = await updateWorkoutAction(1, 1, [{ id: 's1', reps: 5, weight: 100 }])
-
-    expect(result.success).toBe(false)
-    expect(result.error).toBe('Only the owner can update this workout log')
-  })
-
-  it('returns failure for invalid sets', async () => {
-    mockUpdateWorkout.execute.mockImplementation(() => {
-      throw new Error('Weight must be non-negative')
-    })
-
-    const { updateWorkoutAction } = await import('@/features/workout/workout-server-actions')
-    const result = await updateWorkoutAction(1, 1, [{ id: 's1', reps: 5, weight: -10 }])
-
-    expect(result.success).toBe(false)
-    expect(result.error).toBe('Weight must be non-negative')
   })
 })
 
@@ -640,6 +593,44 @@ describe('getTodayWorkoutsAction — counted sets', () => {
     expect(workoutsLine).toEqual({ id: 's1', weight: 135, reps: 5, count: 3 })
     expect(exercisesLine).toEqual({ id: 's1', weight: 135, reps: 5, count: 3 })
     expect(Object.keys(workoutsLine).sort()).toEqual(Object.keys(exercisesLine).sort())
+  })
+})
+
+const SURVIVING_BLOCKS = [
+  { block: 'logWorkoutAction', atLeast: 5 },
+  { block: 'getTodayExercisesAction', atLeast: 4 },
+  { block: 'getHistoryAction', atLeast: 4 },
+  { block: 'getTodayWorkoutsAction', atLeast: 4 },
+  { block: 'getTodayWorkoutsAction — counted sets', atLeast: 13 },
+]
+
+describe('the removed workout update write path', () => {
+  it('exports exactly the four surviving actions', async () => {
+    const actions = await import('@/features/workout/workout-server-actions')
+
+    expect(Object.keys(actions).sort()).toEqual([
+      'getHistoryAction',
+      'getTodayExercisesAction',
+      'getTodayWorkoutsAction',
+      'logWorkoutAction',
+    ])
+  })
+
+  it('refuses to resolve the removed specifier while its surviving sibling still resolves', async () => {
+    const removed = ['@/features/workout', 'update-workout'].join('/')
+    const surviving = ['@/features/workout', 'workout-entity'].join('/')
+
+    await expect(import(removed)).rejects.toThrow()
+    await expect(import(surviving)).resolves.toHaveProperty('validateSet')
+  })
+
+  it('collects and runs every surviving describe block and no removed one', () => {
+    for (const { block, atLeast } of SURVIVING_BLOCKS) {
+      const ran = executedByBlock.get(block) ?? 0
+      expect(ran, `describe block under-ran: ${block}`).toBeGreaterThanOrEqual(atLeast)
+    }
+    expect(executedByBlock.has('updateWorkoutAction')).toBe(false)
+    expect(executedCases.filter((name) => name.startsWith('updateWorkoutAction'))).toEqual([])
   })
 })
 

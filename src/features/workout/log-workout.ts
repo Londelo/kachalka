@@ -22,7 +22,13 @@ export function logWorkoutUseCase(repo: WorkoutRepository) {
       const existing = repo.findByDateAndExercise(userId, date, exerciseId)
 
       if (existing) {
-        return repo.update(existing.id, collapsed)!
+        const updated = repo.update(existing.id, collapsed)
+        if (!updated) {
+          throw new Error(
+            'Workout log not found — it was removed before your set could be saved.',
+          )
+        }
+        return updated
       }
 
       const unsaved = createEmptyLog(userId, exerciseId, date)

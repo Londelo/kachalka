@@ -73,6 +73,27 @@ describe('logWorkoutUseCase', () => {
     expect(repo.create).not.toHaveBeenCalled()
   })
 
+  it('throws when the row disappears before the update lands', () => {
+    const repo = makeRepo()
+    repo.findByDateAndExercise.mockReturnValue({
+      id: 1,
+      userId: 1,
+      exerciseId: 5,
+      date: '2025-01-01',
+      sets: [{ id: 's1', reps: 5, weight: 100 }],
+      createdAt: '2025-01-01T00:00:00.000Z',
+      updatedAt: '2025-01-01T00:00:00.000Z',
+    })
+    repo.update.mockReturnValue(undefined)
+
+    const useCase = logWorkoutUseCase(repo)
+
+    expect(() =>
+      useCase.execute(1, 5, '2025-01-01', [{ id: 's1', reps: 5, weight: 110 }]),
+    ).toThrow('Workout log not found')
+    expect(repo.create).not.toHaveBeenCalled()
+  })
+
   it('throws when sets array is empty', () => {
     const repo = makeRepo()
     const useCase = logWorkoutUseCase(repo)
@@ -288,6 +309,15 @@ describe('logWorkoutUseCase', () => {
         exerciseId: 5,
         date: '2025-01-01',
         sets: [{ id: 'z', reps: 12, weight: 200, count: 4 }],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      })
+      repo.update.mockReturnValue({
+        id: 7,
+        userId: 1,
+        exerciseId: 5,
+        date: '2025-01-01',
+        sets: [{ id: 'a', reps: 5, weight: 100, count: 5 }],
         createdAt: '2025-01-01T00:00:00.000Z',
         updatedAt: '2025-01-01T00:00:00.000Z',
       })
