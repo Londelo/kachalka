@@ -15,7 +15,7 @@ export type WorkoutLog = {
   updatedAt: string
 }
 
-export type HistoryLog = {
+type HistoryLog = {
   id: number
   exerciseId: number
   exerciseName: string
