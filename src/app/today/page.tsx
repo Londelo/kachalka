@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { logWorkoutAction, deleteWorkoutAction, getTodayWorkoutsAction, getTodayExercisesAction } from '@/features/workout/workout-server-actions'
 import { useLoading } from '@/components/loading-context'
@@ -11,12 +11,13 @@ import { selectSaveableDrafts, describeIncompleteDraftFields } from '@/app/today
 import { parseSetField } from '@/app/today/set-field'
 import { collapseSetDrafts } from '@/app/today/collapse-drafts'
 import { createSaveScheduler } from '@/app/today/save-scheduler'
+import { buildPastSessionLines } from '@/app/today/past-session-lines'
 import { jsDayToAppIndex, getTodayLocalDate } from '@/shared/utils/date'
 
 type ExerciseItem = {
   exerciseId: number
   exerciseName: string
-  lastLog?: { weight: number; reps: number }[] | null
+  lastLog?: { weight: number; reps: number; count?: number }[] | null
 }
 
 type ViewMode = 'past' | 'current'
@@ -87,6 +88,7 @@ function ExerciseCard({
   onFieldChange,
 }: ExerciseCardProps) {
   const errorId = `card-error-${exercise.exerciseId}`
+  const pastLines = useMemo(() => buildPastSessionLines(exercise.lastLog), [exercise.lastLog])
 
   function isFieldInvalid(field: SetDraftField): boolean {
     return invalidFields.some((invalidField) => invalidField.field === field)
@@ -126,34 +128,49 @@ function ExerciseCard({
         </button>
       </div>
 
-      {/* Past session view — read-only */}
-      {viewMode === 'past' && exercise.lastLog && exercise.lastLog.length > 0 && (
-        <div className="mb-4 flex flex-col gap-3">
-          {exercise.lastLog.map((s, idx) => (
-            <div key={idx} className="flex items-center gap-3">
+      {viewMode === 'past' && pastLines.length > 0 && (
+        <div
+          className="mb-4 flex flex-col gap-3"
+          data-id={`past-session-rows-${exercise.exerciseId}`}
+          aria-label={`Previous session for ${exercise.exerciseName}`}
+          role="list"
+        >
+          {pastLines.map((line) => (
+            <div
+              key={`${line.weight}-${line.reps}`}
+              role="listitem"
+              data-id={`past-session-line-${exercise.exerciseId}-${line.weight}-${line.reps}`}
+              className="flex items-center gap-3"
+              aria-label={`${line.count} ${line.count === 1 ? 'set' : 'sets'} at ${line.weight} pounds for ${line.reps} reps`}
+            >
               <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background p-2 gap-2">
                 <span className="font-label-mono text-label-mono text-secondary">SET:</span>
                 <span className="font-body-md text-body-md text-on-surface">
-                  {String(idx + 1).padStart(2, '0')}
+                  {String(line.count).padStart(2, '0')}
                 </span>
               </div>
               <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background p-2 gap-2">
                 <span className="font-label-mono text-label-mono text-secondary">LB:</span>
-                <span className="font-body-md text-body-md text-on-surface">{s.weight}</span>
+                <span className="font-body-md text-body-md text-on-surface">{line.weight}</span>
               </div>
               <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background p-2 gap-2">
                 <span className="font-label-mono text-label-mono text-secondary">REPS:</span>
-                <span className="font-body-md text-body-md text-on-surface">{s.reps}</span>
+                <span className="font-body-md text-body-md text-on-surface">{line.reps}</span>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Past session — no previous data */}
-      {viewMode === 'past' && (!exercise.lastLog || exercise.lastLog.length === 0) && (
-        <div className="mb-4 border-b-4 border-dashed border-on-surface pb-4">
-          <p className="font-label-mono text-label-mono text-secondary">
+      {viewMode === 'past' && pastLines.length === 0 && (
+        <div
+          className="mb-4 border-b-4 border-dashed border-on-surface pb-4"
+          data-id={`past-session-empty-${exercise.exerciseId}`}
+        >
+          <p
+            className="font-label-mono text-label-mono text-secondary"
+            role="status"
+          >
             NO PREVIOUS SESSIONS
           </p>
         </div>
