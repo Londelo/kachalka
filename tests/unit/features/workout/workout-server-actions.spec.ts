@@ -664,10 +664,11 @@ const SURVIVING_BLOCKS = [
 ]
 
 describe('the removed workout update write path', () => {
-  it('exports exactly the four surviving actions', async () => {
+  it('exports exactly the five surviving actions', async () => {
     const actions = await import('@/features/workout/workout-server-actions')
 
     expect(Object.keys(actions).sort()).toEqual([
+      'deleteWorkoutAction',
       'getHistoryAction',
       'getTodayExercisesAction',
       'getTodayWorkoutsAction',
