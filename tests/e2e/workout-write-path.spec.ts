@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import type { Page, Request, Response } from '@playwright/test'
 
-import { getTodayISO, jsDayToAppIndex } from '@/shared/utils/date'
+import { getTodayLocalDate, jsDayToAppIndex } from '@/shared/utils/date'
 
 import { ensureSchema, openE2eDatabase, wipeE2eData } from '../harness/e2e-database'
 import { getE2eBaseUrl } from './e2e-config'
@@ -14,19 +14,30 @@ ensureSchema(db, process.cwd())
 
 // TWO CLOCKS — do not "simplify" one of these away.
 //
-// src/app/today/page.tsx renders the routine for the *local* day
-// (jsDayToAppIndex(new Date().getDay()) at :219 and :338) but stores the log
-// under the *UTC* date (new Date().toISOString().split('T')[0] at :319). Near a
-// UTC boundary those two disagree, and the page then shows Monday's exercises
-// while writing them to Sunday's date. So the routine rows below are seeded with
-// the LOCAL day and every read-back asserts the UTC date. Both come from
-// @/shared/utils/date so this file can never drift from what the page does.
+// @/shared/utils/date carries two distinct day helpers: getTodayISO() formats the
+// *UTC* calendar day (formatDate reads getUTCFullYear/getUTCMonth/getUTCDate) and
+// getTodayLocalDate() formats the *local* one. Outside UTC they name different
+// days for roughly a third of any 24 hours, so which one a read-back uses is a
+// fact about the page, not a style choice.
+//
+// This page runs on the LOCAL clock at both ends: it renders the routine for the
+// local weekday (jsDayToAppIndex(new Date().getDay())) and stamps every save with
+// getTodayLocalDate() (src/app/today/page.tsx:472), and getTodayWorkoutsAction
+// reads the pre-fill back on that same local day
+// (src/features/workout/workout-server-actions.ts:86). So the routine rows below
+// are seeded with the LOCAL weekday and every read-back asserts the LOCAL date.
+// Both helpers come from @/shared/utils/date so this file can never drift from
+// what the page does. No test here overrides timezoneId, so the browser's local
+// day is the Node process's local day and these helpers stand in for the page's
+// own honestly — the journey that pins the local-day choice across a real zone
+// split, and goes red first if the page ever returns to getTodayISO(), is
+// tests/e2e/today-counted-entry.spec.ts:654.
 function routineDay(): number {
   return jsDayToAppIndex(new Date().getDay())
 }
 
 function storedDate(): string {
-  return getTodayISO()
+  return getTodayLocalDate()
 }
 
 interface StoredSet {
