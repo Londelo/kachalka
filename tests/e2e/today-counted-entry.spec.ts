@@ -497,8 +497,11 @@ test('a refused value is that card problem alone — the other card still saves'
 
   await typeSet(session, exerciseA, 'Counted Refused A', { count: '2', weight: '0', reps: '5' })
 
+  // The card holds one line, so the position the refusal names is `Line 1` — the
+  // prefix is the whole of what tells a lifter which line to fix, so it is pinned
+  // here in the exact-match form and not left to a substring.
   await expect(errorOf(page, exerciseA)).toHaveText(
-    'Weight must be more than 0 — enter the weight you lifted, or remove the line.',
+    'Line 1: Weight must be more than 0 — enter the weight you lifted, or remove the line.',
   )
 
   await typeSet(session, exerciseB, 'Counted Refused B', { count: '1', weight: '95', reps: '10' })
