@@ -1,7 +1,6 @@
 'use client'
 
 import type { ChartDataPoint } from '@/features/chart/chart-entity'
-import type { WorkoutSet } from '@/features/workout/types'
 import { calculateVolume } from '@/features/workout/workout-entity'
 import { countTotalReps, countTotalSets } from './utils'
 
@@ -11,30 +10,15 @@ export type ProgressTooltipProps = {
   label?: string | number
 }
 
-function safeNumber(value: number | undefined): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0
-}
-
-function readableLines(sets: WorkoutSet[] | undefined): WorkoutSet[] {
-  if (!Array.isArray(sets)) return []
-  return sets.map((line) => ({
-    id: line.id,
-    reps: safeNumber(line.reps),
-    weight: safeNumber(line.weight),
-    count: line.count,
-  }))
-}
-
 export default function ProgressTooltip({ active, payload, label }: ProgressTooltipProps) {
   if (!active) return null
 
   const point = payload?.[0]?.payload
   if (!point) return null
 
-  const sets = readableLines(point.sets)
-  const totalSets = countTotalSets(sets)
-  const totalReps = countTotalReps(sets)
-  const totalVolume = calculateVolume(sets)
+  const totalSets = countTotalSets(point.sets)
+  const totalReps = countTotalReps(point.sets)
+  const totalVolume = calculateVolume(point.sets)
   const date = point.date ?? label ?? ''
 
   return (
