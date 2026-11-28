@@ -1,5 +1,5 @@
 import type { SetDraft } from '@/app/today/set-draft'
-import { generateId, isCollapsibleSetDraft } from '@/app/today/set-draft'
+import { isCollapsibleSetDraft } from '@/app/today/set-draft'
 import type { WorkoutSet } from '@/features/workout/types'
 import { collapseSets, getSetCount } from '@/features/workout/workout-entity'
 
@@ -18,7 +18,7 @@ function toCollapsedDraft(line: WorkoutSet): SetDraft {
   const count = getSetCount(line)
 
   return {
-    id: generateId(),
+    id: line.id,
     weight: line.weight,
     reps: line.reps,
     count,
@@ -42,6 +42,10 @@ function toCollapsedDraft(line: WorkoutSet): SetDraft {
  *
  * Nothing is dropped. Rows the rule cannot take — no weight, or no reps — are
  * returned untouched after the collapsed ones, in their original order.
+ *
+ * Identity is carried in, never minted: `collapseSets` hands back the first
+ * line of each group, so a collapsed row wears the id the row that survives
+ * went in with, and the shell's keyed list updates it instead of remounting it.
  */
 export function collapseSetDrafts(drafts: SetDraft[]): SetDraft[] {
   const numbered = drafts.filter(isNumberedSetDraft)
