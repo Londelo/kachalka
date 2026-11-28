@@ -40,8 +40,9 @@ function toCollapsedDraft(line: WorkoutSet): SetDraft {
  * a blank count is handed over with the `count` key omitted entirely, so the
  * domain's own "no count means one set" default is what produces the one.
  *
- * Nothing is dropped. Rows the rule cannot take — no weight, or no reps — are
- * returned untouched after the collapsed ones, in their original order.
+ * Nothing is dropped. Rows the rule cannot take — no weight, no reps, or a
+ * count the domain would refuse — are returned untouched after the collapsed
+ * ones, in their original order, still holding the count that was typed.
  *
  * Identity is carried in, never minted: `collapseSets` hands back the first
  * line of each group, so a collapsed row wears the id the row that survives

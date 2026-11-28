@@ -14,6 +14,27 @@ export const COUNT_TOO_SMALL =
   'Set count must be at least 1 — enter how many sets you did, or leave it blank for one.'
 
 /**
+ * The one authored predicate behind the sentence above: is this a count the
+ * lifter cannot mean?
+ *
+ * `validateSet` is the only thing that refuses, but the fold's door has to ask
+ * the same question before it folds: a line whose own count is below the
+ * minimum must never join a group, because the group's sum swallows the digit
+ * the lifter typed and the refusal below never gets to fire. Both doors read
+ * the answer here, so the client owns no copy of it.
+ *
+ * Absent and null are not below the minimum — a line with no count is a line
+ * with one set, which is `getSetCount`'s contract, not a refusal.
+ */
+export function isCountBelowMinimum(count: number | null | undefined): boolean {
+  return (
+    count !== undefined &&
+    count !== null &&
+    (!Number.isFinite(count) || Math.floor(count) < 1)
+  )
+}
+
+/**
  * The write path's judge: throws, because a lifter is standing at an input box
  * and can act on the advice.
  *
@@ -39,10 +60,8 @@ export function validateSet(set: WorkoutSet, lineNumber?: number): void {
     )
   }
 
-  if (set.count !== undefined && set.count !== null) {
-    if (!Number.isFinite(set.count) || Math.floor(set.count) < 1) {
-      throw new Error(`${where}${COUNT_TOO_SMALL}`)
-    }
+  if (isCountBelowMinimum(set.count)) {
+    throw new Error(`${where}${COUNT_TOO_SMALL}`)
   }
 }
 

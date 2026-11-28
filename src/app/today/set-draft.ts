@@ -1,4 +1,5 @@
 import type { WorkoutSet } from '@/features/workout/types'
+import { isCountBelowMinimum } from '@/features/workout/workout-entity'
 
 export type SetDraftField = 'weight' | 'reps' | 'count'
 
@@ -38,8 +39,21 @@ export function isBlankSetDraft(draft: SetDraft): boolean {
   )
 }
 
+/**
+ * Whether the fold may take this row.
+ *
+ * A count the lifter typed below the minimum is not the fold's to take: once a
+ * row joins its group the sum swallows that digit and the row disappears, so
+ * the typed zero would reach neither the screen nor `validateSet`. Refusing it
+ * here leaves the row on the card holding exactly what was typed, and the save
+ * refuses it by name the way it refuses a zero weight or a zero rep count.
+ */
 export function isCollapsibleSetDraft(draft: SetDraft): boolean {
-  return draft.weight !== null && draft.reps !== null
+  return (
+    draft.weight !== null &&
+    draft.reps !== null &&
+    !isCountBelowMinimum(draft.count)
+  )
 }
 
 export function toWorkoutSet(draft: SetDraft): WorkoutSet {
