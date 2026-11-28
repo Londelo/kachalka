@@ -143,9 +143,13 @@ describe('logWorkoutUseCase', () => {
   })
 
   describe('refusal order — guard, then raw validation, then fold', () => {
-    const WEIGHT_MSG = 'Weight must be more than 0 — enter the weight you lifted, or remove the line.'
-    const REPS_MSG = 'Reps must be at least 1 — enter how many reps you did, or remove the line.'
-    const COUNT_MSG = 'Set count must be at least 1 — enter how many sets you did, or leave it blank for one.'
+    // Every fixture below is a one-line card, so the position log-workout.ts:16
+    // hands validateSet (index + 1) is always 1 — the prefix is part of the
+    // message the lifter is told, so it is part of what these cases pin.
+    // EMPTY_MSG is the empty-array guard’s own sentence, not a line’s: bare.
+    const WEIGHT_MSG = 'Line 1: Weight must be more than 0 — enter the weight you lifted, or remove the line.'
+    const REPS_MSG = 'Line 1: Reps must be at least 1 — enter how many reps you did, or remove the line.'
+    const COUNT_MSG = 'Line 1: Set count must be at least 1 — enter how many sets you did, or leave it blank for one.'
     const EMPTY_MSG = 'Must log at least one set'
 
     function thrownMessage(run: () => unknown): string {

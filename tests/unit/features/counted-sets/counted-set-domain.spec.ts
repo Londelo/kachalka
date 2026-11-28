@@ -562,7 +562,7 @@ describe('journey 4 — the refusal journey', () => {
   it('refuses a count of 0 by name, never with the empty-array message, and stores nothing', () => {
     expect(() =>
       writeThroughTheRealPath([{ id: 'a', reps: 5, weight: 100, count: 0 }]),
-    ).toThrow(/^Set count must be at least 1/)
+    ).toThrow(/^Line 1: Set count must be at least 1/)
 
     try {
       writeThroughTheRealPath([{ id: 'a', reps: 5, weight: 100, count: 0 }])
@@ -584,7 +584,7 @@ describe('journey 4 — the refusal journey', () => {
       message = (e as Error).message
     }
 
-    expect(message).toMatch(/^Weight must be more than 0/)
+    expect(message).toMatch(/^Line 1: Weight must be more than 0/)
     expect(message).not.toBe(EMPTY_TABLE_MESSAGE)
     expect(message.toLowerCase()).toContain('weight')
     expect(storedRowCount()).toBe(0)
@@ -599,7 +599,7 @@ describe('journey 4 — the refusal journey', () => {
       message = (e as Error).message
     }
 
-    expect(message).toMatch(/^Reps must be at least 1/)
+    expect(message).toMatch(/^Line 1: Reps must be at least 1/)
     expect(message).not.toBe(EMPTY_TABLE_MESSAGE)
     expect(message.toLowerCase()).toContain('reps')
     expect(storedRowCount()).toBe(0)
@@ -637,8 +637,12 @@ describe('journey 4 — the refusal journey', () => {
       message = (e as Error).message
     }
 
+    // The illegal count sits on the second raw line, so the refusal names line 2.
+    // That position is itself the proof of the ordering: these two lines share
+    // reps and weight, so a fold that ran first would leave one line and no
+    // line 2 to name.
     expect(message).toBe(
-      'Set count must be at least 1 — enter how many sets you did, or leave it blank for one.',
+      'Line 2: Set count must be at least 1 — enter how many sets you did, or leave it blank for one.',
     )
     expect(message).not.toBe(EMPTY_TABLE_MESSAGE)
     expect(storedRowCount()).toBe(0)
