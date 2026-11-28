@@ -3,6 +3,7 @@ import {
   validateSet,
   calculateVolume,
   getSetCount,
+  calculateSetCount,
   collapseSets,
   WorkoutLog,
 } from '@/features/workout/workout-entity'
@@ -667,5 +668,141 @@ describe('getSetCount on a line deserialized from the workout_logs sets column',
     expect(getSetCount(line)).toBe(1)
     expect(getSetCount(line)).toBe(1)
     expect(line).toStrictEqual({ id: 's1', reps: 5, weight: 100 })
+  })
+})
+
+describe('calculateSetCount', () => {
+  type SetLine = { reps?: number; weight?: number; count?: number }
+
+  const cases: { label: string; sets: SetLine[]; expected: number }[] = [
+    { label: 'an empty list, which is zero sets and never one', sets: [], expected: 0 },
+
+    {
+      label: 'two legacy lines, which are worth exactly the two rows they are',
+      sets: [
+        { reps: 10, weight: 100 },
+        { reps: 10, weight: 125 },
+      ],
+      expected: 2,
+    },
+    {
+      label: 'three legacy lines at one rep count, worth exactly three rows',
+      sets: [
+        { reps: 8, weight: 50 },
+        { reps: 8, weight: 55 },
+        { reps: 8, weight: 60 },
+      ],
+      expected: 3,
+    },
+    {
+      label: 'the three Squat rows behind the War Logs session figure, worth exactly three rows',
+      sets: [
+        { reps: 5, weight: 135 },
+        { reps: 5, weight: 155 },
+        { reps: 5, weight: 175 },
+      ],
+      expected: 3,
+    },
+
+    { label: 'one line performed three times', sets: [{ count: 3 }], expected: 3 },
+    {
+      label: 'two lines performed three and two times',
+      sets: [{ count: 3 }, { count: 2 }],
+      expected: 5,
+    },
+    {
+      label: 'three lines each performed once, which is the same tally as three legacy rows',
+      sets: [{ count: 1 }, { count: 1 }, { count: 1 }],
+      expected: 3,
+    },
+    { label: 'one line performed twelve times', sets: [{ count: 12 }], expected: 12 },
+
+    {
+      label: 'one legacy line beside one line performed three times',
+      sets: [{ reps: 10, weight: 100 }, { reps: 5, weight: 135, count: 3 }],
+      expected: 4,
+    },
+    {
+      label: 'two legacy lines beside one line performed three times',
+      sets: [
+        { reps: 10, weight: 100 },
+        { reps: 10, weight: 125 },
+        { reps: 5, weight: 135, count: 3 },
+      ],
+      expected: 5,
+    },
+
+    {
+      label: 'one line whose count is the explicit 0, which the shared rule lifts to one',
+      sets: [{ count: 0 }],
+      expected: 1,
+    },
+    {
+      label: 'one line whose count is the negative -1',
+      sets: [{ count: -1 }],
+      expected: 1,
+    },
+    {
+      label: 'one line whose count is the fractional 2.7',
+      sets: [{ count: 2.7 }],
+      expected: 2,
+    },
+    {
+      label: 'one line whose count is NaN',
+      sets: [{ count: NaN }],
+      expected: 1,
+    },
+
+    {
+      label:
+        'three lines all carrying the explicit 0, clamped one at a time so the tally still equals the row count',
+      sets: [{ count: 0 }, { count: 0 }, { count: 0 }],
+      expected: 3,
+    },
+    {
+      label: 'two lines carrying 0.5, each floored and lifted on its own instead of the sum being floored',
+      sets: [{ count: 0.5 }, { count: 0.5 }],
+      expected: 2,
+    },
+    {
+      label:
+        'a counted line, a legacy line and an unusable line in one list, where the bad line costs one and costs nothing to its neighbours',
+      sets: [{ count: 3 }, {}, { count: 0.5 }],
+      expected: 5,
+    },
+    {
+      label:
+        'a hand-edited numeric string count beside a real one, where the sum stays a number instead of concatenating',
+      sets: [{ count: '3' }, { count: 2 }] as unknown as SetLine[],
+      expected: 3,
+    },
+  ]
+
+  it.each(cases)('tallies $label as $expected', ({ sets, expected }) => {
+    expect(calculateSetCount(sets)).toBe(expected)
+  })
+
+  it.each(cases)('answers the $label list with a whole number at least its row count', ({ sets }) => {
+    const total = calculateSetCount(sets)
+
+    expect(Number.isInteger(total)).toBe(true)
+    expect(total).toBeGreaterThanOrEqual(sets.length)
+  })
+
+  it('reads the list without rewriting it — same line objects, same keys, same values', () => {
+    const legacy = { reps: 10, weight: 100 }
+    const counted = { reps: 5, weight: 135, count: 3 }
+    const fractional = { count: 2.7 }
+    const sets: SetLine[] = [legacy, counted, fractional]
+
+    expect(calculateSetCount(sets)).toBe(6)
+
+    expect(sets).toHaveLength(3)
+    expect(sets[0]).toBe(legacy)
+    expect(sets[1]).toBe(counted)
+    expect(sets[2]).toBe(fractional)
+    expect(legacy).toStrictEqual({ reps: 10, weight: 100 })
+    expect(counted).toStrictEqual({ reps: 5, weight: 135, count: 3 })
+    expect(fractional).toStrictEqual({ count: 2.7 })
   })
 })
