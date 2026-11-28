@@ -82,12 +82,34 @@ function seedExerciseScheduledToday(name: string): number {
 // (workout-repo-impl.ts mapRowToWorkoutLog) parses it back exactly once. A row
 // written single-encoded here would still read — the door has a branch for it —
 // and the suite would go green while testing a shape the app never stores.
+function assertDoubleEncoded(stored: string, lines: StoredLine[]): void {
+  const once = JSON.parse(stored) as unknown
+
+  if (typeof once !== 'string') {
+    throw new Error(
+      `seedPreviousSession wrote a SINGLE-encoded sets column (${JSON.stringify(stored)}). The write ` +
+        `path stores it double-encoded, and the read door has a branch for each shape — a single-encoded ` +
+        `seed therefore reads fine and the suite goes green while proving nothing about real rows. ` +
+        `Seeded lines: ${JSON.stringify(lines)}`,
+    )
+  }
+
+  if (JSON.stringify(JSON.parse(once)) !== JSON.stringify(lines)) {
+    throw new Error(
+      `seedPreviousSession's double-encoded column does not read back as the seeded lines: ` +
+        `${once} vs ${JSON.stringify(lines)}`,
+    )
+  }
+}
+
 function seedPreviousSession(exerciseId: number, date: string, lines: StoredLine[]): void {
   const now = Math.floor(Date.now() / 1000)
+  const stored = JSON.stringify(JSON.stringify(lines))
+  assertDoubleEncoded(stored, lines)
 
   db.prepare(
     'INSERT INTO workout_logs (user_id, exercise_id, date, sets, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-  ).run(BRUNO_USER_ID, exerciseId, date, JSON.stringify(JSON.stringify(lines)), now, now)
+  ).run(BRUNO_USER_ID, exerciseId, date, stored, now, now)
 }
 
 function cleanupBruno(): void {
