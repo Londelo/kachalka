@@ -77,6 +77,33 @@ export function getSetCount(line: { count?: number }): number {
   return Math.max(1, Math.floor(count))
 }
 
+/**
+ * The one decoder for the stored `sets` column, shared by every read door.
+ *
+ * The column is `text('sets', { mode: 'json' })` (src/db/schema.ts:42) and the
+ * write path JSON.stringify's the lines before drizzle stringifies them again,
+ * so the stored bytes are double-encoded and drizzle applies exactly one
+ * `JSON.parse` on read. What is stored therefore decides the arrival shape, not
+ * how the query is written: a double-encoded row comes back as raw JSON text and
+ * a row written before that path — stored single-encoded — comes back as an
+ * already-parsed array. Every read door was traced handing back both shapes,
+ * which is why all of them call here and none of them tests the shape itself.
+ *
+ * The `{ value: T }` wrapper branch is defensive, not load-bearing: no query in
+ * src/ and no caller in src/ hands a door a wrapped row — drizzle hands plain
+ * values. The only thing in the repo that does is the pair of "a Drizzle wrapper
+ * around ..." fixture cases in tests/unit/features/chart/chart-repo-impl.spec.ts,
+ * which is the whole of its coverage. It stays in case a future caller hands one in.
+ */
+export function decodeStoredSets(value: unknown): WorkoutSet[] {
+  const unwrapped =
+    typeof value === 'object' && value !== null && 'value' in value
+      ? (value as { value: unknown }).value
+      : value
+
+  return (Array.isArray(unwrapped) ? unwrapped : JSON.parse(unwrapped as string)) as WorkoutSet[]
+}
+
 export function calculateVolume(sets: { reps: number; weight: number; count?: number }[]): number {
   return sets.reduce((total, line) => total + getSetCount(line) * line.weight * line.reps, 0)
 }
