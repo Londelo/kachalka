@@ -279,6 +279,12 @@ export default function TodayPage() {
   }
   const scheduler = schedulerRef.current
 
+  const fallbackRowsRef = useRef<SetDraft[] | null>(null)
+  if (fallbackRowsRef.current === null) {
+    fallbackRowsRef.current = [createBlankSetDraft()]
+  }
+  const fallbackRows = fallbackRowsRef.current
+
   const { start, end } = useLoading()
 
   // Load exercises on mount
@@ -314,17 +320,21 @@ export default function TodayPage() {
                     count: s.count === undefined ? '' : String(s.count),
                   },
                 })))
+              } else {
+                nextSets.set(exercise.exerciseId, [createBlankSetDraft()])
               }
               nextModes.set(exercise.exerciseId, 'current')
             }
             setExerciseSets(nextSets)
             setViewModes(nextModes)
           } else {
-            // No workouts today — set view modes to 'current'
+            const nextSets = new Map<number, SetDraft[]>()
             const nextModes = new Map<number, ViewMode>()
             for (const exercise of res.exercises ?? []) {
+              nextSets.set(exercise.exerciseId, [createBlankSetDraft()])
               nextModes.set(exercise.exerciseId, 'current')
             }
+            setExerciseSets(nextSets)
             setViewModes(nextModes)
           }
         })
@@ -345,13 +355,12 @@ export default function TodayPage() {
   }, [])
 
   function getSets(exerciseId: number): SetDraft[] {
-    const existing = exerciseSets.get(exerciseId)
-    return existing ?? [createBlankSetDraft()]
+    return exerciseSets.get(exerciseId) ?? fallbackRows
   }
 
   function updateSets(exerciseId: number, updater: (prev: SetDraft[]) => SetDraft[]): void {
     setExerciseSets((prev) => {
-      const current = prev.get(exerciseId) ?? [createBlankSetDraft()]
+      const current = prev.get(exerciseId) ?? fallbackRows
       const updated = updater(current)
       const next = new Map(prev)
       next.set(exerciseId, updated)
