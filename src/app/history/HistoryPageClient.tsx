@@ -154,7 +154,10 @@ export default function HistoryPageClient() {
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="font-label-mono text-label-mono text-secondary">
+                            <p
+                              data-id={`history-exercise-max-weight-${log.id}`}
+                              className="font-label-mono text-label-mono text-secondary"
+                            >
                               {exerciseMaxWeight}
                             </p>
                             <p className="font-label-mono text-label-mono uppercase text-secondary">
@@ -319,7 +322,10 @@ export default function HistoryPageClient() {
               </div>
               <div className="flex-1 text-center">
                 <p className="font-label-mono text-label-mono uppercase text-secondary">MAX LB</p>
-                <p className="font-headline-md text-headline-md font-black text-on-surface">
+                <p
+                  data-id="history-modal-max-lb"
+                  className="font-headline-md text-headline-md font-black text-on-surface"
+                >
                   {calcIntensity(selectedLog.log.sets)}
                 </p>
               </div>
