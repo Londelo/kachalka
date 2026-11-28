@@ -35,8 +35,18 @@ function fullDateBadge(isoDate: string): string {
   return `${days[d.getDay()]}, ${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`
 }
 
-function createWorkoutLog(exerciseId: number, date: string, sets: { id: string; reps: number; weight: number }[]): void {
-  const jsonSets = JSON.stringify(sets)
+type WorkoutLine = { id?: string; reps: number; weight: number; count?: number }
+
+// 'production' stores the column the way repo create()/update() do — JSON.stringify before
+// Drizzle's text('sets', { mode: 'json' }) stringifies again — so the row lands double-encoded
+// and the read path parses it back once. 'legacy' is the single-encoded shape older rows hold.
+function createWorkoutLog(
+  exerciseId: number,
+  date: string,
+  sets: WorkoutLine[],
+  storage: 'production' | 'legacy' = 'legacy',
+): void {
+  const jsonSets = storage === 'production' ? JSON.stringify(JSON.stringify(sets)) : JSON.stringify(sets)
   const now = Math.floor(Date.now() / 1000)
   db.prepare(
     'INSERT INTO workout_logs (user_id, exercise_id, date, sets, created_at, updated_at) VALUES (1, ?, ?, ?, ?, ?)',
@@ -277,7 +287,7 @@ test('modal shows date, exercise name, and metrics', async ({ page }) => {
   await expect(modal.getByText(fullDateBadge(sessionDate))).toBeVisible()
 
   await expect(modal.getByText('Bench Press')).toBeVisible()
-  await expect(modal.getByText(/sets/)).toBeVisible()
+  await expect(modal.getByText('2 sets', { exact: true })).toBeVisible()
   await expect(modal.getByText(/reps/)).toBeVisible()
   await expect(modal.getByText(/vol/)).toBeVisible()
   await expect(modal.getByText(/max lb/)).toBeVisible()
@@ -441,5 +451,39 @@ test('chart title updates with granularity change', async ({ page }) => {
 
   await page.getByRole('button', { name: 'month' }).click()
   await expect(page.getByText('VOLUME BY MONTH')).toBeVisible()
+})
+
+// One line standing for three sets, stored double-encoded the way repo create()/update()
+// store it. Three uncounted 5@135 lines produce the same 2,025 volume and are already
+// covered above; only this shape separates a count-aware reader from a count-blind one —
+// the bar and the modal that bar opens must both read 3 sets, 15 reps and 2,025.
+test('a counted session reads the same sets, reps and volume on the bar and in the modal it opens', async ({ page }) => {
+  const exerciseId = createExercises(['Deadlift'])[0]
+
+  createWorkoutLog(
+    exerciseId,
+    daysAgo(10),
+    [{ id: 's1', reps: 5, weight: 135, count: 3 }],
+    'production',
+  )
+
+  await loginAsBruno(page)
+  await page.goto(`${BASE_URL}/progress`)
+  await expect(page.getByRole('heading', { name: 'FORCE PROGRESSION' })).toBeVisible({ timeout: 10000 })
+
+  await openBarModal(page)
+
+  const modal = page.locator('[id="progress-detail-modal"]')
+  await expect(modal.getByText('Deadlift')).toBeVisible()
+  await expect(modal.getByText('3 sets', { exact: true })).toBeVisible()
+  await expect(modal.getByText('15 reps', { exact: true })).toBeVisible()
+  await expect(modal.getByText('2,025 vol', { exact: true })).toBeVisible()
+  await expect(modal.getByText('135 max lb', { exact: true })).toBeVisible()
+
+  // The footer is the bar's own volume — the figure the bar's height is drawn from — so
+  // reading 2,025 here and 2,025 in the row above is the agreement the modal used to break.
+  await expect(
+    modal.locator('p').filter({ hasText: 'TOTAL VOLUME' }).locator('..').locator('p').nth(1),
+  ).toHaveText('2,025')
 })
 

@@ -28,11 +28,22 @@ function assignExercise(exerciseId: number, dayOfWeek: number): void {
   ).run(1, exerciseId, dayOfWeek)
 }
 
-function createWorkoutLog(exerciseId: number, date: string, sets: { reps: number; weight: number }[]): void {
+type WorkoutLine = { id?: string; reps: number; weight: number; count?: number }
+
+// 'production' stores the column the way repo create()/update() do — JSON.stringify before
+// Drizzle's text('sets', { mode: 'json' }) stringifies again — so the row lands double-encoded
+// and the read path parses it back once. 'legacy' is the single-encoded shape older rows hold.
+function createWorkoutLog(
+  exerciseId: number,
+  date: string,
+  sets: WorkoutLine[],
+  storage: 'production' | 'legacy' = 'legacy',
+): void {
   const stmt = db.prepare(
     'INSERT INTO workout_logs (user_id, exercise_id, date, sets) VALUES (?, ?, ?, ?)',
   )
-  stmt.run(1, exerciseId, date, JSON.stringify(sets))
+  const jsonSets = JSON.stringify(sets)
+  stmt.run(1, exerciseId, date, storage === 'production' ? JSON.stringify(jsonSets) : jsonSets)
 }
 
 function cleanupBruno(): void {
@@ -343,4 +354,49 @@ test('multiple exercises in same session show as separate rows', async ({ page }
   await expect(metricBlocks.nth(0).locator('p').nth(1)).toHaveText('3,225')
   await expect(metricBlocks.nth(1).locator('p').nth(1)).toHaveText('5')
   await expect(metricBlocks.nth(2).locator('p').nth(1)).toHaveText('39')
+})
+
+// ──────────────────────────────────────────────
+// Counted sets, read the way production stores them
+// ──────────────────────────────────────────────
+
+test('one line of three sets reads three sets, fifteen reps and 2,025 volume across the session card, the row and the modal', async ({ page }) => {
+  const [exerciseId] = createExercises(['Deadlift'])
+  assignExercise(exerciseId, 4) // Friday
+  createWorkoutLog(
+    exerciseId,
+    '2026-06-20',
+    [{ id: 's1', reps: 5, weight: 135, count: 3 }],
+    'production',
+  )
+
+  await loginAsBruno(page)
+  await page.goto(`${BASE_URL}/history`)
+  await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
+
+  // One stored line, three sets: a reader counting array elements instead of counts
+  // reports 1 set and 5 reps here, and 675 beside them.
+  const sessionCard = page.locator('#history-date-2026-06-20')
+  const metricBlocks = sessionCard.locator('[class*="bg-on-surface"][class*="p-3"]')
+  await expect(metricBlocks.nth(0).locator('p').nth(1)).toHaveText('2,025')
+  await expect(metricBlocks.nth(1).locator('p').nth(1)).toHaveText('3')
+  await expect(metricBlocks.nth(2).locator('p').nth(1)).toHaveText('15')
+
+  const exerciseRow = page.locator('[id^="history-exercise-btn-"]').filter({ hasText: 'Deadlift' })
+  await expect(
+    exerciseRow.locator('p').filter({ hasText: /^SETS$/ }).locator('..').locator('p').first(),
+  ).toHaveText('3')
+  await expect(
+    exerciseRow.locator('p').filter({ hasText: /^REPS$/ }).locator('..').locator('p').first(),
+  ).toHaveText('15')
+
+  await exerciseRow.click()
+
+  const modal = page.locator('#history-set-detail-modal')
+  await expect(modal).toBeVisible()
+  await expect(modal.locator('p').filter({ hasText: /^VOLUME$/ }).locator('..').locator('p').nth(1)).toHaveText('2,025')
+  await expect(modal.locator('p').filter({ hasText: /^SETS$/ }).locator('..').locator('p').nth(1)).toHaveText('3')
+  await expect(modal.locator('p').filter({ hasText: /^MAX LB$/ }).locator('..').locator('p').nth(1)).toHaveText('135')
+  await expect(modal.getByText('SET:')).toHaveCount(1)
+  await expect(modal.getByText('REPS:')).toHaveCount(1)
 })

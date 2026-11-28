@@ -13,7 +13,7 @@ export function getTodayExercisesUseCase(
     execute(userId: number, dayOfWeek: number): Array<{
       exerciseId: number
       exerciseName: string
-      lastLog: { weight: number; reps: number }[] | null
+      lastLog: { id: string; weight: number; reps: number; count?: number }[] | null
     }> {
       const allAssignments = routineRepo.findAllByUser(userId)
       const todayDay = numberToDayOfWeek(dayOfWeek)
@@ -32,7 +32,12 @@ export function getTodayExercisesUseCase(
           exerciseId: assignment.exerciseId,
           exerciseName: exercise?.name ?? 'UNKNOWN',
           lastLog: lastLog
-            ? lastLog.sets.map((s) => ({ weight: s.weight, reps: s.reps }))
+            ? lastLog.sets.map((s) => ({
+                id: s.id,
+                weight: s.weight,
+                reps: s.reps,
+                count: s.count,
+              }))
             : null,
         }
       })

@@ -229,7 +229,7 @@ export default function TodayPage() {
             for (const exercise of res.exercises ?? []) {
               const sets = workoutsRes.workouts[exercise.exerciseId]
               if (sets) {
-                nextSets.set(exercise.exerciseId, sets.map(s => ({ id: generateId(), ...s })))
+                nextSets.set(exercise.exerciseId, sets.map(s => ({ ...s, id: generateId() })))
               }
               nextModes.set(exercise.exerciseId, 'current')
             }

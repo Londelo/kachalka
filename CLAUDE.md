@@ -93,7 +93,7 @@ kachalka/
 │   │   │   ├── get-today-exercises.ts # Use case: join routines + exercises + last workout log
 │   │   │   ├── get-user-volume.ts    # Use case: sum all volumes
 │   │   │   ├── get-workout-history.ts # Use case: return history grouped by date
-│   │   │   └── workout-server-actions.ts # logWorkoutAction, updateWorkoutAction, deleteWorkoutAction, getTodayExercisesAction, getHistoryAction, deleteHistoryEntryAction
+│   │   │   └── workout-server-actions.ts # logWorkoutAction, deleteWorkoutAction, getTodayExercisesAction, getHistoryAction, deleteHistoryEntryAction
 │   │   │
 │   │   └── chart/                    # Progress chart data aggregation
 │   │       ├── chart-entity.ts       # ChartDataPoint, ChartBarData, RangeFilter, TimeGranularity, IntensitySplit
@@ -184,7 +184,7 @@ server-actions.ts  (interface adapter — Next.js specific, 'use server')
 | **user** | `UserId` value object, `createUser()` validation | `findById`, `findByName`, `findAll`, `create`, `delete` | `createUserUseCase`, `getUsersUseCase` | `createUserAction`, `getUsersAction`, `deleteUserAction` |
 | **exercise** | `ExerciseId` value object, `createExercise()` validation | `findById`, `findByName`, `findAll`, `create`, `updateName`, `delete`, `findByOwner`, `inAnyRoutine` | `createExerciseUseCase`, `listExercisesUseCase`, `renameExerciseUseCase`, `deleteExerciseUseCase` | `createExerciseAction`, `renameExerciseAction`, `deleteExerciseAction`, `listExercisesAction` |
 | **routine** | `DayOfWeek` type, `RoutineId` value object, `createRoutineAssignment()`, `DAY_NAMES`, `DAY_LABELS` | `findById`, `findByUserAndDay`, `findByUserExerciseAndDay`, `exists`, `findAllByUserGroupedByDay`, `create`, `delete`, `exerciseExists` | `assignExerciseUseCase`, `removeExerciseUseCase`, `getUserRoutineUseCase` | `assignExerciseAction`, `removeExerciseAction`, `getUserRoutineAction` |
-| **workout** | `WorkoutSet` type, `WorkoutLog` type, `validateSet()`, `calculateVolume()`, `createEmptyLog()` | `findById`, `findByDateAndExercise`, `findByDate`, `findAllByUser`, `create`, `update`, `findByDayOfWeek`, `findLatestForExercise`, `findHistoryByDate` | `logWorkoutUseCase` (upsert), `updateWorkoutUseCase`, `deleteWorkoutUseCase`, `getTodayExercisesUseCase`, `getUserVolumeUseCase`, `getWorkoutHistoryUseCase` | `logWorkoutAction`, `updateWorkoutAction`, `getTodayExercisesAction`, `getHistoryAction` |
+| **workout** | `WorkoutSet` type, `WorkoutLog` type, `validateSet()`, `calculateVolume()`, `createEmptyLog()` | `findById`, `findByDateAndExercise`, `findByDate`, `findAllByUser`, `create`, `update`, `findByDayOfWeek`, `findLatestForExercise`, `findHistoryByDate` | `logWorkoutUseCase` (upsert), `deleteWorkoutUseCase`, `getTodayExercisesUseCase`, `getUserVolumeUseCase`, `getWorkoutHistoryUseCase` | `logWorkoutAction`, `getTodayExercisesAction`, `getHistoryAction` |
 | **chart** | `ChartDataPoint`, `ChartBarData`, `ExerciseInfo`, `RangeFilter`, `TimeGranularity`, `IntensitySplit` | `getVolumeByDate`, `getPeakVolume`, `getIntensitySplit`, `getExercisesWithLogs` | N/A (direct repo calls from server actions) | `getExerciseChartData`, `getAllExerciseChartData`, `getExercisesWithLogsAction`, `getPeakVolumeAction`, `getIntensitySplitAction` |
 
 ### Key Business Rules
