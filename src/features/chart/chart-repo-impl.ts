@@ -5,7 +5,11 @@ import * as schema from '@/db/schema'
 import type { ChartRepository } from '@/features/chart/chart-repository'
 import type { ChartDataPoint, IntensitySplit, RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
 import { groupByGranularity } from '@/features/chart/chart-utils'
-import { calculateVolume, decodeStoredSets, getSetCount } from '@/features/workout/workout-entity'
+import {
+  calculateSetCount,
+  calculateVolume,
+  decodeStoredSets,
+} from '@/features/workout/workout-entity'
 
 // The { value: T } wrapper branch is defensive, not load-bearing: no query in this file and no
 // caller in src/ ever hands these doors a wrapped name or date — drizzle hands plain values. It
@@ -25,7 +29,7 @@ export function mapRowToDataPoint(row: Record<string, unknown>): ChartDataPoint 
     date,
     volume: calculateVolume(sets),
     sets,
-    exercises: [{ name: exerciseName, sets, setCount: sets.reduce((n, s) => n + getSetCount(s), 0) }],
+    exercises: [{ name: exerciseName, sets, setCount: calculateSetCount(sets) }],
   }
 }
 

@@ -1,5 +1,9 @@
 import type { WorkoutSet } from '@/features/workout/types'
-import { calculateVolume, getSetCount } from '@/features/workout/workout-entity'
+import {
+  calculateRepTotal,
+  calculateSetCount,
+  calculateVolume,
+} from '@/features/workout/workout-entity'
 
 export type ExerciseMetrics = {
   name: string
@@ -9,13 +13,9 @@ export type ExerciseMetrics = {
   maxWeight: number
 }
 
-export function countTotalSets(sets: WorkoutSet[]): number {
-  return sets.reduce((total, line) => total + getSetCount(line), 0)
-}
+export const countTotalSets: (sets: WorkoutSet[]) => number = calculateSetCount
 
-export function countTotalReps(sets: WorkoutSet[]): number {
-  return sets.reduce((total, line) => total + getSetCount(line) * line.reps, 0)
-}
+export const countTotalReps: (sets: WorkoutSet[]) => number = calculateRepTotal
 
 export function calcExerciseMetrics(
   exercises: { name: string; sets: WorkoutSet[] }[],
