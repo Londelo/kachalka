@@ -4,25 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getHistoryAction } from '@/features/workout/workout-server-actions'
 import { getSetCount } from '@/features/workout/workout-entity'
+import type { HistoryEntry } from '@/features/workout/types'
 import { useLoading } from '@/components/loading-context'
-
-// This mirrors what `findHistoryByDate` actually publishes (workout-repo-impl.ts:281):
-// the stored lines out verbatim, each owning its own `count`, beside a `volume` built
-// by `calculateVolume` off those same lines. The element type used to stop at
-// `{ id, reps, weight }`, which is what let this file count array elements instead of
-// reading the counts — `getSetCount(s)` would not even typecheck here, so the compiler
-// stayed green while the page reported one line of three sets as one set. The wire
-// always carried the field; only this declaration denied it.
-type HistoryEntry = {
-  date: string
-  logs: {
-    id: number
-    exerciseId: number
-    exerciseName: string
-    sets: { id: string; reps: number; weight: number; count?: number }[]
-    volume: number
-  }[]
-}
 
 /**
  * How many sets a list of stored lines stands for.

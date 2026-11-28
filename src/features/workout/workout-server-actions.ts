@@ -8,7 +8,7 @@ import { getTodayExercisesUseCase } from '@/features/workout/get-today-exercises
 import { getWorkoutHistoryUseCase } from '@/features/workout/get-workout-history'
 import { getUserVolumeUseCase } from '@/features/workout/get-user-volume'
 import { createSqliteExerciseRepository } from '@/features/exercise/exercise-repo-impl'
-import type { WorkoutLog, WorkoutSet } from '@/features/workout/types'
+import type { HistoryEntry, WorkoutLog, WorkoutSet } from '@/features/workout/types'
 
 export async function logWorkoutAction(
   userId: number,
@@ -55,17 +55,6 @@ export async function getTodayExercisesAction(
     const message = e instanceof Error ? e.message : 'Unknown error'
     return { success: false, error: message, exercises: null }
   }
-}
-
-type HistoryEntry = {
-  date: string
-  logs: {
-    id: number
-    exerciseId: number
-    exerciseName: string
-    sets: WorkoutSet[]
-    volume: number
-  }[]
 }
 
 export async function getTodayWorkoutsAction(
