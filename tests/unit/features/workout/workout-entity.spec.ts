@@ -649,3 +649,23 @@ describe('collapseSets', () => {
     ).toStrictEqual([{ id: 'a', reps: 5, weight: 100, count: 4 }])
   })
 })
+
+describe('getSetCount on a line deserialized from the workout_logs sets column', () => {
+  const storedLine = (): WorkoutSet =>
+    JSON.parse('{"id":"s1","reps":5,"weight":100}') as WorkoutSet
+
+  it('reads a pre-count stored line as exactly one set', () => {
+    const line = storedLine()
+
+    expect('count' in line).toBe(false)
+    expect(getSetCount(line)).toBe(1)
+  })
+
+  it('reads the same stored line the same way twice, so a count column and a day total cannot disagree', () => {
+    const line = storedLine()
+
+    expect(getSetCount(line)).toBe(1)
+    expect(getSetCount(line)).toBe(1)
+    expect(line).toStrictEqual({ id: 's1', reps: 5, weight: 100 })
+  })
+})
