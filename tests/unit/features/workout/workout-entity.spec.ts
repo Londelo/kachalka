@@ -4,6 +4,7 @@ import {
   calculateVolume,
   getSetCount,
   calculateSetCount,
+  calculateRepTotal,
   collapseSets,
   WorkoutLog,
 } from '@/features/workout/workout-entity'
@@ -804,5 +805,209 @@ describe('calculateSetCount', () => {
     expect(legacy).toStrictEqual({ reps: 10, weight: 100 })
     expect(counted).toStrictEqual({ reps: 5, weight: 135, count: 3 })
     expect(fractional).toStrictEqual({ count: 2.7 })
+  })
+})
+
+describe('calculateRepTotal', () => {
+  type RepLine = { reps: number; weight?: number; count?: number }
+
+  const twoLegacyBenchRows: RepLine[] = [
+    { reps: 10, weight: 100 },
+    { reps: 10, weight: 125 },
+  ]
+  const threeLegacyRowsOfEight: RepLine[] = [
+    { reps: 8, weight: 50 },
+    { reps: 8, weight: 55 },
+    { reps: 8, weight: 60 },
+  ]
+  const threeLegacyRowsOfFiveFiveThree: RepLine[] = [
+    { reps: 5, weight: 185 },
+    { reps: 5, weight: 225 },
+    { reps: 3, weight: 275 },
+  ]
+
+  const cases: { label: string; sets: RepLine[]; expected: number }[] = [
+    { label: 'an empty list, which is zero reps and never one', sets: [], expected: 0 },
+
+    {
+      label: 'two legacy rows of 10 reps, worth exactly the plain sum of their reps',
+      sets: twoLegacyBenchRows,
+      expected: 20,
+    },
+    {
+      label: 'three legacy rows of 8 reps, worth exactly the plain sum of their reps',
+      sets: threeLegacyRowsOfEight,
+      expected: 24,
+    },
+    {
+      label: 'the legacy rows of 5, 5 and 3 reps, worth exactly the plain sum of their reps',
+      sets: threeLegacyRowsOfFiveFiveThree,
+      expected: 13,
+    },
+
+    { label: 'one line of 5 reps performed 3 times', sets: [{ reps: 5, count: 3 }], expected: 15 },
+    {
+      label: 'three separate lines of 5 reps, the same tally as one line performed 3 times',
+      sets: [{ reps: 5 }, { reps: 5 }, { reps: 5 }],
+      expected: 15,
+    },
+    {
+      label: 'the 12x2 and 5x3 pair behind the War Logs session figure, 24 plus 15',
+      sets: [
+        { reps: 12, count: 2 },
+        { reps: 5, count: 3 },
+      ],
+      expected: 39,
+    },
+
+    {
+      label: 'one legacy line beside one line of 5 reps performed 3 times',
+      sets: [{ reps: 10, weight: 100 }, { reps: 5, weight: 135, count: 3 }],
+      expected: 25,
+    },
+    {
+      label: 'two legacy lines beside one line of 5 reps performed 3 times',
+      sets: [
+        { reps: 10, weight: 100 },
+        { reps: 10, weight: 125 },
+        { reps: 5, weight: 135, count: 3 },
+      ],
+      expected: 35,
+    },
+
+    {
+      label: 'zero reps performed 3 times, where the count floor must not leak into the reps',
+      sets: [{ reps: 0, count: 3 }],
+      expected: 0,
+    },
+    {
+      label: 'zero reps performed 3 times beside 5 reps performed twice',
+      sets: [
+        { reps: 0, count: 3 },
+        { reps: 5, count: 2 },
+      ],
+      expected: 10,
+    },
+
+    {
+      label: '5 reps whose count is the explicit 0, which the shared rule lifts to one',
+      sets: [{ reps: 5, count: 0 }],
+      expected: 5,
+    },
+    {
+      label: '5 reps whose count is the negative -2, which the shared rule lifts to one',
+      sets: [{ reps: 5, count: -2 }],
+      expected: 5,
+    },
+    {
+      label: '5 reps whose count is the fractional 2.7, which the shared rule floors to 2',
+      sets: [{ reps: 5, count: 2.7 }],
+      expected: 10,
+    },
+    {
+      label: '5 reps whose count is NaN, which the shared rule reads as one',
+      sets: [{ reps: 5, count: NaN }],
+      expected: 5,
+    },
+  ]
+
+  it.each(cases)('tallies $label as $expected', ({ sets, expected }) => {
+    expect(calculateRepTotal(sets)).toBe(expected)
+  })
+
+  const legacyLists: { label: string; sets: RepLine[] }[] = [
+    { label: 'two legacy rows of 10 reps', sets: twoLegacyBenchRows },
+    { label: 'three legacy rows of 8 reps', sets: threeLegacyRowsOfEight },
+    { label: 'the legacy rows of 5, 5 and 3 reps', sets: threeLegacyRowsOfFiveFiveThree },
+  ]
+
+  it.each(legacyLists)(
+    'returns the plain sum of reps for $label, so no pre-count number on the War Logs screen ever moves',
+    ({ sets }) => {
+      const plainSum = sets.reduce((total, line) => total + line.reps, 0)
+
+      expect(calculateRepTotal(sets)).toBe(plainSum)
+    },
+  )
+
+  it('tallies three separate lines of 5 reps exactly as one line of 5 performed 3 times', () => {
+    const threeLines = calculateRepTotal([{ reps: 5 }, { reps: 5 }, { reps: 5 }])
+    const oneCollapsedLine = calculateRepTotal([{ reps: 5, count: 3 }])
+
+    expect(threeLines).toBe(oneCollapsedLine)
+  })
+
+  it('answers the same 10 whether the line carries weight 999 or carries no weight at all', () => {
+    const weightedLine: RepLine = { reps: 5, weight: 999, count: 2 }
+    const unweightedLine: RepLine = { reps: 5, count: 2 }
+
+    const weighted = calculateRepTotal([weightedLine])
+    const unweighted = calculateRepTotal([unweightedLine])
+
+    expect(unweighted).toBe(10)
+    expect(weighted).toBe(unweighted)
+  })
+
+  const weightCases: { label: string; weight: number }[] = [
+    { label: 'the zero 0, which cannot zero the reps it is not consulted for', weight: 0 },
+    { label: 'NaN, which would poison the total were it ever read', weight: NaN },
+  ]
+
+  it.each(weightCases)('tallies a line carrying weight $label as 10 all the same', ({ weight }) => {
+    const line: RepLine = { reps: 5, weight, count: 2 }
+
+    expect(calculateRepTotal([line])).toBe(10)
+  })
+
+  it('asks the shared rule how many times a line was performed instead of defaulting the count itself', () => {
+    const line = { reps: 5, count: '3' } as unknown as RepLine
+
+    expect(calculateRepTotal([line])).toBe(getSetCount(line) * 5)
+    expect(calculateRepTotal([line])).toBe(5)
+  })
+
+  const passThroughCases: { label: string; sets: RepLine[]; expected: number }[] = [
+    {
+      label:
+        'a line of -1 reps, which validateSet refuses on the write path and this read path only reports',
+      sets: [{ reps: -1 }],
+      expected: -1,
+    },
+    {
+      label: 'a line of 2.5 reps, whose fraction the count floor never reaches',
+      sets: [{ reps: 2.5, count: 2 }],
+      expected: 5,
+    },
+  ]
+
+  it.each(passThroughCases)('passes $label through as $expected', ({ sets, expected }) => {
+    expect(calculateRepTotal(sets)).toBe(expected)
+  })
+
+  it.each(cases)('answers the $label list with a whole number at least zero', ({ sets }) => {
+    const total = calculateRepTotal(sets)
+
+    expect(Number.isInteger(total)).toBe(true)
+    expect(total).toBeGreaterThanOrEqual(0)
+  })
+
+  it('reads the list without rewriting it — same line objects, same keys, same values', () => {
+    const legacy = { reps: 10, weight: 100 }
+    const counted = { reps: 5, weight: 135, count: 3 }
+    const fractional = { reps: 5, count: 2.7 }
+    const zeroed = { reps: 0, count: 3 }
+    const sets: RepLine[] = [legacy, counted, fractional, zeroed]
+
+    expect(calculateRepTotal(sets)).toBe(35)
+
+    expect(sets).toHaveLength(4)
+    expect(sets[0]).toBe(legacy)
+    expect(sets[1]).toBe(counted)
+    expect(sets[2]).toBe(fractional)
+    expect(sets[3]).toBe(zeroed)
+    expect(legacy).toStrictEqual({ reps: 10, weight: 100 })
+    expect(counted).toStrictEqual({ reps: 5, weight: 135, count: 3 })
+    expect(fractional).toStrictEqual({ reps: 5, count: 2.7 })
+    expect(zeroed).toStrictEqual({ reps: 0, count: 3 })
   })
 })
