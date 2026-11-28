@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+  Tooltip,
 } from 'recharts'
 import {
   getExercisesWithLogsAction,
@@ -17,6 +18,7 @@ import {
 } from '@/features/chart/chart-server-actions'
 import type { ChartDataPoint, RangeFilter, TimeGranularity } from '@/features/chart/chart-entity'
 import { calcExerciseMetrics } from './utils'
+import ProgressTooltip from './progress-tooltip'
 
 function toBars(chartData: ChartDataPoint[] | null): ChartDataPoint[] {
   return chartData ?? []
@@ -254,6 +256,7 @@ export default function ProgressPage() {
                       }
                     }}
                   />
+                  <Tooltip content={<ProgressTooltip />} cursor={false} isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
