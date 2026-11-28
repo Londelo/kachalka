@@ -14,3 +14,16 @@ export type WorkoutLog = {
   createdAt: string
   updatedAt: string
 }
+
+type HistoryLog = {
+  id: number
+  exerciseId: number
+  exerciseName: string
+  sets: WorkoutSet[]
+  volume: number
+}
+
+export type HistoryEntry = {
+  date: string
+  logs: HistoryLog[]
+}

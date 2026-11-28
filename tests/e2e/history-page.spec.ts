@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
 
 import { ensureSchema, openE2eDatabase, wipeE2eData } from '../harness/e2e-database'
 import { getE2eBaseUrl } from './e2e-config'
@@ -399,4 +399,217 @@ test('one line of three sets reads three sets, fifteen reps and 2,025 volume acr
   await expect(modal.locator('p').filter({ hasText: /^MAX LB$/ }).locator('..').locator('p').nth(1)).toHaveText('135')
   await expect(modal.getByText('SET:')).toHaveCount(1)
   await expect(modal.getByText('REPS:')).toHaveCount(1)
+})
+
+// ──────────────────────────────────────────────
+// Counted sets through the tallies and the COUNT cell
+// ──────────────────────────────────────────────
+
+function dayFigure(page: Page, date: string, figure: 'volume' | 'sets' | 'reps') {
+  return page.locator(`#history-date-${date}`).locator(`[data-id="history-total-${figure}"]`)
+}
+
+function exerciseRow(page: Page, name: string) {
+  return page.locator('[id^="history-exercise-btn-"]').filter({ hasText: name })
+}
+
+function rowFigure(row: Locator, figure: 'sets' | 'reps') {
+  return row.locator(`[data-id^="history-exercise-${figure}-"]`)
+}
+
+function rowMaxLb(row: Locator) {
+  return row.locator('p').filter({ hasText: /^MAX LB$/ }).locator('..').locator('p').first()
+}
+
+function modalFigure(modal: Locator, label: 'VOLUME' | 'MAX LB') {
+  return modal.locator('p').filter({ hasText: new RegExp(`^${label}$`) }).locator('..').locator('p').nth(1)
+}
+
+// The base suite's counted fixture is one line on one exercise, so every figure on that
+// screen is the same number three times over and no assertion can tell a per-log reading
+// from a per-day one. This fixture is the pair that separates them: two counted logs on
+// one day, deliberately different in count, reps and weight.
+test('two counted lines logged the same day keep their own row figures and their own modal summary', async ({
+  page,
+}) => {
+  const [deadliftId, pressId] = createExercises(['Deadlift', 'Overhead Press'])
+  assignExercise(deadliftId, 4) // Friday
+  assignExercise(pressId, 4) // Friday
+  createWorkoutLog(deadliftId, '2026-07-03', [{ id: 's1', reps: 5, weight: 135, count: 3 }], 'production')
+  createWorkoutLog(pressId, '2026-07-03', [{ id: 's1', reps: 8, weight: 95, count: 2 }], 'production')
+
+  await loginAsBruno(page)
+  await page.goto(`${BASE_URL}/history`)
+  await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
+
+  // The day block is the only place the two lines may meet: 3 + 2 sets, 15 + 16 reps,
+  // 2,025 + 1,520 volume.
+  await expect(dayFigure(page, '2026-07-03', 'volume')).toHaveText('3,545')
+  await expect(dayFigure(page, '2026-07-03', 'sets')).toHaveText('5')
+  await expect(dayFigure(page, '2026-07-03', 'reps')).toHaveText('31')
+
+  // Each row carries its own log's figures. A row reading the day tally — or either
+  // other log's — answers 5 sets and 31 reps here, and the single-line base fixture
+  // cannot see that, because there the two agree.
+  const deadlift = exerciseRow(page, 'Deadlift')
+  await expect(rowFigure(deadlift, 'sets')).toHaveText('3')
+  await expect(rowFigure(deadlift, 'reps')).toHaveText('15')
+
+  const press = exerciseRow(page, 'Overhead Press')
+  await expect(rowFigure(press, 'sets')).toHaveText('2')
+  // A reader counting array elements instead of counts reports 8 here, not 16.
+  await expect(rowFigure(press, 'reps')).toHaveText('16')
+
+  // The modal opens over the pressed log alone: one stored line is one row however many
+  // sets that line stands for, and the summary bar reads that log's 2 sets and 1,520 lb,
+  // not the day's 5 and 3,545.
+  await press.click()
+  const modal = page.locator('#history-set-detail-modal')
+  await expect(modal).toBeVisible()
+
+  await expect(modal.locator('[data-id="history-modal-set-row-0"]')).toBeVisible()
+  await expect(modal.locator('[data-id="history-modal-set-row-1"]')).toHaveCount(0)
+  await expect(modal.locator('[data-id="history-modal-set-count-0"]')).toHaveText(/^COUNT:\s*2$/)
+  await expect(modal.locator('[data-id="history-modal-sets"]')).toHaveText('2')
+  await expect(modalFigure(modal, 'VOLUME')).toHaveText('1,520')
+})
+
+test('a day holding one legacy line and one counted line tallies four sets, twenty-five reps and 3,025 volume', async ({
+  page,
+}) => {
+  const [legacyId, countedId] = createExercises(['Bench Press', 'Back Squat'])
+  assignExercise(legacyId, 0)
+  assignExercise(countedId, 0)
+  createWorkoutLog(legacyId, '2026-07-04', [{ reps: 10, weight: 100 }])
+  createWorkoutLog(countedId, '2026-07-04', [{ id: 's1', reps: 5, weight: 135, count: 3 }], 'production')
+
+  await loginAsBruno(page)
+  await page.goto(`${BASE_URL}/history`)
+  await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
+
+  // A tally still counting array elements reports 2 sets, 15 reps and 2,025 here.
+  await expect(dayFigure(page, '2026-07-04', 'sets')).toHaveText('4')
+  await expect(dayFigure(page, '2026-07-04', 'reps')).toHaveText('25')
+  await expect(dayFigure(page, '2026-07-04', 'volume')).toHaveText('3,025')
+})
+
+test('two differing counted lines arrive as two modal rows carrying counts 3 and 2 and five sets', async ({
+  page,
+}) => {
+  const [exerciseId] = createExercises(['Front Squat'])
+  assignExercise(exerciseId, 1)
+  createWorkoutLog(
+    exerciseId,
+    '2026-07-05',
+    [
+      { id: 's1', reps: 5, weight: 135, count: 3 },
+      { id: 's2', reps: 5, weight: 155, count: 2 },
+    ],
+    'production',
+  )
+
+  await loginAsBruno(page)
+  await page.goto(`${BASE_URL}/history`)
+  await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
+
+  const row = exerciseRow(page, 'Front Squat')
+  await row.click()
+  const modal = page.locator('#history-set-detail-modal')
+  await expect(modal).toBeVisible()
+
+  await expect(modal.locator('[data-id="history-modal-set-row-0"]')).toBeVisible()
+  await expect(modal.locator('[data-id="history-modal-set-row-1"]')).toBeVisible()
+  await expect(modal.locator('[data-id="history-modal-set-row-2"]')).toHaveCount(0)
+  await expect(modal.locator('[data-id="history-modal-set-count-0"]')).toHaveText(/^COUNT:\s*3$/)
+  await expect(modal.locator('[data-id="history-modal-set-count-1"]')).toHaveText(/^COUNT:\s*2$/)
+  await expect(modal.locator('[data-id="history-modal-sets"]')).toHaveText('5')
+
+  await expect(dayFigure(page, '2026-07-05', 'reps')).toHaveText('25')
+})
+
+test('a counted line of five sets at 200 lb reports the same intensity as the single effort it stands for', async ({
+  page,
+}) => {
+  const [exerciseId] = createExercises(['Overhead Press'])
+  assignExercise(exerciseId, 2)
+  createWorkoutLog(exerciseId, '2026-07-06', [{ id: 's1', reps: 5, weight: 200, count: 5 }], 'production')
+
+  await loginAsBruno(page)
+  await page.goto(`${BASE_URL}/history`)
+  await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
+
+  const row = exerciseRow(page, 'Overhead Press')
+  await expect(rowMaxLb(row)).toHaveText('200')
+
+  await row.click()
+  const modal = page.locator('#history-set-detail-modal')
+  await expect(modal).toBeVisible()
+  await expect(modalFigure(modal, 'MAX LB')).toHaveText('200')
+})
+
+test('the same effort stored as five legacy lines reports the same 200 lb intensity as one counted line', async ({
+  page,
+}) => {
+  const [exerciseId] = createExercises(['Overhead Press'])
+  assignExercise(exerciseId, 2)
+  createWorkoutLog(exerciseId, '2026-07-07', [
+    { id: 's1', reps: 5, weight: 200 },
+    { id: 's2', reps: 5, weight: 200 },
+    { id: 's3', reps: 5, weight: 200 },
+    { id: 's4', reps: 5, weight: 200 },
+    { id: 's5', reps: 5, weight: 200 },
+  ])
+
+  await loginAsBruno(page)
+  await page.goto(`${BASE_URL}/history`)
+  await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
+
+  const row = exerciseRow(page, 'Overhead Press')
+  await expect(rowMaxLb(row)).toHaveText('200')
+
+  await row.click()
+  const modal = page.locator('#history-set-detail-modal')
+  await expect(modal).toBeVisible()
+  await expect(modalFigure(modal, 'MAX LB')).toHaveText('200')
+})
+
+test('a legacy line with no count key renders a COUNT cell reading 1 rather than blank', async ({ page }) => {
+  const [exerciseId] = createExercises(['Pull-Up'])
+  assignExercise(exerciseId, 0)
+  createWorkoutLog(exerciseId, '2026-07-08', [{ reps: 8, weight: 60 }])
+
+  await loginAsBruno(page)
+  await page.goto(`${BASE_URL}/history`)
+  await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
+
+  await exerciseRow(page, 'Pull-Up').click()
+  const modal = page.locator('#history-set-detail-modal')
+  await expect(modal).toBeVisible()
+
+  // Exact match on the whole cell: a blank, undefined or empty count fails this.
+  await expect(modal.locator('[data-id="history-modal-set-count-0"]')).toHaveText(/^COUNT:\s*1$/)
+})
+
+test('the modal opens and closes over a log whose line carries a count, by CLOSE and by backdrop', async ({
+  page,
+}) => {
+  const [exerciseId] = createExercises(['Deadlift'])
+  assignExercise(exerciseId, 4)
+  createWorkoutLog(exerciseId, '2026-07-09', [{ id: 's1', reps: 5, weight: 135, count: 3 }], 'production')
+
+  await loginAsBruno(page)
+  await page.goto(`${BASE_URL}/history`)
+  await expect(page.getByRole('heading', { name: 'WAR LOGS' })).toBeVisible({ timeout: 10000 })
+
+  const modal = page.locator('#history-set-detail-modal')
+
+  await exerciseRow(page, 'Deadlift').click()
+  await expect(modal).toBeVisible()
+  await modal.getByRole('button', { name: 'CLOSE', exact: true }).click()
+  await expect(modal).not.toBeVisible()
+
+  await exerciseRow(page, 'Deadlift').click()
+  await expect(modal).toBeVisible()
+  await modal.click({ position: { x: 0, y: 0 } })
+  await expect(modal).not.toBeVisible()
 })

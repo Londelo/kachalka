@@ -3,48 +3,13 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getHistoryAction } from '@/features/workout/workout-server-actions'
-import { getSetCount } from '@/features/workout/workout-entity'
+import {
+  calculateSetCount,
+  calculateRepTotal,
+  getSetCount,
+} from '@/features/workout/workout-entity'
+import type { HistoryEntry } from '@/features/workout/types'
 import { useLoading } from '@/components/loading-context'
-
-// This mirrors what `findHistoryByDate` actually publishes (workout-repo-impl.ts:281):
-// the stored lines out verbatim, each owning its own `count`, beside a `volume` built
-// by `calculateVolume` off those same lines. The element type used to stop at
-// `{ id, reps, weight }`, which is what let this file count array elements instead of
-// reading the counts — `getSetCount(s)` would not even typecheck here, so the compiler
-// stayed green while the page reported one line of three sets as one set. The wire
-// always carried the field; only this declaration denied it.
-type HistoryEntry = {
-  date: string
-  logs: {
-    id: number
-    exerciseId: number
-    exerciseName: string
-    sets: { id: string; reps: number; weight: number; count?: number }[]
-    volume: number
-  }[]
-}
-
-/**
- * How many sets a list of stored lines stands for.
- *
- * `getSetCount` is the shared read rule — a line with no usable count is one set — so
- * a legacy row with no `count` tallies exactly as it did when this file counted
- * elements: three uncounted lines still read 3.
- */
-function calcSetTotal(sets: { count?: number }[]): number {
-  return sets.reduce((total, line) => total + getSetCount(line), 0)
-}
-
-/**
- * How many reps a list of stored lines stands for.
- *
- * A line's `reps` are the reps of ONE set, so a line standing for three sets is three
- * lots of them. Omitting the multiplier is what made a session of 3 × 135kg × 5 read
- * 5 reps beside a volume of 2,025 — the two figures the same screen shows side by side.
- */
-function calcRepTotal(sets: { reps: number; count?: number }[]): number {
-  return sets.reduce((total, line) => total + getSetCount(line) * line.reps, 0)
-}
 
 export default function HistoryPageClient() {
   const router = useRouter()
@@ -127,15 +92,9 @@ export default function HistoryPageClient() {
       {history.length > 0 && history.map((dateEntry, dateIdx) => {
         const sessionNum = dateIdx + 1
 
-        // Aggregate metrics across all exercises in this session.
-        //
-        // `totalVolume` already reads the server's own count-aware figure, and stays the
-        // single owner of volume on this page — no second formula is added beside it.
-        // SETS and REPS are now derived from the same lines the volume came from, by the
-        // same shared rule, so the three figures in this row can no longer disagree.
         const totalVolume = dateEntry.logs.reduce((sum, log) => sum + log.volume, 0)
-        const totalSets = dateEntry.logs.reduce((sum, log) => sum + calcSetTotal(log.sets), 0)
-        const totalReps = dateEntry.logs.reduce((sum, log) => sum + calcRepTotal(log.sets), 0)
+        const totalSets = dateEntry.logs.reduce((sum, log) => sum + calculateSetCount(log.sets), 0)
+        const totalReps = dateEntry.logs.reduce((sum, log) => sum + calculateRepTotal(log.sets), 0)
 
         return (
           <section key={dateEntry.date} id={`history-date-${dateEntry.date}`} className="mb-8 w-full">
@@ -154,12 +113,8 @@ export default function HistoryPageClient() {
               {/* Exercise list — each row is clickable */}
               <div className="flex flex-col gap-3">
                 {dateEntry.logs.map((log) => {
-                  // The same two rules as the session row above, applied to one exercise's
-                  // lines, so a row and the figure it sums into can never diverge.
-                  // `exerciseMaxWeight` is a per-line maximum, not a tally, so it is left
-                  // alone — a line standing for three sets of 135kg is still 135kg heavy.
-                  const exerciseSets = calcSetTotal(log.sets)
-                  const exerciseReps = calcRepTotal(log.sets)
+                  const exerciseSets = calculateSetCount(log.sets)
+                  const exerciseReps = calculateRepTotal(log.sets)
                   const exerciseMaxWeight = calcIntensity(log.sets)
                   return (
                     <button
@@ -177,7 +132,10 @@ export default function HistoryPageClient() {
                         </span>
                         <div className="flex gap-4">
                           <div className="text-right">
-                            <p className="font-label-mono text-label-mono text-secondary">
+                            <p
+                              data-id={`history-exercise-sets-${log.id}`}
+                              className="font-label-mono text-label-mono text-secondary"
+                            >
                               {exerciseSets}
                             </p>
                             <p className="font-label-mono text-label-mono uppercase text-secondary">
@@ -185,7 +143,10 @@ export default function HistoryPageClient() {
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="font-label-mono text-label-mono text-secondary">
+                            <p
+                              data-id={`history-exercise-reps-${log.id}`}
+                              className="font-label-mono text-label-mono text-secondary"
+                            >
                               {exerciseReps}
                             </p>
                             <p className="font-label-mono text-label-mono uppercase text-secondary">
@@ -193,7 +154,10 @@ export default function HistoryPageClient() {
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="font-label-mono text-label-mono text-secondary">
+                            <p
+                              data-id={`history-exercise-max-weight-${log.id}`}
+                              className="font-label-mono text-label-mono text-secondary"
+                            >
                               {exerciseMaxWeight}
                             </p>
                             <p className="font-label-mono text-label-mono uppercase text-secondary">
@@ -214,7 +178,10 @@ export default function HistoryPageClient() {
                   <p className="font-label-mono text-label-mono uppercase text-background">
                     VOLUME
                   </p>
-                  <p className="mt-1 font-headline-md text-headline-md font-black text-tertiary-fixed">
+                  <p
+                    data-id="history-total-volume"
+                    className="mt-1 font-headline-md text-headline-md font-black text-tertiary-fixed"
+                  >
                     {totalVolume.toLocaleString()}
                   </p>
                   <p className="font-label-mono text-label-mono text-background">
@@ -227,7 +194,10 @@ export default function HistoryPageClient() {
                   <p className="font-label-mono text-label-mono uppercase text-background">
                     SETS
                   </p>
-                  <p className="mt-1 font-headline-md text-headline-md font-black text-tertiary-fixed">
+                  <p
+                    data-id="history-total-sets"
+                    className="mt-1 font-headline-md text-headline-md font-black text-tertiary-fixed"
+                  >
                     {totalSets}
                   </p>
                   <p className="font-label-mono text-label-mono text-background">
@@ -240,7 +210,10 @@ export default function HistoryPageClient() {
                   <p className="font-label-mono text-label-mono uppercase text-background">
                     REPS
                   </p>
-                  <p className="mt-1 font-headline-md text-headline-md font-black text-tertiary-fixed">
+                  <p
+                    data-id="history-total-reps"
+                    className="mt-1 font-headline-md text-headline-md font-black text-tertiary-fixed"
+                  >
                     {totalReps}
                   </p>
                   <p className="font-label-mono text-label-mono text-background">
@@ -278,28 +251,52 @@ export default function HistoryPageClient() {
             </div>
 
             {/* Set rows */}
-            <div className="mb-6 flex flex-col gap-3">
+            <div className="mb-6 flex flex-col gap-3" role="table" aria-label="Set lines">
               {selectedLog.log.sets.map((set, idx) => (
-                <div key={idx} className="flex items-center gap-3">
+                <div
+                  key={idx}
+                  className="flex items-center gap-3"
+                  role="row"
+                  data-id={`history-modal-set-row-${idx}`}
+                >
                   {/* Set number */}
-                  <div className="flex min-w-[80px] flex-1 items-center border-b-4 border-primary pb-2 pt-1">
+                  <div
+                    className="flex min-w-[80px] flex-1 items-center border-b-4 border-primary pb-2 pt-1"
+                    role="cell"
+                  >
                     <span className="font-label-mono text-label-mono text-secondary">SET:</span>
                     <span className="font-body-md text-body-md text-on-surface">
                       {String(idx + 1).padStart(2, '0')}
                     </span>
                   </div>
                   {/* Weight */}
-                  <div className="flex min-w-[80px] flex-1 items-center border-b-4 border-primary pb-2 pt-1">
+                  <div
+                    className="flex min-w-[80px] flex-1 items-center border-b-4 border-primary pb-2 pt-1"
+                    role="cell"
+                  >
                     <span className="font-label-mono text-label-mono text-secondary">LB:</span>
                     <span className="font-body-md text-body-md text-on-surface">
                       {set.weight}
                     </span>
                   </div>
                   {/* Reps */}
-                  <div className="flex min-w-[80px] flex-1 items-center border-b-4 border-primary pb-2 pt-1">
+                  <div
+                    className="flex min-w-[80px] flex-1 items-center border-b-4 border-primary pb-2 pt-1"
+                    role="cell"
+                  >
                     <span className="font-label-mono text-label-mono text-secondary">REPS:</span>
                     <span className="font-body-md text-body-md text-on-surface">
                       {set.reps}
+                    </span>
+                  </div>
+                  <div
+                    className="flex min-w-[80px] flex-1 items-center border-b-4 border-primary pb-2 pt-1"
+                    role="cell"
+                    data-id={`history-modal-set-count-${idx}`}
+                  >
+                    <span className="font-label-mono text-label-mono text-secondary">COUNT:</span>
+                    <span className="font-body-md text-body-md text-on-surface">
+                      {getSetCount(set)}
                     </span>
                   </div>
                 </div>
@@ -316,13 +313,19 @@ export default function HistoryPageClient() {
               </div>
               <div className="flex-1 text-center">
                 <p className="font-label-mono text-label-mono uppercase text-secondary">SETS</p>
-                <p className="font-headline-md text-headline-md font-black text-on-surface">
-                  {calcSetTotal(selectedLog.log.sets)}
+                <p
+                  data-id="history-modal-sets"
+                  className="font-headline-md text-headline-md font-black text-on-surface"
+                >
+                  {calculateSetCount(selectedLog.log.sets)}
                 </p>
               </div>
               <div className="flex-1 text-center">
                 <p className="font-label-mono text-label-mono uppercase text-secondary">MAX LB</p>
-                <p className="font-headline-md text-headline-md font-black text-on-surface">
+                <p
+                  data-id="history-modal-max-lb"
+                  className="font-headline-md text-headline-md font-black text-on-surface"
+                >
                   {calcIntensity(selectedLog.log.sets)}
                 </p>
               </div>

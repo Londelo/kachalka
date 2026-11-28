@@ -68,6 +68,14 @@ export function calculateVolume(sets: { reps: number; weight: number; count?: nu
   return sets.reduce((total, line) => total + getSetCount(line) * line.weight * line.reps, 0)
 }
 
+export function calculateSetCount(sets: { count?: number }[]): number {
+  return sets.reduce((total, line) => total + getSetCount(line), 0)
+}
+
+export function calculateRepTotal(sets: { reps: number; count?: number }[]): number {
+  return sets.reduce((total, line) => total + getSetCount(line) * line.reps, 0)
+}
+
 /**
  * The three figures the fold is defined over, and nothing else.
  *
