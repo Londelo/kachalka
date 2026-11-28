@@ -68,6 +68,10 @@ export function calculateVolume(sets: { reps: number; weight: number; count?: nu
   return sets.reduce((total, line) => total + getSetCount(line) * line.weight * line.reps, 0)
 }
 
+export function calculateSetCount(sets: { count?: number }[]): number {
+  return sets.reduce((total, line) => total + getSetCount(line), 0)
+}
+
 export function collapseSets(sets: WorkoutSet[]): WorkoutSet[] {
   const folded = new Map<string, { first: WorkoutSet; count: number }>()
 
