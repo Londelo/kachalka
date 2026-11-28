@@ -4,10 +4,14 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { logWorkoutAction, getTodayWorkoutsAction, getTodayExercisesAction } from '@/features/workout/workout-server-actions'
 import { useLoading } from '@/components/loading-context'
-import type { WorkoutSet } from '@/features/workout/types'
 import type { SetDraft, SetDraftField } from '@/app/today/set-draft'
+import { createBlankSetDraft, generateId, toWorkoutSet } from '@/app/today/set-draft'
 import type { IncompleteField } from '@/app/today/saveable-sets'
-import { jsDayToAppIndex } from '@/shared/utils/date'
+import { selectSaveableDrafts, describeIncompleteDraftFields } from '@/app/today/saveable-sets'
+import { parseSetField } from '@/app/today/set-field'
+import { collapseSetDrafts } from '@/app/today/collapse-drafts'
+import { createSaveScheduler } from '@/app/today/save-scheduler'
+import { jsDayToAppIndex, getTodayLocalDate } from '@/shared/utils/date'
 
 type ExerciseItem = {
   exerciseId: number
@@ -19,15 +23,37 @@ type ViewMode = 'past' | 'current'
 
 const DEBOUNCE_MS = 500
 
-function generateId(): string {
-  return crypto.getRandomValues(new Uint32Array(4))[0].toString(16) +
-    crypto.getRandomValues(new Uint32Array(4))[0].toString(16) +
-    crypto.getRandomValues(new Uint32Array(4))[0].toString(16) +
-    crypto.getRandomValues(new Uint32Array(4))[0].toString(16)
+const FIELD_LABELS: Record<SetDraftField, string> = {
+  weight: 'WEIGHT',
+  reps: 'REPS',
+  count: 'SET',
 }
 
-function defaultSet(): WorkoutSet {
-  return { id: generateId(), reps: 1, weight: 0 }
+const INCOMPLETE_FIELD_ORDER: readonly SetDraftField[] = ['weight', 'reps', 'count']
+
+function joinFieldLabels(fields: SetDraftField[]): string {
+  const labels = fields.map((field) => FIELD_LABELS[field])
+  if (labels.length === 1) return labels[0]
+  return `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`
+}
+
+function describeIncompleteDraft(incomplete: IncompleteField[]): string {
+  const blank = INCOMPLETE_FIELD_ORDER.filter((field) =>
+    incomplete.some((entry) => entry.field === field && entry.reason === 'blank'),
+  )
+  const invalid = INCOMPLETE_FIELD_ORDER.filter((field) =>
+    incomplete.some((entry) => entry.field === field && entry.reason === 'invalid'),
+  )
+
+  const clauses: string[] = []
+  if (blank.length > 0) {
+    clauses.push(`Enter a number for ${joinFieldLabels(blank)} on every set line, or remove the line.`)
+  }
+  if (invalid.length > 0) {
+    clauses.push(`${joinFieldLabels(invalid)} must be a number, or remove the line.`)
+  }
+
+  return clauses.join(' ')
 }
 
 function getStoredUserId(): number | null {
@@ -236,13 +262,22 @@ export default function TodayPage() {
 
   // Per-exercise state (Map-based)
   const [viewModes, setViewModes] = useState<Map<number, ViewMode>>(new Map())
-  const [exerciseSets, setExerciseSets] = useState<Map<number, WorkoutSet[]>>(new Map())
+  const [exerciseSets, setExerciseSets] = useState<Map<number, SetDraft[]>>(new Map())
   const [savingExercises, setSavingExercises] = useState<Set<number>>(new Set())
   const [errors, setErrors] = useState<Map<number, string>>(new Map())
-  const debounceTimersRef = useRef<Map<number, NodeJS.Timeout>>(new Map())
-  const exerciseSetsRef = useRef<Map<number, WorkoutSet[]>>(new Map())
+  const exerciseSetsRef = useRef<Map<number, SetDraft[]>>(new Map())
   // Keep ref in sync with state so debounced callbacks always read fresh data
   exerciseSetsRef.current = exerciseSets
+
+  const schedulerRef = useRef<ReturnType<typeof createSaveScheduler> | null>(null)
+  if (schedulerRef.current === null) {
+    schedulerRef.current = createSaveScheduler({
+      delayMs: DEBOUNCE_MS,
+      setTimer: setTimeout,
+      clearTimer: clearTimeout,
+    })
+  }
+  const scheduler = schedulerRef.current
 
   const { start, end } = useLoading()
 
@@ -263,12 +298,22 @@ export default function TodayPage() {
         // Pre-fill current session from today's saved data
         getTodayWorkoutsAction(userId).then((workoutsRes) => {
           if (workoutsRes.success && workoutsRes.workouts) {
-            const nextSets = new Map<number, WorkoutSet[]>()
+            const nextSets = new Map<number, SetDraft[]>()
             const nextModes = new Map<number, ViewMode>()
             for (const exercise of res.exercises ?? []) {
               const sets = workoutsRes.workouts[exercise.exerciseId]
               if (sets) {
-                nextSets.set(exercise.exerciseId, sets.map(s => ({ ...s, id: generateId() })))
+                nextSets.set(exercise.exerciseId, sets.map((s) => ({
+                  id: generateId(),
+                  weight: s.weight,
+                  reps: s.reps,
+                  count: s.count ?? null,
+                  raw: {
+                    weight: String(s.weight),
+                    reps: String(s.reps),
+                    count: s.count === undefined ? '' : String(s.count),
+                  },
+                })))
               }
               nextModes.set(exercise.exerciseId, 'current')
             }
@@ -292,24 +337,21 @@ export default function TodayPage() {
     }
   }, [])
 
-  // Cleanup: clear all debounce timers on unmount
   useEffect(() => {
-    const timers = debounceTimersRef.current
     return () => {
-      timers.forEach((timer) => clearTimeout(timer))
+      scheduler.flushAll()
+      scheduler.clearAll()
     }
   }, [])
 
-  // Helper: get sets for an exercise, default to [defaultSet()]
-  function getSets(exerciseId: number): WorkoutSet[] {
+  function getSets(exerciseId: number): SetDraft[] {
     const existing = exerciseSets.get(exerciseId)
-    return existing ?? [defaultSet()]
+    return existing ?? [createBlankSetDraft()]
   }
 
-  // Helper: update sets in the Map
-  function updateSets(exerciseId: number, updater: (prev: WorkoutSet[]) => WorkoutSet[]): void {
+  function updateSets(exerciseId: number, updater: (prev: SetDraft[]) => SetDraft[]): void {
     setExerciseSets((prev) => {
-      const current = prev.get(exerciseId) ?? [defaultSet()]
+      const current = prev.get(exerciseId) ?? [createBlankSetDraft()]
       const updated = updater(current)
       const next = new Map(prev)
       next.set(exerciseId, updated)
@@ -317,63 +359,68 @@ export default function TodayPage() {
     })
   }
 
-  // Helper: trigger debounced save
-  function triggerSave(exerciseId: number): void {
-    const timers = debounceTimersRef.current
-    const existing = timers.get(exerciseId)
-    if (existing) {
-      clearTimeout(existing)
-      timers.delete(exerciseId)
-    }
-    const timer = setTimeout(() => {
-      debouncedSave(exerciseId)
-      timers.delete(exerciseId)
-    }, DEBOUNCE_MS)
-    timers.set(exerciseId, timer)
-  }
-
-  // Debounced save: filter empty sets, call logWorkoutAction
-  async function debouncedSave(exerciseId: number): Promise<void> {
-    const userId = getStoredUserId()
-    if (!userId) return
-
-    const sets = exerciseSetsRef.current.get(exerciseId)
-    if (!sets) return
-
-    // Filter out sets where both weight and reps are 0
-    const validSets = sets.filter((s) => s.weight !== 0 || s.reps !== 0)
-    if (validSets.length === 0) return
-
-    setSavingExercises((prev) => {
-      const next = new Set(prev)
-      next.add(exerciseId)
+  function setCardError(exerciseId: number, message: string): void {
+    setErrors((prev) => {
+      const next = new Map(prev)
+      next.set(exerciseId, message)
       return next
     })
+  }
+
+  function clearCardError(exerciseId: number): void {
     setErrors((prev) => {
+      if (!prev.has(exerciseId)) return prev
       const next = new Map(prev)
       next.delete(exerciseId)
       return next
     })
+  }
 
-    const today = new Date().toISOString().split('T')[0]
-    const res = await logWorkoutAction(userId, exerciseId, today, validSets)
-
+  function markSaving(exerciseId: number, saving: boolean): void {
     setSavingExercises((prev) => {
+      const has = prev.has(exerciseId)
+      if (has === saving) return prev
       const next = new Set(prev)
-      next.delete(exerciseId)
+      if (saving) next.add(exerciseId)
+      else next.delete(exerciseId)
       return next
     })
+  }
 
-    if (!res.success) {
-      setErrors((prev) => {
-        const next = new Map(prev)
-        next.set(exerciseId, res.error ?? 'Failed to save workout')
-        return next
-      })
+  async function saveExercise(exerciseId: number): Promise<void> {
+    const userId = getStoredUserId()
+    if (!userId) return
+
+    const drafts = exerciseSetsRef.current.get(exerciseId)
+    if (!drafts) return
+
+    const saveable = selectSaveableDrafts(drafts)
+    if (saveable.length === 0) return
+
+    const incomplete = saveable.flatMap(describeIncompleteDraftFields)
+    if (incomplete.length > 0) {
+      setCardError(exerciseId, describeIncompleteDraft(incomplete))
       return
     }
 
-    // Refresh exercises on success
+    markSaving(exerciseId, true)
+
+    const res = await logWorkoutAction(
+      userId,
+      exerciseId,
+      getTodayLocalDate(),
+      saveable.map(toWorkoutSet),
+    )
+
+    markSaving(exerciseId, false)
+
+    if (!res.success) {
+      setCardError(exerciseId, res.error ?? 'Failed to save workout')
+      return
+    }
+
+    clearCardError(exerciseId)
+
     const dayOfWeek = jsDayToAppIndex(new Date().getDay())
     const exRes = await getTodayExercisesAction(userId, dayOfWeek)
     if (exRes.success && exRes.exercises) {
@@ -381,8 +428,9 @@ export default function TodayPage() {
     }
   }
 
-  // Toggle view mode: clear exerciseSets so it reinitializes on next view
   function handleToggleView(exerciseId: number): void {
+    scheduler.flush(exerciseId)
+
     setViewModes((prev) => {
       const next = new Map(prev)
       const current = next.get(exerciseId)
@@ -397,23 +445,38 @@ export default function TodayPage() {
   }
 
   function handleAddSet(exerciseId: number): void {
-    updateSets(exerciseId, (prev) => [...prev, defaultSet()])
-    triggerSave(exerciseId)
+    updateSets(exerciseId, (prev) => [...prev, createBlankSetDraft()])
+    scheduler.schedule(exerciseId, () => {
+      void saveExercise(exerciseId)
+    })
   }
 
   function handleRemoveSet(exerciseId: number, index: number): void {
     updateSets(exerciseId, (prev) => prev.filter((_, i) => i !== index))
-    triggerSave(exerciseId)
+    scheduler.schedule(exerciseId, () => {
+      void saveExercise(exerciseId)
+    })
   }
 
-  function handleSetChange(exerciseId: number, index: number, field: keyof WorkoutSet, value: string): void {
+  function handleFieldChange(exerciseId: number, index: number, field: SetDraftField, raw: string): void {
+    const parsed = parseSetField(raw)
+
     updateSets(exerciseId, (prev) => {
       const updated = [...prev]
       const current = updated[index]
-      updated[index] = { ...current, [field]: parseFloat(value) || 0 }
-      return updated
+      if (!current) return prev
+
+      updated[index] = {
+        ...current,
+        [field]: parsed.kind === 'value' ? parsed.value : null,
+        raw: { ...current.raw, [field]: raw },
+      }
+      return collapseSetDrafts(updated)
     })
-    triggerSave(exerciseId)
+
+    scheduler.schedule(exerciseId, () => {
+      void saveExercise(exerciseId)
+    })
   }
 
   if (loading) {
@@ -444,20 +507,12 @@ export default function TodayPage() {
           <div className="flex w-full flex-col gap-8">
             {exercises.map((exercise) => {
               const viewMode = viewModes.get(exercise.exerciseId) ?? 'current'
-              const sets = getSets(exercise.exerciseId)
+              const drafts = getSets(exercise.exerciseId)
               const saving = savingExercises.has(exercise.exerciseId)
               const error = errors.get(exercise.exerciseId) ?? null
-              const drafts: SetDraft[] = sets.map((set) => ({
-                id: set.id,
-                weight: set.weight,
-                reps: set.reps,
-                count: set.count ?? null,
-                raw: {
-                  weight: String(set.weight),
-                  reps: String(set.reps),
-                  count: set.count === undefined ? '' : String(set.count),
-                },
-              }))
+              const invalidFields = error === null
+                ? []
+                : selectSaveableDrafts(drafts).flatMap(describeIncompleteDraftFields)
 
               return (
                 <ExerciseCard
@@ -471,8 +526,8 @@ export default function TodayPage() {
                   onToggleView={() => handleToggleView(exercise.exerciseId)}
                   onAddSet={() => handleAddSet(exercise.exerciseId)}
                   onRemoveSet={(index) => handleRemoveSet(exercise.exerciseId, index)}
-                  onFieldChange={(index, field, value) =>
-                    handleSetChange(exercise.exerciseId, index, field, value)
+                  onFieldChange={(index, field, raw) =>
+                    handleFieldChange(exercise.exerciseId, index, field, raw)
                   }
                 />
               )
