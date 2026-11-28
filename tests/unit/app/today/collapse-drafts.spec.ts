@@ -183,10 +183,17 @@ describe('collapseSetDrafts', () => {
     it('gives every returned draft its own non-empty id', () => {
       const first = draft(135, 5, 3)
       const second = draft(135, 5, 2)
+      const third = draft(95, 10, 1)
       const untouched = createBlankSetDraft()
-      rule.collapseSets.mockReturnValue([ruleLine(135, 5, 5), ruleLine(95, 10, 1)])
+      // Identity is carried in, never minted: the shared rule echoes the first
+      // line of each group, so each collapsed row wears the id of the input row
+      // that survived it — `first` for the 135×5 group, `third` for the 95×10.
+      rule.collapseSets.mockReturnValue([
+        { id: first.id, weight: 135, reps: 5, count: 5 },
+        { id: third.id, weight: 95, reps: 10, count: 1 },
+      ])
 
-      const result = collapseSetDrafts([first, second, untouched])
+      const result = collapseSetDrafts([first, second, third, untouched])
 
       const ids = result.map(row => row.id)
       ids.forEach(id => {
@@ -194,9 +201,7 @@ describe('collapseSetDrafts', () => {
         expect(id.length).toBeGreaterThan(0)
       })
       expect(new Set(ids).size).toBe(3)
-      expect(ids.slice(0, 2)).not.toContain(RULE_LINE_ID)
-      expect(ids.slice(0, 2)).not.toContain(first.id)
-      expect(ids.slice(0, 2)).not.toContain(second.id)
+      expect(ids).toEqual([first.id, third.id, untouched.id])
       expect(ids[2]).toBe(untouched.id)
     })
   })
