@@ -10,6 +10,7 @@ import { getWorkoutHistoryUseCase } from '@/features/workout/get-workout-history
 import { getUserVolumeUseCase } from '@/features/workout/get-user-volume'
 import { createSqliteExerciseRepository } from '@/features/exercise/exercise-repo-impl'
 import type { WorkoutLog, WorkoutSet } from '@/features/workout/types'
+import { getTodayLocalDate } from '@/shared/utils/date'
 
 export async function logWorkoutAction(
   userId: number,
@@ -89,7 +90,7 @@ export async function getTodayWorkoutsAction(
   try {
     const db = getDatabase()
     const repo = createSqliteWorkoutRepository(db)
-    const today = new Date().toISOString().split('T')[0]
+    const today = getTodayLocalDate()
     const logs = repo.findByDate(userId, today)
     const workouts: TodayWorkouts = {}
     for (const log of logs) {
