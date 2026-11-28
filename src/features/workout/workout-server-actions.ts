@@ -4,6 +4,7 @@ import { getDatabase } from '@/config/db'
 import { createSqliteWorkoutRepository } from '@/features/workout/workout-repo-impl'
 import { createSqliteRoutineRepository } from '@/features/routine/routine-repo-impl'
 import { logWorkoutUseCase } from '@/features/workout/log-workout'
+import { deleteWorkoutUseCase } from '@/features/workout/delete-workout'
 import { getTodayExercisesUseCase } from '@/features/workout/get-today-exercises'
 import { getWorkoutHistoryUseCase } from '@/features/workout/get-workout-history'
 import { getUserVolumeUseCase } from '@/features/workout/get-user-volume'
@@ -40,6 +41,8 @@ export type TodayWorkouts = Record<
   { id: string; weight: number; reps: number; count?: number }[]
 >
 
+export type TodayWorkoutLogIds = Record<number, number>
+
 export async function getTodayExercisesAction(
   userId: number,
   dayOfWeek: number,
@@ -71,13 +74,19 @@ type HistoryEntry = {
 
 export async function getTodayWorkoutsAction(
   userId: number,
-): Promise<{ success: boolean; workouts?: TodayWorkouts | null; error?: string }> {
+): Promise<{
+  success: boolean
+  workouts?: TodayWorkouts | null
+  logIds?: TodayWorkoutLogIds
+  error?: string
+}> {
   try {
     const db = getDatabase()
     const repo = createSqliteWorkoutRepository(db)
     const today = getTodayLocalDate()
     const logs = repo.findByDate(userId, today)
     const workouts: TodayWorkouts = {}
+    const logIds: TodayWorkoutLogIds = {}
     for (const log of logs) {
       workouts[log.exerciseId] = log.sets.map(s => ({
         id: s.id,
@@ -85,11 +94,28 @@ export async function getTodayWorkoutsAction(
         reps: s.reps,
         count: s.count,
       }))
+      logIds[log.exerciseId] = log.id
     }
-    return { success: true, workouts }
+    return { success: true, workouts, logIds }
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error'
     return { success: false, error: message, workouts: null }
+  }
+}
+
+export async function deleteWorkoutAction(
+  userId: number,
+  logId: number,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const db = getDatabase()
+    const repo = createSqliteWorkoutRepository(db)
+    const useCase = deleteWorkoutUseCase(repo)
+    useCase.execute(logId, userId)
+    return { success: true }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error'
+    return { success: false, error: message }
   }
 }
 

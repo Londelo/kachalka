@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { logWorkoutAction, getTodayWorkoutsAction, getTodayExercisesAction } from '@/features/workout/workout-server-actions'
+import { logWorkoutAction, deleteWorkoutAction, getTodayWorkoutsAction, getTodayExercisesAction } from '@/features/workout/workout-server-actions'
 import { useLoading } from '@/components/loading-context'
 import type { SetDraft, SetDraftField } from '@/app/today/set-draft'
 import { createBlankSetDraft, generateId, toWorkoutSet } from '@/app/today/set-draft'
@@ -268,6 +268,7 @@ export default function TodayPage() {
   const exerciseSetsRef = useRef<Map<number, SetDraft[]>>(new Map())
   // Keep ref in sync with state so debounced callbacks always read fresh data
   exerciseSetsRef.current = exerciseSets
+  const savedLogIdsRef = useRef<Map<number, number>>(new Map())
 
   const schedulerRef = useRef<ReturnType<typeof createSaveScheduler> | null>(null)
   if (schedulerRef.current === null) {
@@ -306,8 +307,10 @@ export default function TodayPage() {
           if (workoutsRes.success && workoutsRes.workouts) {
             const nextSets = new Map<number, SetDraft[]>()
             const nextModes = new Map<number, ViewMode>()
+            const logIds = workoutsRes.logIds ?? {}
             for (const exercise of res.exercises ?? []) {
               const sets = workoutsRes.workouts[exercise.exerciseId]
+              const logId = logIds[exercise.exerciseId]
               if (sets) {
                 nextSets.set(exercise.exerciseId, sets.map((s) => ({
                   id: generateId(),
@@ -320,8 +323,12 @@ export default function TodayPage() {
                     count: s.count === undefined ? '' : String(s.count),
                   },
                 })))
+                if (logId !== undefined) {
+                  savedLogIdsRef.current.set(exercise.exerciseId, logId)
+                }
               } else {
                 nextSets.set(exercise.exerciseId, [createBlankSetDraft()])
+                savedLogIdsRef.current.delete(exercise.exerciseId)
               }
               nextModes.set(exercise.exerciseId, 'current')
             }
@@ -396,6 +403,35 @@ export default function TodayPage() {
     })
   }
 
+  async function refreshExercises(userId: number): Promise<void> {
+    const dayOfWeek = jsDayToAppIndex(new Date().getDay())
+    const exRes = await getTodayExercisesAction(userId, dayOfWeek)
+    if (exRes.success && exRes.exercises) {
+      setExercises(exRes.exercises)
+    }
+  }
+
+  async function deleteSavedLog(
+    exerciseId: number,
+    userId: number,
+    logId: number,
+  ): Promise<void> {
+    markSaving(exerciseId, true)
+
+    const res = await deleteWorkoutAction(userId, logId)
+
+    markSaving(exerciseId, false)
+
+    if (!res.success) {
+      setCardError(exerciseId, res.error ?? 'Failed to delete workout')
+      return
+    }
+
+    savedLogIdsRef.current.delete(exerciseId)
+    clearCardError(exerciseId)
+    await refreshExercises(userId)
+  }
+
   async function saveExercise(exerciseId: number): Promise<void> {
     const userId = getStoredUserId()
     if (!userId) return
@@ -404,7 +440,12 @@ export default function TodayPage() {
     if (!drafts) return
 
     const saveable = selectSaveableDrafts(drafts)
-    if (saveable.length === 0) return
+    if (saveable.length === 0) {
+      const logId = savedLogIdsRef.current.get(exerciseId)
+      if (logId === undefined) return
+      await deleteSavedLog(exerciseId, userId, logId)
+      return
+    }
 
     const incomplete = saveable.flatMap(describeIncompleteDraftFields)
     if (incomplete.length > 0) {
@@ -428,13 +469,13 @@ export default function TodayPage() {
       return
     }
 
+    if (res.log) {
+      savedLogIdsRef.current.set(exerciseId, res.log.id)
+    }
+
     clearCardError(exerciseId)
 
-    const dayOfWeek = jsDayToAppIndex(new Date().getDay())
-    const exRes = await getTodayExercisesAction(userId, dayOfWeek)
-    if (exRes.success && exRes.exercises) {
-      setExercises(exRes.exercises)
-    }
+    await refreshExercises(userId)
   }
 
   function handleToggleView(exerciseId: number): void {
@@ -446,6 +487,7 @@ export default function TodayPage() {
       next.set(exerciseId, current === 'past' ? 'current' : 'past')
       return next
     })
+    savedLogIdsRef.current.delete(exerciseId)
     setExerciseSets((prev) => {
       const next = new Map(prev)
       next.delete(exerciseId)
