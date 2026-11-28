@@ -3,7 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getHistoryAction } from '@/features/workout/workout-server-actions'
-import { calculateSetCount, calculateRepTotal } from '@/features/workout/workout-entity'
+import {
+  calculateSetCount,
+  calculateRepTotal,
+  getSetCount,
+} from '@/features/workout/workout-entity'
 import type { HistoryEntry } from '@/features/workout/types'
 import { useLoading } from '@/components/loading-context'
 
@@ -244,28 +248,52 @@ export default function HistoryPageClient() {
             </div>
 
             {/* Set rows */}
-            <div className="mb-6 flex flex-col gap-3">
+            <div className="mb-6 flex flex-col gap-3" role="table" aria-label="Set lines">
               {selectedLog.log.sets.map((set, idx) => (
-                <div key={idx} className="flex items-center gap-3">
+                <div
+                  key={idx}
+                  className="flex items-center gap-3"
+                  role="row"
+                  data-id={`history-modal-set-row-${idx}`}
+                >
                   {/* Set number */}
-                  <div className="flex min-w-[80px] flex-1 items-center border-b-4 border-primary pb-2 pt-1">
+                  <div
+                    className="flex min-w-[80px] flex-1 items-center border-b-4 border-primary pb-2 pt-1"
+                    role="cell"
+                  >
                     <span className="font-label-mono text-label-mono text-secondary">SET:</span>
                     <span className="font-body-md text-body-md text-on-surface">
                       {String(idx + 1).padStart(2, '0')}
                     </span>
                   </div>
                   {/* Weight */}
-                  <div className="flex min-w-[80px] flex-1 items-center border-b-4 border-primary pb-2 pt-1">
+                  <div
+                    className="flex min-w-[80px] flex-1 items-center border-b-4 border-primary pb-2 pt-1"
+                    role="cell"
+                  >
                     <span className="font-label-mono text-label-mono text-secondary">LB:</span>
                     <span className="font-body-md text-body-md text-on-surface">
                       {set.weight}
                     </span>
                   </div>
                   {/* Reps */}
-                  <div className="flex min-w-[80px] flex-1 items-center border-b-4 border-primary pb-2 pt-1">
+                  <div
+                    className="flex min-w-[80px] flex-1 items-center border-b-4 border-primary pb-2 pt-1"
+                    role="cell"
+                  >
                     <span className="font-label-mono text-label-mono text-secondary">REPS:</span>
                     <span className="font-body-md text-body-md text-on-surface">
                       {set.reps}
+                    </span>
+                  </div>
+                  <div
+                    className="flex min-w-[80px] flex-1 items-center border-b-4 border-primary pb-2 pt-1"
+                    role="cell"
+                    data-id={`history-modal-set-count-${idx}`}
+                  >
+                    <span className="font-label-mono text-label-mono text-secondary">COUNT:</span>
+                    <span className="font-body-md text-body-md text-on-surface">
+                      {getSetCount(set)}
                     </span>
                   </div>
                 </div>
