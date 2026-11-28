@@ -520,15 +520,23 @@ test('junk in a weight field stays on screen as junk and writes no row', async (
 
   await expect(cardOf(page, exerciseId)).toBeVisible()
 
-  // The ticket's word for this input was `heavy`. A type="number" field cannot
-  // hold it: page.fill rejects the string outright, and inserting it as text
-  // leaves el.value === '' with validity.badInput set, so React's value tracker
-  // never fires onChange and the feature never sees the keystroke at all. '1e3'
-  // is the strongest junk a real browser does hand across this boundary — legal
-  // HTML floating-point syntax, so the value getter returns it verbatim and the
-  // page really does receive it, and not a plain decimal, so the parse rejects
-  // it. Same seam, same refusal, same "never silently a zero".
-  await typeSet(session, exerciseId, 'Counted Junk', { count: '2', weight: '1e3', reps: '5' })
+  // Typed one character at a time, the way a hand types it, so it is the browser
+  // that decides whether `heavy` is an acceptable value for this control and not
+  // Playwright deciding on its behalf before the page ever saw the key.
+  await awaitMountPrefill(session)
+  await awaitQuietCard(session, exerciseId, 1)
+
+  const countField = inputOf(page, exerciseId, 'Counted Junk', 'count')
+  await countField.click()
+  await countField.pressSequentially('2', { delay: KEYSTROKE_DELAY_MS })
+
+  const weightField = inputOf(page, exerciseId, 'Counted Junk', 'weight')
+  await weightField.click()
+  await weightField.pressSequentially('heavy', { delay: KEYSTROKE_DELAY_MS })
+
+  const repsField = inputOf(page, exerciseId, 'Counted Junk', 'reps')
+  await repsField.click()
+  await repsField.pressSequentially('5', { delay: KEYSTROKE_DELAY_MS })
 
   // The card error is the fingerprint that the scheduled callback ran and chose
   // not to call the server, so the request count below is a refusal, not a race.
@@ -536,9 +544,9 @@ test('junk in a weight field stays on screen as junk and writes no row', async (
     'WEIGHT must be a number, or remove the line.',
   )
 
-  await expect(inputOf(page, exerciseId, 'Counted Junk', 'weight')).toHaveValue('1e3')
-  await expect(inputOf(page, exerciseId, 'Counted Junk', 'weight')).not.toHaveValue('0')
-  await expect(inputOf(page, exerciseId, 'Counted Junk', 'weight')).not.toHaveValue('')
+  await expect(weightField).toHaveValue('heavy')
+  await expect(weightField).not.toHaveValue('0')
+  await expect(weightField).not.toHaveValue('')
 
   expect(savesFor(session, exerciseId)).toHaveLength(0)
   expect(rowsFor(exerciseId, BROWSER_LOCAL_DATE)).toHaveLength(0)
@@ -787,13 +795,10 @@ test('a set typed one character at a time keeps the caret and stores every chara
   ])
 
   // The last leg types a character a hand can press and a number control will not
-  // accept, and it belongs here rather than beside the junk journey above for one
-  // reason stated in that journey's own comment: fill() cannot deliver a letter to
-  // a number field, so that journey proves the refusal with '1e3' — a string a
-  // number control does hand over. A build that slipped back to type="number"
-  // therefore keeps all seven of them green while the browser eats every letter
-  // typed into the card. Nothing but a real key event, and the character still on
-  // screen afterwards, says which control is underneath.
+  // accept, on top of digits already in the field. A build that slipped back to
+  // type="number" eats every letter at the browser, so the keystroke never reaches
+  // onChange and the field comes back without them. Nothing but a real key event,
+  // and the character still on screen afterwards, says which control is underneath.
   //
   // The character reaching the field is all this asserts. That the field then
   // refuses out loud and writes no row is the junk journey's claim, proved once.
