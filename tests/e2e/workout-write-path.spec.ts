@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import type { Page, Request, Response } from '@playwright/test'
 
-import { getTodayISO, jsDayToAppIndex } from '@/shared/utils/date'
+import { getTodayLocalDate, jsDayToAppIndex } from '@/shared/utils/date'
 
 import { ensureSchema, openE2eDatabase, wipeE2eData } from '../harness/e2e-database'
 import { getE2eBaseUrl } from './e2e-config'
@@ -14,19 +14,30 @@ ensureSchema(db, process.cwd())
 
 // TWO CLOCKS — do not "simplify" one of these away.
 //
-// src/app/today/page.tsx renders the routine for the *local* day
-// (jsDayToAppIndex(new Date().getDay()) at :219 and :338) but stores the log
-// under the *UTC* date (new Date().toISOString().split('T')[0] at :319). Near a
-// UTC boundary those two disagree, and the page then shows Monday's exercises
-// while writing them to Sunday's date. So the routine rows below are seeded with
-// the LOCAL day and every read-back asserts the UTC date. Both come from
-// @/shared/utils/date so this file can never drift from what the page does.
+// @/shared/utils/date carries two distinct day helpers: getTodayISO() formats the
+// *UTC* calendar day (formatDate reads getUTCFullYear/getUTCMonth/getUTCDate) and
+// getTodayLocalDate() formats the *local* one. Outside UTC they name different
+// days for roughly a third of any 24 hours, so which one a read-back uses is a
+// fact about the page, not a style choice.
+//
+// This page runs on the LOCAL clock at both ends: it renders the routine for the
+// local weekday (jsDayToAppIndex(new Date().getDay())) and stamps every save with
+// getTodayLocalDate() (src/app/today/page.tsx:472), and getTodayWorkoutsAction
+// reads the pre-fill back on that same local day
+// (src/features/workout/workout-server-actions.ts:86). So the routine rows below
+// are seeded with the LOCAL weekday and every read-back asserts the LOCAL date.
+// Both helpers come from @/shared/utils/date so this file can never drift from
+// what the page does. No test here overrides timezoneId, so the browser's local
+// day is the Node process's local day and these helpers stand in for the page's
+// own honestly — the journey that pins the local-day choice across a real zone
+// split, and goes red first if the page ever returns to getTodayISO(), is
+// tests/e2e/today-counted-entry.spec.ts:654.
 function routineDay(): number {
   return jsDayToAppIndex(new Date().getDay())
 }
 
 function storedDate(): string {
-  return getTodayISO()
+  return getTodayLocalDate()
 }
 
 interface StoredSet {
@@ -82,17 +93,18 @@ function cardFor(page: Page, exerciseId: number) {
   return page.locator(`[data-id="exercise-card-${exerciseId}"]`)
 }
 
-// The weight and reps inputs carry no data-id and no label association — the
-// only text near them is a sibling <span> reading "LB:" / "REPS:". Within one row
-// weight comes first and reps second (today/page.tsx:136 then :148), so the
-// ordered pair scoped to one card is the selector. Never reach across cards.
-function weightInputOf(page: Page, exerciseId: number) {
-  return cardFor(page, exerciseId).locator('input[type="number"][placeholder="0"]').nth(0)
-}
+// A row carries three fields — SET, LB, REPS — and their order is the page's
+// business, not this file's. Each input's accessible name is the only selector
+// that survives the page reordering them, so every field is reached by name.
+// Never reach across cards.
+const weightInputOf = (page: Page, exerciseId: number, name: string) =>
+  cardFor(page, exerciseId).getByLabel(`Weight in pounds for ${name}`)
 
-function repsInputOf(page: Page, exerciseId: number) {
-  return cardFor(page, exerciseId).locator('input[type="number"][placeholder="0"]').nth(1)
-}
+const repsInputOf = (page: Page, exerciseId: number, name: string) =>
+  cardFor(page, exerciseId).getByLabel(`Reps for ${name}`)
+
+const countInputOf = (page: Page, exerciseId: number, name: string) =>
+  cardFor(page, exerciseId).getByLabel(`Set count for ${name}`)
 
 function errorOf(page: Page, exerciseId: number) {
   return cardFor(page, exerciseId).locator('p.text-error')
@@ -233,50 +245,62 @@ function savingIndicatorOf(page: Page, exerciseId: number) {
   return cardFor(page, exerciseId).getByText('SAVING...', { exact: true })
 }
 
-async function awaitQuietCard(session: TodaySession, exerciseId: number): Promise<void> {
+async function awaitQuietCard(
+  session: TodaySession,
+  exerciseId: number,
+  exerciseName: string,
+): Promise<void> {
   const { page } = session
   await expect(cardFor(page, exerciseId)).toBeVisible()
-  await expect(weightInputOf(page, exerciseId)).toBeAttached()
+  await expect(weightInputOf(page, exerciseId, exerciseName)).toBeAttached()
   await expect(savingIndicatorOf(page, exerciseId)).toHaveCount(0)
 }
 
 async function typeFirstSet(
   session: TodaySession,
   exerciseId: number,
+  exerciseName: string,
   weight: number,
   reps: number,
 ): Promise<void> {
   const { page } = session
 
   await awaitMountPrefill(session)
-  await awaitQuietCard(session, exerciseId)
+  await awaitQuietCard(session, exerciseId, exerciseName)
 
-  await weightInputOf(page, exerciseId).fill(String(weight))
-  await expect(weightInputOf(page, exerciseId)).toHaveValue(String(weight))
+  await weightInputOf(page, exerciseId, exerciseName).fill(String(weight))
+  await expect(weightInputOf(page, exerciseId, exerciseName)).toHaveValue(String(weight))
 
-  await repsInputOf(page, exerciseId).fill(String(reps))
-  await expect(repsInputOf(page, exerciseId)).toHaveValue(String(reps))
+  await repsInputOf(page, exerciseId, exerciseName).fill(String(reps))
+  await expect(repsInputOf(page, exerciseId, exerciseName)).toHaveValue(String(reps))
 
-  // The weight is re-read after the second keystroke because the failure this file
+  // A row is only saveable once every field parses (saveable-sets.ts:16-29), so
+  // the count is part of the keystroke, not decoration: leave it blank and the
+  // card refuses the line and no request is ever sent.
+  await countInputOf(page, exerciseId, exerciseName).fill('1')
+  await expect(countInputOf(page, exerciseId, exerciseName)).toHaveValue('1')
+
+  // The weight is re-read after the last keystroke because the failure this file
   // exists to keep honest once looked like a missing row and was in fact a lost
-  // keystroke: a pre-fill landing between the two fills silently reverted the
+  // keystroke: a pre-fill landing between the fills silently reverted the
   // weight to defaultSet()'s 0. Asserting it here names that at the keystroke
   // instead of 15 seconds later as `Received: null`.
-  await expect(weightInputOf(page, exerciseId)).toHaveValue(String(weight))
+  await expect(weightInputOf(page, exerciseId, exerciseName)).toHaveValue(String(weight))
 }
 
 async function changeWeight(
   session: TodaySession,
   exerciseId: number,
+  exerciseName: string,
   weight: number,
 ): Promise<void> {
   const { page } = session
 
   await awaitMountPrefill(session)
-  await awaitQuietCard(session, exerciseId)
+  await awaitQuietCard(session, exerciseId, exerciseName)
 
-  await weightInputOf(page, exerciseId).fill(String(weight))
-  await expect(weightInputOf(page, exerciseId)).toHaveValue(String(weight))
+  await weightInputOf(page, exerciseId, exerciseName).fill(String(weight))
+  await expect(weightInputOf(page, exerciseId, exerciseName)).toHaveValue(String(weight))
 }
 
 function savesFor(session: TodaySession, exerciseId: number): SentSave[] {
@@ -323,7 +347,7 @@ test('a typed set reaches the database through the surviving write path as exact
   const session = await signInAsBruno(page)
 
   await expect(cardFor(page, exerciseA)).toBeVisible()
-  await typeFirstSet(session, exerciseA, 135, 5)
+  await typeFirstSet(session, exerciseA, 'Write Path Alpha', 135, 5)
   await awaitStoredSets(session, exerciseA, [{ weight: 135, reps: 5 }])
 
   expect(rowsFor(exerciseA)).toHaveLength(1)
@@ -336,10 +360,10 @@ test('a re-save replaces the row rather than appending a second one', async ({ p
   const session = await signInAsBruno(page)
 
   await expect(cardFor(page, exerciseA)).toBeVisible()
-  await typeFirstSet(session, exerciseA, 135, 5)
+  await typeFirstSet(session, exerciseA, 'Write Path Alpha', 135, 5)
   await awaitStoredSets(session, exerciseA, [{ weight: 135, reps: 5 }])
 
-  await changeWeight(session, exerciseA, 185)
+  await changeWeight(session, exerciseA, 'Write Path Alpha', 185)
   await awaitStoredSets(session, exerciseA, [{ weight: 185, reps: 5 }])
 
   // The repository's update() survived the deletion: a second write to the same
@@ -360,11 +384,11 @@ test('a second exercise writes its own row and leaves the first untouched', asyn
   await expect(cardFor(page, exerciseA)).toBeVisible()
   await expect(cardFor(page, exerciseB)).toBeVisible()
 
-  await typeFirstSet(session, exerciseA, 135, 5)
+  await typeFirstSet(session, exerciseA, 'Write Path Alpha', 135, 5)
   await awaitStoredSets(session, exerciseA, [{ weight: 135, reps: 5 }])
   const alphaBefore = rawSetsJson(exerciseA)
 
-  await typeFirstSet(session, exerciseB, 95, 10)
+  await typeFirstSet(session, exerciseB, 'Write Path Beta', 95, 10)
   await awaitStoredSets(session, exerciseB, [{ weight: 95, reps: 10 }])
 
   expect(rowsFor(exerciseB)).toHaveLength(1)
@@ -383,16 +407,16 @@ test('no second write path fired — the row inventory is exactly the exercises 
   const session = await signInAsBruno(page)
 
   await expect(cardFor(page, exerciseA)).toBeVisible()
-  await typeFirstSet(session, exerciseA, 135, 5)
+  await typeFirstSet(session, exerciseA, 'Write Path Alpha', 135, 5)
   await awaitStoredSets(session, exerciseA, [{ weight: 135, reps: 5 }])
 
   // The re-save belongs in this case: a resurrected second write path only
   // duplicates on the SECOND write, so an inventory taken after one write per
   // exercise would stay green while the upsert was appending rows.
-  await changeWeight(session, exerciseA, 185)
+  await changeWeight(session, exerciseA, 'Write Path Alpha', 185)
   await awaitStoredSets(session, exerciseA, [{ weight: 185, reps: 5 }])
 
-  await typeFirstSet(session, exerciseB, 95, 10)
+  await typeFirstSet(session, exerciseB, 'Write Path Beta', 95, 10)
   await awaitStoredSets(session, exerciseB, [{ weight: 95, reps: 10 }])
 
   const inventory = db
@@ -444,7 +468,7 @@ test('a rejected save surfaces on the card and writes no row', async ({ page }) 
   const session = await signInAsBruno(page)
 
   await expect(cardFor(page, exerciseC)).toBeVisible()
-  await typeFirstSet(session, exerciseC, -10, 5)
+  await typeFirstSet(session, exerciseC, 'Write Path Rejected', -10, 5)
 
   await expect(errorOf(page, exerciseC)).toBeVisible()
   await expect(errorOf(page, exerciseC)).not.toHaveText('')

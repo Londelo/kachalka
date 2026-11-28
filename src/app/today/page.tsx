@@ -2,10 +2,16 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { logWorkoutAction, getTodayWorkoutsAction, getTodayExercisesAction } from '@/features/workout/workout-server-actions'
+import { logWorkoutAction, deleteWorkoutAction, getTodayWorkoutsAction, getTodayExercisesAction } from '@/features/workout/workout-server-actions'
 import { useLoading } from '@/components/loading-context'
-import type { WorkoutSet } from '@/features/workout/types'
-import { jsDayToAppIndex } from '@/shared/utils/date'
+import type { SetDraft, SetDraftField } from '@/app/today/set-draft'
+import { createBlankSetDraft, generateId, toWorkoutSet } from '@/app/today/set-draft'
+import type { IncompleteField } from '@/app/today/saveable-sets'
+import { selectSaveableDrafts, describeIncompleteDraftFields } from '@/app/today/saveable-sets'
+import { parseSetField } from '@/app/today/set-field'
+import { collapseSetDrafts } from '@/app/today/collapse-drafts'
+import { createSaveScheduler } from '@/app/today/save-scheduler'
+import { jsDayToAppIndex, getTodayLocalDate } from '@/shared/utils/date'
 
 type ExerciseItem = {
   exerciseId: number
@@ -17,15 +23,37 @@ type ViewMode = 'past' | 'current'
 
 const DEBOUNCE_MS = 500
 
-function generateId(): string {
-  return crypto.getRandomValues(new Uint32Array(4))[0].toString(16) +
-    crypto.getRandomValues(new Uint32Array(4))[0].toString(16) +
-    crypto.getRandomValues(new Uint32Array(4))[0].toString(16) +
-    crypto.getRandomValues(new Uint32Array(4))[0].toString(16)
+const FIELD_LABELS: Record<SetDraftField, string> = {
+  weight: 'WEIGHT',
+  reps: 'REPS',
+  count: 'SET',
 }
 
-function defaultSet(): WorkoutSet {
-  return { id: generateId(), reps: 1, weight: 0 }
+const INCOMPLETE_FIELD_ORDER: readonly SetDraftField[] = ['weight', 'reps', 'count']
+
+function joinFieldLabels(fields: SetDraftField[]): string {
+  const labels = fields.map((field) => FIELD_LABELS[field])
+  if (labels.length === 1) return labels[0]
+  return `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`
+}
+
+function describeIncompleteDraft(incomplete: IncompleteField[]): string {
+  const blank = INCOMPLETE_FIELD_ORDER.filter((field) =>
+    incomplete.some((entry) => entry.field === field && entry.reason === 'blank'),
+  )
+  const invalid = INCOMPLETE_FIELD_ORDER.filter((field) =>
+    incomplete.some((entry) => entry.field === field && entry.reason === 'invalid'),
+  )
+
+  const clauses: string[] = []
+  if (blank.length > 0) {
+    clauses.push(`Enter a number for ${joinFieldLabels(blank)} on every set line, or remove the line.`)
+  }
+  if (invalid.length > 0) {
+    clauses.push(`${joinFieldLabels(invalid)} must be a number, or remove the line.`)
+  }
+
+  return clauses.join(' ')
 }
 
 function getStoredUserId(): number | null {
@@ -33,27 +61,43 @@ function getStoredUserId(): number | null {
   return match ? Number(match[1]) : null
 }
 
-function ExerciseCard({
-  exercise,
-  viewMode,
-  sets,
-  saving,
-  error,
-  onToggleView,
-  onAddSet,
-  onRemoveSet,
-  onSetChange,
-}: {
+interface ExerciseCardProps {
   exercise: ExerciseItem
   viewMode: ViewMode
-  sets: WorkoutSet[]
+  drafts: SetDraft[]
   saving: boolean
   error: string | null
+  invalidFields: IncompleteField[]
   onToggleView: () => void
   onAddSet: () => void
   onRemoveSet: (index: number) => void
-  onSetChange: (index: number, field: keyof WorkoutSet, value: string) => void
-}) {
+  onFieldChange: (index: number, field: SetDraftField, value: string) => void
+}
+
+function ExerciseCard({
+  exercise,
+  viewMode,
+  drafts,
+  saving,
+  error,
+  invalidFields,
+  onToggleView,
+  onAddSet,
+  onRemoveSet,
+  onFieldChange,
+}: ExerciseCardProps) {
+  const errorId = `card-error-${exercise.exerciseId}`
+
+  function isFieldInvalid(field: SetDraftField): boolean {
+    return invalidFields.some((invalidField) => invalidField.field === field)
+  }
+
+  function invalidProps(field: SetDraftField) {
+    return isFieldInvalid(field)
+      ? { 'aria-invalid': 'true' as const, 'aria-describedby': errorId }
+      : {}
+  }
+
   return (
     <div
       className="border-4 border-on-surface bg-tertiary-fixed p-6"
@@ -118,47 +162,61 @@ function ExerciseCard({
       {/* Current session view — editable */}
       {viewMode === 'current' && (
         <>
-          {sets.length > 0 && (
+          {drafts.length > 0 && (
             <div className="mb-4 flex flex-col gap-4">
-              {sets.map((set, index) => (
-                <div key={set.id} className="flex items-center gap-3">
-                  {/* Set number box */}
-                  <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background p-2 gap-2">
+              {drafts.map((draft, index) => (
+                <div key={draft.id} className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
                     <span className="font-label-mono text-label-mono text-secondary">SET:</span>
-                    <span className="font-body-md text-body-md text-on-surface">
-                      {String(index + 1).padStart(2, '0')}
-                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={draft.raw.count}
+                      onChange={(e) => onFieldChange(index, 'count', e.target.value)}
+                      placeholder="0"
+                      className="w-full bg-transparent [-moz-appearance:textfield] appearance-none font-body-md text-body-md text-on-surface outline-none [-webkit-appearance:none]"
+                      data-id={`set-count-${exercise.exerciseId}-${draft.id}`}
+                      aria-label={`Set count for ${exercise.exerciseName}`}
+                      {...invalidProps('count')}
+                    />
                   </div>
 
-                  {/* Weight input */}
                   <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
                     <span className="font-label-mono text-label-mono text-secondary">LB:</span>
                     <input
-                      type="number"
-                      value={set.weight || ''}
-                      onChange={(e) => onSetChange(index, 'weight', e.target.value)}
+                      type="text"
+                      inputMode="decimal"
+                      value={draft.raw.weight}
+                      onChange={(e) => onFieldChange(index, 'weight', e.target.value)}
                       placeholder="0"
                       className="w-full bg-transparent [-moz-appearance:textfield] appearance-none font-body-md text-body-md text-on-surface outline-none [-webkit-appearance:none]"
+                      data-id={`set-weight-${exercise.exerciseId}-${draft.id}`}
+                      aria-label={`Weight in pounds for ${exercise.exerciseName}`}
+                      {...invalidProps('weight')}
                     />
                   </div>
 
-                  {/* Reps input */}
                   <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
                     <span className="font-label-mono text-label-mono text-secondary">REPS:</span>
                     <input
-                      type="number"
-                      value={set.reps || ''}
-                      onChange={(e) => onSetChange(index, 'reps', e.target.value)}
+                      type="text"
+                      inputMode="decimal"
+                      value={draft.raw.reps}
+                      onChange={(e) => onFieldChange(index, 'reps', e.target.value)}
                       placeholder="0"
                       className="w-full bg-transparent [-moz-appearance:textfield] appearance-none font-body-md text-body-md text-on-surface outline-none [-webkit-appearance:none]"
+                      data-id={`set-reps-${exercise.exerciseId}-${draft.id}`}
+                      aria-label={`Reps for ${exercise.exerciseName}`}
+                      {...invalidProps('reps')}
                     />
                   </div>
 
-                  {/* Delete button */}
                   <button
                     type="button"
                     onClick={() => onRemoveSet(index)}
                     className="flex size-8 shrink-0 items-center justify-center border-b-4 border-on-surface bg-error p-1 text-on-primary neo-shadow transition-all active-press"
+                    data-id={`remove-set-${exercise.exerciseId}-${draft.id}`}
+                    aria-label={`Remove set ${index + 1} for ${exercise.exerciseName}`}
                   >
                     <span className="material-symbols-outlined text-[14px]">delete</span>
                   </button>
@@ -171,6 +229,7 @@ function ExerciseCard({
             type="button"
             onClick={onAddSet}
             className="mb-4 w-full border-4 border-on-surface bg-primary p-3 font-label-bold text-label-bold uppercase text-on-primary neo-shadow transition-all active-press"
+            data-id={`add-set-${exercise.exerciseId}`}
           >
             ADD A SET
           </button>
@@ -182,9 +241,15 @@ function ExerciseCard({
         <p className="font-label-mono text-label-mono text-secondary">SAVING...</p>
       )}
 
-      {/* Per-card error display */}
       {error && (
-        <p className="mt-2 font-label-bold text-label-bold text-error">{error}</p>
+        <p
+          className="mt-2 font-label-bold text-label-bold text-error"
+          role="alert"
+          id={errorId}
+          data-id={errorId}
+        >
+          {error}
+        </p>
       )}
     </div>
   )
@@ -197,13 +262,29 @@ export default function TodayPage() {
 
   // Per-exercise state (Map-based)
   const [viewModes, setViewModes] = useState<Map<number, ViewMode>>(new Map())
-  const [exerciseSets, setExerciseSets] = useState<Map<number, WorkoutSet[]>>(new Map())
+  const [exerciseSets, setExerciseSets] = useState<Map<number, SetDraft[]>>(new Map())
   const [savingExercises, setSavingExercises] = useState<Set<number>>(new Set())
   const [errors, setErrors] = useState<Map<number, string>>(new Map())
-  const debounceTimersRef = useRef<Map<number, NodeJS.Timeout>>(new Map())
-  const exerciseSetsRef = useRef<Map<number, WorkoutSet[]>>(new Map())
+  const exerciseSetsRef = useRef<Map<number, SetDraft[]>>(new Map())
   // Keep ref in sync with state so debounced callbacks always read fresh data
   exerciseSetsRef.current = exerciseSets
+  const savedLogIdsRef = useRef<Map<number, number>>(new Map())
+
+  const schedulerRef = useRef<ReturnType<typeof createSaveScheduler> | null>(null)
+  if (schedulerRef.current === null) {
+    schedulerRef.current = createSaveScheduler({
+      delayMs: DEBOUNCE_MS,
+      setTimer: setTimeout,
+      clearTimer: clearTimeout,
+    })
+  }
+  const scheduler = schedulerRef.current
+
+  const fallbackRowsRef = useRef<SetDraft[] | null>(null)
+  if (fallbackRowsRef.current === null) {
+    fallbackRowsRef.current = [createBlankSetDraft()]
+  }
+  const fallbackRows = fallbackRowsRef.current
 
   const { start, end } = useLoading()
 
@@ -224,23 +305,43 @@ export default function TodayPage() {
         // Pre-fill current session from today's saved data
         getTodayWorkoutsAction(userId).then((workoutsRes) => {
           if (workoutsRes.success && workoutsRes.workouts) {
-            const nextSets = new Map<number, WorkoutSet[]>()
+            const nextSets = new Map<number, SetDraft[]>()
             const nextModes = new Map<number, ViewMode>()
+            const logIds = workoutsRes.logIds ?? {}
             for (const exercise of res.exercises ?? []) {
               const sets = workoutsRes.workouts[exercise.exerciseId]
+              const logId = logIds[exercise.exerciseId]
               if (sets) {
-                nextSets.set(exercise.exerciseId, sets.map(s => ({ ...s, id: generateId() })))
+                nextSets.set(exercise.exerciseId, sets.map((s) => ({
+                  id: generateId(),
+                  weight: s.weight,
+                  reps: s.reps,
+                  count: s.count ?? null,
+                  raw: {
+                    weight: String(s.weight),
+                    reps: String(s.reps),
+                    count: s.count === undefined ? '' : String(s.count),
+                  },
+                })))
+                if (logId !== undefined) {
+                  savedLogIdsRef.current.set(exercise.exerciseId, logId)
+                }
+              } else {
+                nextSets.set(exercise.exerciseId, [createBlankSetDraft()])
+                savedLogIdsRef.current.delete(exercise.exerciseId)
               }
               nextModes.set(exercise.exerciseId, 'current')
             }
             setExerciseSets(nextSets)
             setViewModes(nextModes)
           } else {
-            // No workouts today — set view modes to 'current'
+            const nextSets = new Map<number, SetDraft[]>()
             const nextModes = new Map<number, ViewMode>()
             for (const exercise of res.exercises ?? []) {
+              nextSets.set(exercise.exerciseId, [createBlankSetDraft()])
               nextModes.set(exercise.exerciseId, 'current')
             }
+            setExerciseSets(nextSets)
             setViewModes(nextModes)
           }
         })
@@ -253,24 +354,20 @@ export default function TodayPage() {
     }
   }, [])
 
-  // Cleanup: clear all debounce timers on unmount
   useEffect(() => {
-    const timers = debounceTimersRef.current
     return () => {
-      timers.forEach((timer) => clearTimeout(timer))
+      scheduler.flushAll()
+      scheduler.clearAll()
     }
   }, [])
 
-  // Helper: get sets for an exercise, default to [defaultSet()]
-  function getSets(exerciseId: number): WorkoutSet[] {
-    const existing = exerciseSets.get(exerciseId)
-    return existing ?? [defaultSet()]
+  function getSets(exerciseId: number): SetDraft[] {
+    return exerciseSets.get(exerciseId) ?? fallbackRows
   }
 
-  // Helper: update sets in the Map
-  function updateSets(exerciseId: number, updater: (prev: WorkoutSet[]) => WorkoutSet[]): void {
+  function updateSets(exerciseId: number, updater: (prev: SetDraft[]) => SetDraft[]): void {
     setExerciseSets((prev) => {
-      const current = prev.get(exerciseId) ?? [defaultSet()]
+      const current = prev.get(exerciseId) ?? fallbackRows
       const updated = updater(current)
       const next = new Map(prev)
       next.set(exerciseId, updated)
@@ -278,78 +375,134 @@ export default function TodayPage() {
     })
   }
 
-  // Helper: trigger debounced save
-  function triggerSave(exerciseId: number): void {
-    const timers = debounceTimersRef.current
-    const existing = timers.get(exerciseId)
-    if (existing) {
-      clearTimeout(existing)
-      timers.delete(exerciseId)
-    }
-    const timer = setTimeout(() => {
-      debouncedSave(exerciseId)
-      timers.delete(exerciseId)
-    }, DEBOUNCE_MS)
-    timers.set(exerciseId, timer)
-  }
-
-  // Debounced save: filter empty sets, call logWorkoutAction
-  async function debouncedSave(exerciseId: number): Promise<void> {
-    const userId = getStoredUserId()
-    if (!userId) return
-
-    const sets = exerciseSetsRef.current.get(exerciseId)
-    if (!sets) return
-
-    // Filter out sets where both weight and reps are 0
-    const validSets = sets.filter((s) => s.weight !== 0 || s.reps !== 0)
-    if (validSets.length === 0) return
-
-    setSavingExercises((prev) => {
-      const next = new Set(prev)
-      next.add(exerciseId)
+  function setCardError(exerciseId: number, message: string): void {
+    setErrors((prev) => {
+      const next = new Map(prev)
+      next.set(exerciseId, message)
       return next
     })
+  }
+
+  function clearCardError(exerciseId: number): void {
     setErrors((prev) => {
+      if (!prev.has(exerciseId)) return prev
       const next = new Map(prev)
       next.delete(exerciseId)
       return next
     })
+  }
 
-    const today = new Date().toISOString().split('T')[0]
-    const res = await logWorkoutAction(userId, exerciseId, today, validSets)
-
+  function markSaving(exerciseId: number, saving: boolean): void {
     setSavingExercises((prev) => {
+      const has = prev.has(exerciseId)
+      if (has === saving) return prev
       const next = new Set(prev)
-      next.delete(exerciseId)
+      if (saving) next.add(exerciseId)
+      else next.delete(exerciseId)
       return next
     })
+  }
 
-    if (!res.success) {
-      setErrors((prev) => {
-        const next = new Map(prev)
-        next.set(exerciseId, res.error ?? 'Failed to save workout')
-        return next
-      })
-      return
-    }
-
-    // Refresh exercises on success
+  async function refreshExercises(userId: number): Promise<void> {
     const dayOfWeek = jsDayToAppIndex(new Date().getDay())
-    const exRes = await getTodayExercisesAction(userId, dayOfWeek)
-    if (exRes.success && exRes.exercises) {
-      setExercises(exRes.exercises)
+    try {
+      const exRes = await getTodayExercisesAction(userId, dayOfWeek)
+      if (exRes.success && exRes.exercises) {
+        setExercises(exRes.exercises)
+      }
+    } catch {
+      // a re-fetch runs after the write already landed; the list keeps its last good load
     }
   }
 
-  // Toggle view mode: clear exerciseSets so it reinitializes on next view
+  async function deleteSavedLog(
+    exerciseId: number,
+    userId: number,
+    logId: number,
+  ): Promise<void> {
+    markSaving(exerciseId, true)
+
+    try {
+      const res = await deleteWorkoutAction(userId, logId)
+
+      if (!res.success) {
+        setCardError(exerciseId, res.error ?? 'Failed to delete workout')
+        return
+      }
+
+      savedLogIdsRef.current.delete(exerciseId)
+      clearCardError(exerciseId)
+    } catch (e) {
+      setCardError(exerciseId, e instanceof Error ? e.message : 'Failed to delete workout')
+      return
+    } finally {
+      markSaving(exerciseId, false)
+    }
+
+    await refreshExercises(userId)
+  }
+
+  async function saveExercise(exerciseId: number): Promise<void> {
+    const userId = getStoredUserId()
+    if (!userId) return
+
+    const drafts = exerciseSetsRef.current.get(exerciseId)
+    if (!drafts) return
+
+    const saveable = selectSaveableDrafts(drafts)
+    if (saveable.length === 0) {
+      const logId = savedLogIdsRef.current.get(exerciseId)
+      if (logId === undefined) return
+      await deleteSavedLog(exerciseId, userId, logId)
+      return
+    }
+
+    const incomplete = saveable.flatMap(describeIncompleteDraftFields)
+    if (incomplete.length > 0) {
+      setCardError(exerciseId, describeIncompleteDraft(incomplete))
+      return
+    }
+
+    markSaving(exerciseId, true)
+
+    try {
+      const res = await logWorkoutAction(
+        userId,
+        exerciseId,
+        getTodayLocalDate(),
+        saveable.map(toWorkoutSet),
+      )
+
+      if (!res.success) {
+        setCardError(exerciseId, res.error ?? 'Failed to save workout')
+        return
+      }
+
+      if (res.log) {
+        savedLogIdsRef.current.set(exerciseId, res.log.id)
+      }
+
+      clearCardError(exerciseId)
+    } catch (e) {
+      setCardError(exerciseId, e instanceof Error ? e.message : 'Failed to save workout')
+      return
+    } finally {
+      markSaving(exerciseId, false)
+    }
+
+    await refreshExercises(userId)
+  }
+
   function handleToggleView(exerciseId: number): void {
+    scheduler.flush(exerciseId)
+
     setViewModes((prev) => {
       const next = new Map(prev)
       const current = next.get(exerciseId)
       next.set(exerciseId, current === 'past' ? 'current' : 'past')
       return next
     })
+    savedLogIdsRef.current.delete(exerciseId)
     setExerciseSets((prev) => {
       const next = new Map(prev)
       next.delete(exerciseId)
@@ -358,23 +511,38 @@ export default function TodayPage() {
   }
 
   function handleAddSet(exerciseId: number): void {
-    updateSets(exerciseId, (prev) => [...prev, defaultSet()])
-    triggerSave(exerciseId)
+    updateSets(exerciseId, (prev) => [...prev, createBlankSetDraft()])
+    scheduler.schedule(exerciseId, () => {
+      void saveExercise(exerciseId)
+    })
   }
 
   function handleRemoveSet(exerciseId: number, index: number): void {
     updateSets(exerciseId, (prev) => prev.filter((_, i) => i !== index))
-    triggerSave(exerciseId)
+    scheduler.schedule(exerciseId, () => {
+      void saveExercise(exerciseId)
+    })
   }
 
-  function handleSetChange(exerciseId: number, index: number, field: keyof WorkoutSet, value: string): void {
+  function handleFieldChange(exerciseId: number, index: number, field: SetDraftField, raw: string): void {
+    const parsed = parseSetField(raw)
+
     updateSets(exerciseId, (prev) => {
       const updated = [...prev]
       const current = updated[index]
-      updated[index] = { ...current, [field]: parseFloat(value) || 0 }
-      return updated
+      if (!current) return prev
+
+      updated[index] = {
+        ...current,
+        [field]: parsed.kind === 'value' ? parsed.value : null,
+        raw: { ...current.raw, [field]: raw },
+      }
+      return collapseSetDrafts(updated)
     })
-    triggerSave(exerciseId)
+
+    scheduler.schedule(exerciseId, () => {
+      void saveExercise(exerciseId)
+    })
   }
 
   if (loading) {
@@ -405,23 +573,27 @@ export default function TodayPage() {
           <div className="flex w-full flex-col gap-8">
             {exercises.map((exercise) => {
               const viewMode = viewModes.get(exercise.exerciseId) ?? 'current'
-              const sets = getSets(exercise.exerciseId)
+              const drafts = getSets(exercise.exerciseId)
               const saving = savingExercises.has(exercise.exerciseId)
               const error = errors.get(exercise.exerciseId) ?? null
+              const invalidFields = error === null
+                ? []
+                : selectSaveableDrafts(drafts).flatMap(describeIncompleteDraftFields)
 
               return (
                 <ExerciseCard
                   key={exercise.exerciseId}
                   exercise={exercise}
                   viewMode={viewMode}
-                  sets={sets}
+                  drafts={drafts}
                   saving={saving}
                   error={error}
+                  invalidFields={invalidFields}
                   onToggleView={() => handleToggleView(exercise.exerciseId)}
                   onAddSet={() => handleAddSet(exercise.exerciseId)}
                   onRemoveSet={(index) => handleRemoveSet(exercise.exerciseId, index)}
-                  onSetChange={(index, field, value) =>
-                    handleSetChange(exercise.exerciseId, index, field, value)
+                  onFieldChange={(index, field, raw) =>
+                    handleFieldChange(exercise.exerciseId, index, field, raw)
                   }
                 />
               )

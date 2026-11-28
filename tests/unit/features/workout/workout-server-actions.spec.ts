@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const mockDb = {}
 
+const mockDateModule = vi.hoisted(() => ({
+  getTodayLocalDate: vi.fn(),
+}))
+
 const mockWorkoutRepo = {
   findById: vi.fn(),
   create: vi.fn(),
@@ -40,6 +44,10 @@ const mockGetWorkoutHistory = {
 }
 
 const mockGetUserVolume = {
+  execute: vi.fn(),
+}
+
+const mockDeleteWorkout = {
   execute: vi.fn(),
 }
 
@@ -85,8 +93,22 @@ vi.mock('@/features/workout/get-user-volume', () => ({
   getUserVolumeUseCase: vi.fn(() => mockGetUserVolume),
 }))
 
+vi.mock('@/features/workout/delete-workout', () => ({
+  deleteWorkoutUseCase: vi.fn(() => mockDeleteWorkout),
+}))
+
+vi.mock('@/shared/utils/date', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/shared/utils/date')>()
+  return {
+    ...actual,
+    getTodayISO: vi.fn(actual.getTodayISO),
+    getTodayLocalDate: mockDateModule.getTodayLocalDate,
+  }
+})
+
 beforeEach(() => {
   vi.clearAllMocks()
+  mockDateModule.getTodayLocalDate.mockReturnValue('2025-01-01')
   mockLogWorkout.execute.mockReset()
   mockGetTodayExercises.execute.mockReset()
   mockGetWorkoutHistory.execute.mockReset()
@@ -366,6 +388,7 @@ describe('getTodayWorkoutsAction — counted sets', () => {
     expect(result).toEqual({
       success: true,
       workouts: { 5: [{ id: 's1', weight: 135, reps: 5, count: 3 }] },
+      logIds: { 5: 1 },
     })
   })
 
@@ -460,6 +483,50 @@ describe('getTodayWorkoutsAction — counted sets', () => {
       { id: 's2', weight: 95, reps: 8, count: undefined },
       { id: 's3', weight: 60, reps: 2, count: 1 },
     ])
+  })
+
+  // Log ids (11, 27) share no value with any exercise id (5, 9) or set id ('s1'..'s3'),
+  // so a wrong key, a swapped pairing, or a set id written where the log id belongs all fail this pin.
+  it('maps each exercise id to its own log id from the same read, while its rows carry set ids', async () => {
+    mockWorkoutRepo.findByDate.mockReturnValue([
+      {
+        id: 11,
+        userId: 1,
+        exerciseId: 5,
+        date: '2025-01-01',
+        sets: [{ id: 's1', reps: 5, weight: 135, count: 3 }],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+      {
+        id: 27,
+        userId: 1,
+        exerciseId: 9,
+        date: '2025-01-01',
+        sets: [
+          { id: 's2', reps: 8, weight: 95, count: 2 },
+          { id: 's3', reps: 1, weight: 60 },
+        ],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result).toEqual({
+      success: true,
+      workouts: {
+        5: [{ id: 's1', weight: 135, reps: 5, count: 3 }],
+        9: [
+          { id: 's2', weight: 95, reps: 8, count: 2 },
+          { id: 's3', weight: 60, reps: 1, count: undefined },
+        ],
+      },
+      logIds: { 5: 11, 9: 27 },
+    })
+    expect(mockWorkoutRepo.findByDate).toHaveBeenCalledTimes(1)
   })
 
   it('lets the later log win the key when two logs share one exercise id', async () => {
@@ -605,10 +672,11 @@ const SURVIVING_BLOCKS = [
 ]
 
 describe('the removed workout update write path', () => {
-  it('exports exactly the four surviving actions', async () => {
+  it('exports exactly the five surviving actions', async () => {
     const actions = await import('@/features/workout/workout-server-actions')
 
     expect(Object.keys(actions).sort()).toEqual([
+      'deleteWorkoutAction',
       'getHistoryAction',
       'getTodayExercisesAction',
       'getTodayWorkoutsAction',
@@ -632,5 +700,177 @@ describe('the removed workout update write path', () => {
     expect(executedByBlock.has('updateWorkoutAction')).toBe(false)
     expect(executedCases.filter((name) => name.startsWith('updateWorkoutAction'))).toEqual([])
   })
+})
+
+describe('getTodayWorkoutsAction — which calendar day it asks for', () => {
+  const LOCAL_SENTINEL = '2026-11-25'
+  const OTHER_LOCAL_SENTINEL = '2027-03-07'
+  const FROZEN_UTC_INSTANT = '2026-11-27T23:30:00.000Z'
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('asks the repository for exactly the day getTodayLocalDate returned', async () => {
+    mockDateModule.getTodayLocalDate.mockReturnValue(LOCAL_SENTINEL)
+    mockWorkoutRepo.findByDate.mockReturnValue([])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    const result = await getTodayWorkoutsAction(1)
+
+    expect(result.success).toBe(true)
+    expect(mockWorkoutRepo.findByDate).toHaveBeenCalledTimes(1)
+    expect(mockWorkoutRepo.findByDate).toHaveBeenCalledWith(1, LOCAL_SENTINEL)
+  })
+
+  it('never asks the repository for the UTC calendar day', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(FROZEN_UTC_INSTANT))
+    const utcToday = new Date().toISOString().split('T')[0]
+    mockDateModule.getTodayLocalDate.mockReturnValue(LOCAL_SENTINEL)
+    mockWorkoutRepo.findByDate.mockReturnValue([])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    await getTodayWorkoutsAction(1)
+
+    expect(utcToday).not.toBe(LOCAL_SENTINEL)
+    expect(mockWorkoutRepo.findByDate).toHaveBeenCalledWith(1, LOCAL_SENTINEL)
+    expect(mockWorkoutRepo.findByDate).not.toHaveBeenCalledWith(1, utcToday)
+  })
+
+  it('forwards a different sentinel verbatim rather than recomputing a date', async () => {
+    mockDateModule.getTodayLocalDate.mockReturnValue(OTHER_LOCAL_SENTINEL)
+    mockWorkoutRepo.findByDate.mockReturnValue([])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    await getTodayWorkoutsAction(1)
+
+    expect(mockWorkoutRepo.findByDate).toHaveBeenCalledWith(1, OTHER_LOCAL_SENTINEL)
+  })
+
+  it('never reads the UTC helper getTodayISO', async () => {
+    mockDateModule.getTodayLocalDate.mockReturnValue(LOCAL_SENTINEL)
+    mockWorkoutRepo.findByDate.mockReturnValue([])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    await getTodayWorkoutsAction(1)
+    const dateModule = await import('@/shared/utils/date')
+
+    expect(dateModule.getTodayISO).not.toHaveBeenCalled()
+  })
+
+  it('reads the local clock exactly once per invocation', async () => {
+    mockDateModule.getTodayLocalDate.mockReturnValue(LOCAL_SENTINEL)
+    mockWorkoutRepo.findByDate.mockReturnValue([])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    await getTodayWorkoutsAction(1)
+
+    expect(mockDateModule.getTodayLocalDate).toHaveBeenCalledTimes(1)
+  })
+
+  it('forwards the user id untouched as the first argument', async () => {
+    mockDateModule.getTodayLocalDate.mockReturnValue(LOCAL_SENTINEL)
+    mockWorkoutRepo.findByDate.mockReturnValue([])
+
+    const { getTodayWorkoutsAction } = await import('@/features/workout/workout-server-actions')
+    await getTodayWorkoutsAction(42)
+
+    expect(mockWorkoutRepo.findByDate).toHaveBeenCalledWith(42, LOCAL_SENTINEL)
+  })
+})
+
+// deleteWorkoutAction is the branch's only untested write path, and a destructive one: it is the
+// code that removes a user's workout_logs row. What is pinned here is the action's own
+// encapsulation — the (userId, logId) -> execute(logId, userId) argument reversal across two
+// same-typed numbers, the success/failure envelope the Today page reads, and that the delete
+// reaches the database only through the ownership-checked use case. The ownership rule itself and
+// the two messages it rejects with are pinned by tests/unit/features/workout/delete-workout.spec.ts
+// and are deliberately not re-asserted here.
+describe('deleteWorkoutAction', () => {
+  // Distinct on purpose: userId and logId are both `number`, so equal sentinels would let a
+  // swapped or duplicated call pass. 7 and 203 collide with nothing in this file.
+  const CALLER_ID = 7
+  const LOG_ID = 203
+
+  beforeEach(() => {
+    mockDeleteWorkout.execute.mockReset()
+    mockWorkoutRepo.findById.mockReset()
+    mockWorkoutRepo.delete.mockReset()
+  })
+
+  it('returns exactly { success: true } and no error key when the delete is accepted', async () => {
+    const { deleteWorkoutAction } = await import('@/features/workout/workout-server-actions')
+
+    const result = await deleteWorkoutAction(CALLER_ID, LOG_ID)
+
+    expect(result).toStrictEqual({ success: true })
+    expect(mockDeleteWorkout.execute).toHaveBeenCalledTimes(1)
+  })
+
+  it('hands the use case (logId, userId) — reversed against the action signature, in that order', async () => {
+    const { deleteWorkoutAction } = await import('@/features/workout/workout-server-actions')
+
+    await deleteWorkoutAction(CALLER_ID, LOG_ID)
+
+    expect(mockDeleteWorkout.execute).toHaveBeenCalledWith(LOG_ID, CALLER_ID)
+  })
+
+  it('builds the use case on the workout repository made from the database singleton', async () => {
+    const { deleteWorkoutAction } = await import('@/features/workout/workout-server-actions')
+
+    await deleteWorkoutAction(CALLER_ID, LOG_ID)
+
+    const { createSqliteWorkoutRepository } = await import('@/features/workout/workout-repo-impl')
+    const { deleteWorkoutUseCase } = await import('@/features/workout/delete-workout')
+
+    expect(createSqliteWorkoutRepository).toHaveBeenCalledWith(mockDb)
+    expect(deleteWorkoutUseCase).toHaveBeenCalledWith(mockWorkoutRepo)
+  })
+
+  it('never touches the row through the repository itself — the delete goes only via the use case', async () => {
+    const { deleteWorkoutAction } = await import('@/features/workout/workout-server-actions')
+
+    await deleteWorkoutAction(CALLER_ID, LOG_ID)
+
+    expect(mockWorkoutRepo.delete).not.toHaveBeenCalled()
+    expect(mockWorkoutRepo.findById).not.toHaveBeenCalled()
+  })
+
+  // The two messages are the ones deleteWorkoutUseCase actually throws; pinning them verbatim is
+  // what proves the page receives a refusal as a message rather than as a silent success.
+  it.each([
+    { name: 'a log that does not exist', message: 'Workout log not found' },
+    { name: 'a log owned by another user', message: 'Only the owner can delete this workout log' },
+  ])(
+    'reports $name as a failed envelope carrying the use case message verbatim',
+    async ({ message }) => {
+      mockDeleteWorkout.execute.mockImplementation(() => {
+        throw new Error(message)
+      })
+
+      const { deleteWorkoutAction } = await import('@/features/workout/workout-server-actions')
+      const result = await deleteWorkoutAction(CALLER_ID, LOG_ID)
+
+      expect(result).toStrictEqual({ success: false, error: message })
+    },
+  )
+
+  it.each([
+    { name: 'a string', thrown: 'string error' },
+    { name: 'undefined', thrown: undefined },
+  ])(
+    'reports a throw of $name as Unknown error rather than reading a property off it',
+    async ({ thrown }) => {
+      mockDeleteWorkout.execute.mockImplementation(() => {
+        throw thrown
+      })
+
+      const { deleteWorkoutAction } = await import('@/features/workout/workout-server-actions')
+      const result = await deleteWorkoutAction(CALLER_ID, LOG_ID)
+
+      expect(result).toStrictEqual({ success: false, error: 'Unknown error' })
+    },
+  )
 })
 
