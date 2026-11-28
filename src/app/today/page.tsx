@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { logWorkoutAction, getTodayWorkoutsAction, getTodayExercisesAction } from '@/features/workout/workout-server-actions'
 import { useLoading } from '@/components/loading-context'
 import type { WorkoutSet } from '@/features/workout/types'
+import type { SetDraft, SetDraftField } from '@/app/today/set-draft'
+import type { IncompleteField } from '@/app/today/saveable-sets'
 import { jsDayToAppIndex } from '@/shared/utils/date'
 
 type ExerciseItem = {
@@ -33,27 +35,43 @@ function getStoredUserId(): number | null {
   return match ? Number(match[1]) : null
 }
 
-function ExerciseCard({
-  exercise,
-  viewMode,
-  sets,
-  saving,
-  error,
-  onToggleView,
-  onAddSet,
-  onRemoveSet,
-  onSetChange,
-}: {
+interface ExerciseCardProps {
   exercise: ExerciseItem
   viewMode: ViewMode
-  sets: WorkoutSet[]
+  drafts: SetDraft[]
   saving: boolean
   error: string | null
+  invalidFields: IncompleteField[]
   onToggleView: () => void
   onAddSet: () => void
   onRemoveSet: (index: number) => void
-  onSetChange: (index: number, field: keyof WorkoutSet, value: string) => void
-}) {
+  onFieldChange: (index: number, field: SetDraftField, value: string) => void
+}
+
+function ExerciseCard({
+  exercise,
+  viewMode,
+  drafts,
+  saving,
+  error,
+  invalidFields,
+  onToggleView,
+  onAddSet,
+  onRemoveSet,
+  onFieldChange,
+}: ExerciseCardProps) {
+  const errorId = `card-error-${exercise.exerciseId}`
+
+  function isFieldInvalid(field: SetDraftField): boolean {
+    return invalidFields.some((invalidField) => invalidField.field === field)
+  }
+
+  function invalidProps(field: SetDraftField) {
+    return isFieldInvalid(field)
+      ? { 'aria-invalid': 'true' as const, 'aria-describedby': errorId }
+      : {}
+  }
+
   return (
     <div
       className="border-4 border-on-surface bg-tertiary-fixed p-6"
@@ -118,47 +136,61 @@ function ExerciseCard({
       {/* Current session view — editable */}
       {viewMode === 'current' && (
         <>
-          {sets.length > 0 && (
+          {drafts.length > 0 && (
             <div className="mb-4 flex flex-col gap-4">
-              {sets.map((set, index) => (
-                <div key={set.id} className="flex items-center gap-3">
-                  {/* Set number box */}
-                  <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background p-2 gap-2">
+              {drafts.map((draft, index) => (
+                <div key={draft.id} className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
                     <span className="font-label-mono text-label-mono text-secondary">SET:</span>
-                    <span className="font-body-md text-body-md text-on-surface">
-                      {String(index + 1).padStart(2, '0')}
-                    </span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={draft.raw.count}
+                      onChange={(e) => onFieldChange(index, 'count', e.target.value)}
+                      placeholder="0"
+                      className="w-full bg-transparent [-moz-appearance:textfield] appearance-none font-body-md text-body-md text-on-surface outline-none [-webkit-appearance:none]"
+                      data-id={`set-count-${exercise.exerciseId}-${draft.id}`}
+                      aria-label={`Set count for ${exercise.exerciseName}`}
+                      {...invalidProps('count')}
+                    />
                   </div>
 
-                  {/* Weight input */}
                   <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
                     <span className="font-label-mono text-label-mono text-secondary">LB:</span>
                     <input
                       type="number"
-                      value={set.weight || ''}
-                      onChange={(e) => onSetChange(index, 'weight', e.target.value)}
+                      inputMode="decimal"
+                      value={draft.raw.weight}
+                      onChange={(e) => onFieldChange(index, 'weight', e.target.value)}
                       placeholder="0"
                       className="w-full bg-transparent [-moz-appearance:textfield] appearance-none font-body-md text-body-md text-on-surface outline-none [-webkit-appearance:none]"
+                      data-id={`set-weight-${exercise.exerciseId}-${draft.id}`}
+                      aria-label={`Weight in pounds for ${exercise.exerciseName}`}
+                      {...invalidProps('weight')}
                     />
                   </div>
 
-                  {/* Reps input */}
                   <div className="flex flex-1 flex-row items-center border-4 border-on-surface bg-background neo-shadow focus-within:[box-shadow:none] p-2 gap-2">
                     <span className="font-label-mono text-label-mono text-secondary">REPS:</span>
                     <input
                       type="number"
-                      value={set.reps || ''}
-                      onChange={(e) => onSetChange(index, 'reps', e.target.value)}
+                      inputMode="decimal"
+                      value={draft.raw.reps}
+                      onChange={(e) => onFieldChange(index, 'reps', e.target.value)}
                       placeholder="0"
                       className="w-full bg-transparent [-moz-appearance:textfield] appearance-none font-body-md text-body-md text-on-surface outline-none [-webkit-appearance:none]"
+                      data-id={`set-reps-${exercise.exerciseId}-${draft.id}`}
+                      aria-label={`Reps for ${exercise.exerciseName}`}
+                      {...invalidProps('reps')}
                     />
                   </div>
 
-                  {/* Delete button */}
                   <button
                     type="button"
                     onClick={() => onRemoveSet(index)}
                     className="flex size-8 shrink-0 items-center justify-center border-b-4 border-on-surface bg-error p-1 text-on-primary neo-shadow transition-all active-press"
+                    data-id={`remove-set-${exercise.exerciseId}-${draft.id}`}
+                    aria-label={`Remove set ${index + 1} for ${exercise.exerciseName}`}
                   >
                     <span className="material-symbols-outlined text-[14px]">delete</span>
                   </button>
@@ -171,6 +203,7 @@ function ExerciseCard({
             type="button"
             onClick={onAddSet}
             className="mb-4 w-full border-4 border-on-surface bg-primary p-3 font-label-bold text-label-bold uppercase text-on-primary neo-shadow transition-all active-press"
+            data-id={`add-set-${exercise.exerciseId}`}
           >
             ADD A SET
           </button>
@@ -182,9 +215,15 @@ function ExerciseCard({
         <p className="font-label-mono text-label-mono text-secondary">SAVING...</p>
       )}
 
-      {/* Per-card error display */}
       {error && (
-        <p className="mt-2 font-label-bold text-label-bold text-error">{error}</p>
+        <p
+          className="mt-2 font-label-bold text-label-bold text-error"
+          role="alert"
+          id={errorId}
+          data-id={errorId}
+        >
+          {error}
+        </p>
       )}
     </div>
   )
@@ -408,19 +447,31 @@ export default function TodayPage() {
               const sets = getSets(exercise.exerciseId)
               const saving = savingExercises.has(exercise.exerciseId)
               const error = errors.get(exercise.exerciseId) ?? null
+              const drafts: SetDraft[] = sets.map((set) => ({
+                id: set.id,
+                weight: set.weight,
+                reps: set.reps,
+                count: set.count ?? null,
+                raw: {
+                  weight: String(set.weight),
+                  reps: String(set.reps),
+                  count: set.count === undefined ? '' : String(set.count),
+                },
+              }))
 
               return (
                 <ExerciseCard
                   key={exercise.exerciseId}
                   exercise={exercise}
                   viewMode={viewMode}
-                  sets={sets}
+                  drafts={drafts}
                   saving={saving}
                   error={error}
+                  invalidFields={[]}
                   onToggleView={() => handleToggleView(exercise.exerciseId)}
                   onAddSet={() => handleAddSet(exercise.exerciseId)}
                   onRemoveSet={(index) => handleRemoveSet(exercise.exerciseId, index)}
-                  onSetChange={(index, field, value) =>
+                  onFieldChange={(index, field, value) =>
                     handleSetChange(exercise.exerciseId, index, field, value)
                   }
                 />
