@@ -47,6 +47,10 @@ const mockGetUserVolume = {
   execute: vi.fn(),
 }
 
+const mockDeleteWorkout = {
+  execute: vi.fn(),
+}
+
 const mockLog = {
   id: { value: 1 },
   userId: 1,
@@ -87,6 +91,10 @@ vi.mock('@/features/workout/get-workout-history', () => ({
 
 vi.mock('@/features/workout/get-user-volume', () => ({
   getUserVolumeUseCase: vi.fn(() => mockGetUserVolume),
+}))
+
+vi.mock('@/features/workout/delete-workout', () => ({
+  deleteWorkoutUseCase: vi.fn(() => mockDeleteWorkout),
 }))
 
 vi.mock('@/shared/utils/date', async importOriginal => {
@@ -770,5 +778,99 @@ describe('getTodayWorkoutsAction — which calendar day it asks for', () => {
 
     expect(mockWorkoutRepo.findByDate).toHaveBeenCalledWith(42, LOCAL_SENTINEL)
   })
+})
+
+// deleteWorkoutAction is the branch's only untested write path, and a destructive one: it is the
+// code that removes a user's workout_logs row. What is pinned here is the action's own
+// encapsulation — the (userId, logId) -> execute(logId, userId) argument reversal across two
+// same-typed numbers, the success/failure envelope the Today page reads, and that the delete
+// reaches the database only through the ownership-checked use case. The ownership rule itself and
+// the two messages it rejects with are pinned by tests/unit/features/workout/delete-workout.spec.ts
+// and are deliberately not re-asserted here.
+describe('deleteWorkoutAction', () => {
+  // Distinct on purpose: userId and logId are both `number`, so equal sentinels would let a
+  // swapped or duplicated call pass. 7 and 203 collide with nothing in this file.
+  const CALLER_ID = 7
+  const LOG_ID = 203
+
+  beforeEach(() => {
+    mockDeleteWorkout.execute.mockReset()
+    mockWorkoutRepo.findById.mockReset()
+    mockWorkoutRepo.delete.mockReset()
+  })
+
+  it('returns exactly { success: true } and no error key when the delete is accepted', async () => {
+    const { deleteWorkoutAction } = await import('@/features/workout/workout-server-actions')
+
+    const result = await deleteWorkoutAction(CALLER_ID, LOG_ID)
+
+    expect(result).toStrictEqual({ success: true })
+    expect(mockDeleteWorkout.execute).toHaveBeenCalledTimes(1)
+  })
+
+  it('hands the use case (logId, userId) — reversed against the action signature, in that order', async () => {
+    const { deleteWorkoutAction } = await import('@/features/workout/workout-server-actions')
+
+    await deleteWorkoutAction(CALLER_ID, LOG_ID)
+
+    expect(mockDeleteWorkout.execute).toHaveBeenCalledWith(LOG_ID, CALLER_ID)
+  })
+
+  it('builds the use case on the workout repository made from the database singleton', async () => {
+    const { deleteWorkoutAction } = await import('@/features/workout/workout-server-actions')
+
+    await deleteWorkoutAction(CALLER_ID, LOG_ID)
+
+    const { createSqliteWorkoutRepository } = await import('@/features/workout/workout-repo-impl')
+    const { deleteWorkoutUseCase } = await import('@/features/workout/delete-workout')
+
+    expect(createSqliteWorkoutRepository).toHaveBeenCalledWith(mockDb)
+    expect(deleteWorkoutUseCase).toHaveBeenCalledWith(mockWorkoutRepo)
+  })
+
+  it('never touches the row through the repository itself — the delete goes only via the use case', async () => {
+    const { deleteWorkoutAction } = await import('@/features/workout/workout-server-actions')
+
+    await deleteWorkoutAction(CALLER_ID, LOG_ID)
+
+    expect(mockWorkoutRepo.delete).not.toHaveBeenCalled()
+    expect(mockWorkoutRepo.findById).not.toHaveBeenCalled()
+  })
+
+  // The two messages are the ones deleteWorkoutUseCase actually throws; pinning them verbatim is
+  // what proves the page receives a refusal as a message rather than as a silent success.
+  it.each([
+    { name: 'a log that does not exist', message: 'Workout log not found' },
+    { name: 'a log owned by another user', message: 'Only the owner can delete this workout log' },
+  ])(
+    'reports $name as a failed envelope carrying the use case message verbatim',
+    async ({ message }) => {
+      mockDeleteWorkout.execute.mockImplementation(() => {
+        throw new Error(message)
+      })
+
+      const { deleteWorkoutAction } = await import('@/features/workout/workout-server-actions')
+      const result = await deleteWorkoutAction(CALLER_ID, LOG_ID)
+
+      expect(result).toStrictEqual({ success: false, error: message })
+    },
+  )
+
+  it.each([
+    { name: 'a string', thrown: 'string error' },
+    { name: 'undefined', thrown: undefined },
+  ])(
+    'reports a throw of $name as Unknown error rather than reading a property off it',
+    async ({ thrown }) => {
+      mockDeleteWorkout.execute.mockImplementation(() => {
+        throw thrown
+      })
+
+      const { deleteWorkoutAction } = await import('@/features/workout/workout-server-actions')
+      const result = await deleteWorkoutAction(CALLER_ID, LOG_ID)
+
+      expect(result).toStrictEqual({ success: false, error: 'Unknown error' })
+    },
+  )
 })
 
