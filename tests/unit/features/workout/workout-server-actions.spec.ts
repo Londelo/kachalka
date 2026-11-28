@@ -100,6 +100,7 @@ vi.mock('@/shared/utils/date', async importOriginal => {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockDateModule.getTodayLocalDate.mockReturnValue('2025-01-01')
   mockLogWorkout.execute.mockReset()
   mockGetTodayExercises.execute.mockReset()
   mockGetWorkoutHistory.execute.mockReset()
