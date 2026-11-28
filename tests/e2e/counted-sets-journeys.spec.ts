@@ -627,3 +627,167 @@ test('a refused line names itself on its card, leaves the saved line intact, and
   await expect(day.locator('[data-id="history-total-reps"]')).toHaveText('20')
   await expect(day.locator('[data-id="history-total-volume"]')).toHaveText('3,050')
 })
+
+// ── the named line ────────────────────────────────────────────────────────────
+//
+// A card renders ONE error string for the whole exercise — `errors` is a
+// Map<number, string> keyed by exerciseId and the string is painted at card level
+// (src/app/today/page.tsx:595) — so on a card holding several lines the sentence
+// alone can say what is wrong without saying where. Every journey above drives one
+// refused line and reads that sentence, and none of them can tell "the line is
+// named" from "no line is named": with a single line on the card, any true sentence
+// names it by default. Five lines with the zero on the third is the shape that
+// separates the two, and the message has to answer for the position the lifter
+// counts with their own eyes — which is the DOM order of the rows, not an index
+// some frame above the throw holds.
+//
+// The zero is a WEIGHT, and that is a fact about the page rather than a preference.
+// A typed count of `0` parses to the number 0 (src/app/today/set-field.ts:20) and is
+// then rewritten to 1 by `collapseSetDrafts` before the save is ever armed — every
+// collapsible row is handed through `toCollapsedDraft`, which paints
+// `getSetCount(line)` back over both `count` and `raw.count` — so a count zero never
+// reaches `validateSet` from this screen at all. A weight of `0` is parsed to 0,
+// sails through `describeIncompleteDraftFields` because the field is not null, and is
+// carried to the wire untouched, which is what makes the domain's throw the only
+// refusal the lifter ever sees on this card.
+//
+// The lines are typed top to bottom and no pair repeats, both on purpose: the
+// collapse moves an incomplete row to the back of the list, so a row filled out of
+// order would end the burst somewhere other than where it started, and a repeated
+// pair would fold a line away and move the zero to a position nobody counted.
+
+const FIVE_LINES: RowValues[] = [
+  { count: '2', weight: '135', reps: '5' },
+  { count: '1', weight: '185', reps: '3' },
+  { count: '3', weight: '0', reps: '8' },
+  { count: '1', weight: '95', reps: '10' },
+  { count: '4', weight: '225', reps: '6' },
+]
+
+const REFUSED_LINE = 3
+const REFUSED_LINE_INDEX = REFUSED_LINE - 1
+const REFUSED_LINE_FIX = '205'
+
+// Rows are addressed by the draft id the shell keys them with, never by position:
+// the row being typed into is the one the collapse moves, so `nth(index)` would be
+// aimed at whichever row happened to be sitting at that index this render.
+function rowDraftIdsInOrderOf(page: Page, exerciseId: number): Promise<string[]> {
+  return rowIdsOf(page, exerciseId).evaluateAll(
+    (elements, prefix) =>
+      elements.map((element) => (element.getAttribute('data-id') ?? '').slice(prefix.length)),
+    `set-count-${exerciseId}-`,
+  )
+}
+
+function fieldOfRow(
+  page: Page,
+  exerciseId: number,
+  field: 'count' | 'weight' | 'reps',
+  draftId: string,
+) {
+  const dataId = { count: 'set-count', weight: 'set-weight', reps: 'set-reps' }[field]
+  return page.locator(`[data-id="${dataId}-${exerciseId}-${draftId}"]`)
+}
+
+test('a zero on the third line of a five-line card is refused by name, and fixing that one line saves all five', async ({
+  page,
+}) => {
+  // Two whole debounce windows are in this journey — the save the zero is refused
+  // on, and the save the fix lands on — on top of fifteen fills and a walk to War
+  // Logs. The suite default is one window's floor, so this lifts this journey only.
+  test.setTimeout(60_000)
+
+  const exerciseId = seedExerciseScheduledToday('Incline Press')
+  const session = await signInAsBruno(page)
+
+  await expect(cardOf(page, exerciseId)).toBeVisible()
+  await awaitMountPrefill(session)
+  await awaitQuietCard(session, exerciseId, 1)
+
+  for (let line = 1; line < FIVE_LINES.length; line += 1) {
+    await addButtonOf(page, exerciseId).click()
+  }
+  await expect(rowIdsOf(page, exerciseId)).toHaveCount(FIVE_LINES.length)
+
+  // Read before the first keystroke, while all five rows are blank and therefore
+  // unmoved: this is the order the lifter sees and counts, and the ids are how every
+  // field below is addressed.
+  const draftIds = await rowDraftIdsInOrderOf(page, exerciseId)
+  expect(draftIds, 'the card holds five lines').toHaveLength(FIVE_LINES.length)
+
+  // SET, LB, REPS per line — the order the row lays them out, so the keystroke that
+  // makes a line collapsible is the last one and no collapse rewrite lands on a
+  // field mid-burst. One 5000ms window covers the whole fifteen-fill burst.
+  for (const [index, values] of FIVE_LINES.entries()) {
+    for (const field of ['count', 'weight', 'reps'] as const) {
+      await fieldOfRow(page, exerciseId, field, draftIds[index]).fill(values[field])
+    }
+  }
+
+  const error = errorOf(page, exerciseId)
+  await expect(error).toBeVisible()
+  await expect(error).toHaveText(
+    `Line ${REFUSED_LINE}: Weight must be more than 0 — enter the weight you lifted, or remove the line.`,
+  )
+
+  // The zero reached the domain over the wire rather than being filtered out on the
+  // way, and it was the third line of the array the domain walked — the number in
+  // the message is a position in this list, so the list is part of the claim.
+  const refusedSaves = savesFor(session, exerciseId)
+  expect(
+    refusedSaves.length,
+    'more than one save went out while the card was still being typed into, so a ' +
+      'save earlier than the refused one wrote lines to the day and the emptiness ' +
+      'below is not this refusal\'s doing',
+  ).toBe(1)
+  expect(
+    refusedSaves[0]?.sets,
+    'the zero has to reach the domain and be refused there, not be filtered out on the way',
+  ).toEqual([
+    { weight: 135, reps: 5, count: 2 },
+    { weight: 185, reps: 3, count: 1 },
+    { weight: 0, reps: 8, count: 3 },
+    { weight: 95, reps: 10, count: 1 },
+    { weight: 225, reps: 6, count: 4 },
+  ])
+
+  // The number the message names is the row the lifter counts, top to bottom: the
+  // third row on the card is the one still holding the zero, and the first is not.
+  const domOrder = await rowDraftIdsInOrderOf(page, exerciseId)
+  expect(
+    domOrder,
+    'the card no longer lays its five lines out in the order they were typed, so a ' +
+      'line number read off the saved array is not a position on the screen',
+  ).toEqual(draftIds)
+  await expect(fieldOfRow(page, exerciseId, 'weight', domOrder[REFUSED_LINE_INDEX])).toHaveValue(
+    '0',
+  )
+  await expect(fieldOfRow(page, exerciseId, 'weight', domOrder[0])).not.toHaveValue('0')
+
+  expect(rowsFor(exerciseId, TODAY), 'the refusal wrote nothing partial').toHaveLength(0)
+
+  // The recovery the message exists to make possible: one field, on the line it
+  // named, with the other four lines never touched again.
+  await fieldOfRow(page, exerciseId, 'weight', domOrder[REFUSED_LINE_INDEX]).fill(
+    REFUSED_LINE_FIX,
+  )
+
+  const row = await awaitStoredSets(session, exerciseId, [
+    { weight: 135, reps: 5, count: 2 },
+    { weight: 185, reps: 3, count: 1 },
+    { weight: 205, reps: 8, count: 3 },
+    { weight: 95, reps: 10, count: 1 },
+    { weight: 225, reps: 6, count: 4 },
+  ])
+  await expect(error).toHaveCount(0)
+
+  // And the four lines the lifter never retyped arrived anyway: War Logs reads the
+  // same eleven sets, seventy-one reps and 13,175 of volume the card is holding.
+  await walkTo(page, 'HISTORY', '/history')
+  const day = historyDay(page)
+  await expect(day.locator(`[data-id="history-exercise-sets-${row.id}"]`)).toHaveText('11')
+  await expect(day.locator(`[data-id="history-exercise-reps-${row.id}"]`)).toHaveText('71')
+  await expect(day.locator('[data-id="history-total-sets"]')).toHaveText('11')
+  await expect(day.locator('[data-id="history-total-reps"]')).toHaveText('71')
+  await expect(day.locator('[data-id="history-total-volume"]')).toHaveText('13,175')
+})
