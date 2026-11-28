@@ -442,6 +442,8 @@ test('one counted line of 5 reps at 135 lb is one modal row reading COUNT 3 and 
 
   const row = exerciseRow(page, 'Deadlift')
   await expect(rowFigure(row, 'sets')).toHaveText('3')
+  // A reader counting array elements instead of counts reports 5 here, not 15.
+  await expect(rowFigure(row, 'reps')).toHaveText('15')
 
   await row.click()
   const modal = page.locator('#history-set-detail-modal')
