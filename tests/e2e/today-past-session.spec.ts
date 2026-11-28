@@ -416,15 +416,22 @@ test('the past view figures are the same figures the current view pre-fills from
   await expect(card).toBeVisible()
 
   // Read the pre-fill first: toggling away clears this card's drafts.
+  // All three figures are read on this side too — a comparison of weight and
+  // reps alone is blind to the count, which is the whole subject of the feature.
   const weightInputs = card.getByLabel(`Weight in pounds for Bench Press`)
   const repsInputs = card.getByLabel(`Reps for Bench Press`)
+  const setInputs = card.getByLabel('Set count for Bench Press')
   await expect(weightInputs).toHaveCount(2)
   await expect(repsInputs).toHaveCount(2)
+  await expect(setInputs).toHaveCount(2)
 
   const currentWeight = await weightInputs.evaluateAll((inputs) =>
     inputs.map((input) => (input as HTMLInputElement).value),
   )
   const currentReps = await repsInputs.evaluateAll((inputs) =>
+    inputs.map((input) => (input as HTMLInputElement).value),
+  )
+  const currentSet = await setInputs.evaluateAll((inputs) =>
     inputs.map((input) => (input as HTMLInputElement).value),
   )
   const currentPairs = currentWeight.map((weight: string, index: number) => `${weight}x${currentReps[index]}`)
@@ -437,6 +444,17 @@ test('the past view figures are the same figures the current view pre-fills from
 
   expect(pastPairs).toEqual(currentPairs)
   expect(pastPairs).toEqual(['135x5', '225x3'])
+
+  // The count is the third figure and the one this feature exists to surface,
+  // so the agreement has to cover it: each side is pinned to its own literal
+  // first, then the two are compared. The shapes differ by design — the current
+  // input holds the raw digit the pre-fill wrote to draft.raw.count, the past
+  // cell is padStart(2, '0')-padded — so the figures are compared, never the
+  // strings, or a re-padding fails the case for a reason that is not a real
+  // disagreement between the views.
+  expect(currentSet).toEqual(['3', '2'])
+  expect(pastRows.map((row) => row.set)).toEqual(['03', '02'])
+  expect(pastRows.map((row) => Number(row.set))).toEqual(currentSet.map(Number))
 })
 
 // ── 8. toggling is idempotent ──────────────────────────────────────────────────
