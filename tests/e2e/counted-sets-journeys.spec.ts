@@ -671,20 +671,32 @@ test('a refused line names itself on its card, leaves the saved line intact, and
 // counts with their own eyes — which is the DOM order of the rows, not an index
 // some frame above the throw holds.
 //
-// The zero is a WEIGHT, and that is a fact about the page rather than a preference.
-// A typed count of `0` parses to the number 0 (src/app/today/set-field.ts:20) and is
-// then rewritten to 1 by `collapseSetDrafts` before the save is ever armed — every
-// collapsible row is handed through `toCollapsedDraft`, which paints
-// `getSetCount(line)` back over both `count` and `raw.count` — so a count zero never
-// reaches `validateSet` from this screen at all. A weight of `0` is parsed to 0,
-// sails through `describeIncompleteDraftFields` because the field is not null, and is
-// carried to the wire untouched, which is what makes the domain's throw the only
-// refusal the lifter ever sees on this card.
+// All three fields answer to the same judge: `validateSet` throws for a zero
+// weight, a zero rep count and a count below the minimum, each prefixed with
+// `Line N: ` (src/features/workout/workout-entity.ts:48-66), and N is the
+// position in the array the wire sent — `sets.forEach((set, index) =>
+// validateSet(set, index + 1))` (src/features/workout/log-workout.ts:16) — which
+// is the order the card lays its rows out in.
 //
-// The lines are typed top to bottom and no pair repeats, both on purpose: the
-// collapse moves an incomplete row to the back of the list, so a row filled out of
-// order would end the burst somewhere other than where it started, and a repeated
-// pair would fold a line away and move the zero to a position nobody counted.
+// The refused line here carries a zero WEIGHT. That is a choice, not a
+// consequence: the weight zero is the one refusal with no second door standing in
+// front of it, since `describeIncompleteDraftFields` only asks whether a field is
+// null, so a parsed 0 sails through it and the domain's throw is the only refusal
+// the lifter ever sees on this card. A count zero is refused by the same rule and
+// is driven by its own journey at the bottom of this file.
+//
+// A typed count of `0` does reach that throw. It parses to the number 0
+// (src/app/today/set-field.ts:20) and `isCollapsibleSetDraft`
+// (src/app/today/set-draft.ts:51-56) then answers false for its row, so the row is
+// never handed to the fold and never passes through `toCollapsedDraft`, which
+// would have painted `getSetCount`'s clamped 1 over the digit before the save was
+// ever armed. A row the rule cannot take also keeps its own position
+// (src/app/today/collapse-drafts.ts:66-71), so the number in the sentence is still
+// the row the lifter is looking at.
+//
+// The lines are typed top to bottom and no pair repeats. Nothing the fold does can
+// move a row any more, but a repeated pair folds two lines into one, and the line
+// the message numbers would then be no row on the screen at all.
 
 const FIVE_LINES: RowValues[] = [
   { count: '2', weight: '135', reps: '5' },
@@ -820,4 +832,114 @@ test('a zero on the third line of a five-line card is refused by name, and fixin
   await expect(day.locator('[data-id="history-total-sets"]')).toHaveText('11')
   await expect(day.locator('[data-id="history-total-reps"]')).toHaveText('71')
   await expect(day.locator('[data-id="history-total-volume"]')).toHaveText('13,175')
+})
+
+// ── the count box ───────────────────────────────────────────────────────────────
+//
+// The weight zero above and the rep zero further up are refused on screen; the
+// count box is the third field and the only one whose road to `validateSet` moved.
+// A `0` typed there used to be clamped to 1 by the fold before the save was armed,
+// so the sentence below was unreachable from this input box no matter what the
+// domain thought. No journey in this file typed one, so nothing in a browser
+// proved the digit survives the keystroke, the collapse and the wire and comes
+// back as the sentence on the card. The unit tier owns the rule itself; this owns
+// the road.
+
+const COUNT_TOO_SMALL =
+  'Set count must be at least 1 — enter how many sets you did, or leave it blank for one.'
+
+const COUNT_ZERO_LINES: RowValues[] = [
+  { count: '2', weight: '135', reps: '5' },
+  { count: '0', weight: '185', reps: '3' },
+  { count: '1', weight: '95', reps: '10' },
+]
+
+const COUNT_ZERO_LINE = 2
+const COUNT_ZERO_LINE_INDEX = COUNT_ZERO_LINE - 1
+const COUNT_ZERO_FIX = '1'
+
+test('a zero typed in the count box of the second line of a three-line card is refused by name, and fixing that one line saves all three', async ({
+  page,
+}) => {
+  // Two whole debounce windows are in this journey — the save the zero is refused
+  // on, and the save the fix lands on. The suite default is one window's floor.
+  test.setTimeout(60_000)
+
+  const exerciseId = seedExerciseScheduledToday('Barbell Row')
+  const session = await signInAsBruno(page)
+
+  await expect(cardOf(page, exerciseId)).toBeVisible()
+  await awaitMountPrefill(session)
+  await awaitQuietCard(session, exerciseId, 1)
+
+  for (let line = 1; line < COUNT_ZERO_LINES.length; line += 1) {
+    await addButtonOf(page, exerciseId).click()
+  }
+  await expect(rowIdsOf(page, exerciseId)).toHaveCount(COUNT_ZERO_LINES.length)
+
+  // Read before the first keystroke, while all three rows are blank: this is the
+  // order the lifter sees and counts, and the ids are how every field below is
+  // addressed.
+  const draftIds = await rowDraftIdsInOrderOf(page, exerciseId)
+  expect(draftIds, 'the card holds three lines').toHaveLength(COUNT_ZERO_LINES.length)
+
+  // SET, LB, REPS per line, so the keystroke that would make a row collapsible is
+  // the last one and no fold rewrite lands on a field mid-burst.
+  for (const [index, values] of COUNT_ZERO_LINES.entries()) {
+    for (const field of ['count', 'weight', 'reps'] as const) {
+      await fieldOfRow(page, exerciseId, field, draftIds[index]).fill(values[field])
+    }
+  }
+
+  const error = errorOf(page, exerciseId)
+  await expect(error).toBeVisible()
+  await expect(error).toHaveText(`Line ${COUNT_ZERO_LINE}: ${COUNT_TOO_SMALL}`)
+
+  // The digit the lifter typed is the digit the domain judged: a fold that had
+  // taken this row would have sent 1 and the sentence above would never have
+  // fired, so this array is the difference between a refusal and a silent rewrite.
+  const refusedSaves = savesFor(session, exerciseId)
+  expect(
+    refusedSaves.length,
+    'more than one save went out while the card was still being typed into, so a ' +
+      'save earlier than the refused one wrote lines to the day and the emptiness ' +
+      'below is not this refusal\'s doing',
+  ).toBe(1)
+  expect(
+    refusedSaves[0]?.sets,
+    'the typed zero has to reach the domain and be refused there, not be clamped to ' +
+      '1 by the fold on the way',
+  ).toEqual([
+    { weight: 135, reps: 5, count: 2 },
+    { weight: 185, reps: 3, count: 0 },
+    { weight: 95, reps: 10, count: 1 },
+  ])
+
+  // The number the message names is the row the lifter counts, top to bottom: the
+  // second row on the card still holds the zero, and the first does not.
+  const domOrder = await rowDraftIdsInOrderOf(page, exerciseId)
+  expect(
+    domOrder,
+    'the card no longer lays its three lines out in the order they were typed, so a ' +
+      'line number read off the saved array is not a position on the screen',
+  ).toEqual(draftIds)
+  await expect(
+    fieldOfRow(page, exerciseId, 'count', domOrder[COUNT_ZERO_LINE_INDEX]),
+  ).toHaveValue('0')
+  await expect(fieldOfRow(page, exerciseId, 'count', domOrder[0])).not.toHaveValue('0')
+
+  expect(rowsFor(exerciseId, TODAY), 'the refusal wrote nothing partial').toHaveLength(0)
+
+  // The recovery the message exists to make possible: one field, on the line it
+  // named, with the other two lines never touched again.
+  await fieldOfRow(page, exerciseId, 'count', domOrder[COUNT_ZERO_LINE_INDEX]).fill(
+    COUNT_ZERO_FIX,
+  )
+
+  await awaitStoredSets(session, exerciseId, [
+    { weight: 135, reps: 5, count: 2 },
+    { weight: 185, reps: 3, count: 1 },
+    { weight: 95, reps: 10, count: 1 },
+  ])
+  await expect(error).toHaveCount(0)
 })
